@@ -21,7 +21,7 @@
         "*://*.backlogtool.com/view/*"
       ],
       "js": ["content.js"],
-      "css": ["content.css"],
+      "css": ["content-styles.css", "sidebar-styles.css"],
       "run_at": "document_end"
     }
   ],
@@ -39,7 +39,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["chatbot.js", "chatbot.css"],
+      "resources": ["chatbot.js", "chatbot-styles.css", "sidebar-styles.css", "icons/icon.svg"],
       "matches": ["*://*.backlog.com/*", "*://*.backlog.jp/*", "*://*.backlogtool.com/*"]
     }
   ]

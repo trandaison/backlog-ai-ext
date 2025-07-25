@@ -359,6 +359,10 @@ const ChatbotApp: React.FC = () => {
   );
 };
 
+// Export component để có thể import
+export { ChatbotComponent };
+export default ChatbotApp;
+
 // Initialize chatbot when the script loads
 const initializeChatbot = () => {
   const container = document.getElementById('backlog-ai-chatbot-container');

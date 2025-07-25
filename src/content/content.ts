@@ -5,7 +5,9 @@ import { ChatbotManager } from '../shared/chatbotManager';
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
   private chatbotManager: ChatbotManager;
-  private chatbotContainer: HTMLElement | null = null;
+  private asideContainer: HTMLElement | null = null;
+  private toggleButton: HTMLButtonElement | null = null;
+  private isOpen: boolean = false;
 
   constructor() {
     this.ticketAnalyzer = new TicketAnalyzer();
@@ -16,12 +18,20 @@ class BacklogAIInjector {
   private init() {
     console.log('Backlog AI Extension loaded');
 
-    // Đợi DOM load xong
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.setupChatbot());
-    } else {
+    // Load sidebar CSS
+    this.loadSidebarCSS();
+
+    // Kiểm tra xem có phải là trang ticket không
+    if (this.isTicketPage()) {
       this.setupChatbot();
     }
+  }
+
+  private loadSidebarCSS() {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('sidebar-styles.css');
+    document.head.appendChild(link);
   }
 
   private setupChatbot() {
@@ -39,73 +49,121 @@ class BacklogAIInjector {
   }
 
   private injectChatbot() {
-    // Tạo container cho chatbot
-    this.chatbotContainer = document.createElement('div');
-    this.chatbotContainer.id = 'backlog-ai-chatbot-container';
-    this.chatbotContainer.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      width: 350px;
-      height: 500px;
-      z-index: 10000;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: none;
-    `;
+    // Tìm container chính của Backlog
+    const container = document.querySelector('#container');
+    if (!container) {
+      console.error('Backlog container not found');
+      return;
+    }
+
+    // Tạo aside container cho chatbot
+    this.asideContainer = document.createElement('aside');
+    this.asideContainer.id = 'ai-ext-root';
+
+    // Tạo nội dung bên trong aside
+    const asideContent = document.createElement('div');
+    asideContent.className = 'ai-ext-aside-content';
+
+    // Tạo header với nút đóng
+    const header = document.createElement('div');
+    header.className = 'ai-ext-header';
+
+    const title = document.createElement('h3');
+    title.className = 'ai-ext-title';
+    title.textContent = '🤖 AI Assistant';
+
+    const closeButton = document.createElement('button');
+    closeButton.className = 'ai-ext-close-button';
+    closeButton.innerHTML = '✕';
+    closeButton.addEventListener('click', () => this.closeChatbot());
+
+    header.appendChild(title);
+    header.appendChild(closeButton);
+
+    // Tạo nội dung chatbot
+    const chatbotContent = document.createElement('div');
+    chatbotContent.id = 'backlog-ai-chatbot-container';
+    chatbotContent.className = 'ai-ext-chatbot-content';
+
+    asideContent.appendChild(header);
+    asideContent.appendChild(chatbotContent);
+    this.asideContainer.appendChild(asideContent);
 
     // Tạo toggle button
-    const toggleButton = document.createElement('button');
-    toggleButton.id = 'backlog-ai-toggle';
-    toggleButton.innerHTML = '🤖 AI';
-    toggleButton.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      width: 50px;
-      height: 50px;
-      z-index: 10001;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
+    this.toggleButton = document.createElement('button');
+    this.toggleButton.id = 'backlog-ai-toggle';
 
-    toggleButton.addEventListener('click', () => {
-      this.toggleChatbot();
-    });
+    // Tạo img element cho icon
+    const iconImg = document.createElement('img');
+    iconImg.src = chrome.runtime.getURL('icons/icon.svg');
+    iconImg.alt = 'AI Assistant';
+
+    this.toggleButton.appendChild(iconImg);
+    this.toggleButton.addEventListener('click', () => this.toggleChatbot());
 
     // Thêm vào DOM
-    document.body.appendChild(this.chatbotContainer);
-    document.body.appendChild(toggleButton);
+    container.appendChild(this.asideContainer);
+    document.body.appendChild(this.toggleButton);
 
     // Load chatbot React component
     this.loadChatbotComponent();
   }
 
   private toggleChatbot() {
-    if (this.chatbotContainer) {
-      const isVisible = this.chatbotContainer.style.display !== 'none';
-      this.chatbotContainer.style.display = isVisible ? 'none' : 'block';
+    if (this.asideContainer) {
+      const isVisible = this.asideContainer.classList.contains('ai-ext-open');
+      if (isVisible) {
+        this.closeChatbot();
+      } else {
+        this.openChatbot();
+      }
     }
   }
 
-  private loadChatbotComponent() {
-    // Tạo script tag để load chatbot component
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('chatbot.js');
-    document.head.appendChild(script);
+  private openChatbot() {
+    if (this.asideContainer) {
+      this.asideContainer.classList.add('ai-ext-open');
+      document.body.classList.add('ai-ext-sidebar-open');
+      this.isOpen = true;
+    }
+  }
 
-    // Load CSS
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = chrome.runtime.getURL('chatbot.css');
-    document.head.appendChild(link);
+  private closeChatbot() {
+    if (this.asideContainer) {
+      this.asideContainer.classList.remove('ai-ext-open');
+      document.body.classList.remove('ai-ext-sidebar-open');
+      this.isOpen = false;
+    }
+  }
+
+  private async loadChatbotComponent() {
+    const chatbotContainer = document.getElementById('backlog-ai-chatbot-container');
+    if (!chatbotContainer) {
+      console.error('Chatbot container not found');
+      return;
+    }
+
+    try {
+      // Import và render React component
+      const { default: React } = await import('react');
+      const { createRoot } = await import('react-dom/client');
+      const { default: ChatbotApp } = await import('../chatbot/chatbot');
+
+      // Extract ticket data
+      const ticketData = this.ticketAnalyzer.extractTicketData();
+
+      const root = createRoot(chatbotContainer);
+      root.render(React.createElement(ChatbotApp));
+
+    } catch (error) {
+      console.error('Failed to load chatbot component:', error);
+      chatbotContainer.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #666;">
+          <p>⚠️ Không thể tải AI Chatbot</p>
+          <p style="font-size: 12px;">Vui lòng reload trang để thử lại</p>
+        </div>
+      `;
+    }
   }
 
   private analyzeTicket() {

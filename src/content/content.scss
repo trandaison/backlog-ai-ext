@@ -1,0 +1,171 @@
+/* Content script styles for Backlog AI Extension */
+
+// Variables
+$toggle-size: 50px;
+$primary-color: #007acc;
+$shadow-color: rgba(0, 0, 0, 0.2);
+$z-index-toggle: 999999;
+$z-index-chatbot: 999998;
+
+// Mixins
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin reset-styles {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+@mixin button-base {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+// Reset and base styles for injected elements
+#backlog-ai-chatbot-container * {
+  @include reset-styles;
+}
+
+// Toggle button styles are now in sidebar.scss
+// Removed duplicate styles to avoid conflicts
+
+// Chatbot container styles
+#backlog-ai-chatbot-container {
+  position: fixed !important;
+  top: 80px !important;
+  right: 20px !important;
+  width: 350px !important;
+  height: 500px !important;
+  z-index: $z-index-chatbot !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  display: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  overflow: hidden !important;
+
+  &.visible {
+    display: block !important;
+  }
+
+  // Ensure all child elements inherit font
+  * {
+    font-family: inherit !important;
+  }
+
+  // Reset button styles within chatbot
+  button {
+    @include button-base;
+
+    &:focus {
+      outline: 2px solid $primary-color;
+      outline-offset: 2px;
+    }
+  }
+
+  // Input styles
+  input,
+  textarea {
+    font-family: inherit !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+
+    &:focus {
+      outline: none !important;
+      border-color: $primary-color !important;
+      box-shadow: 0 0 0 2px rgba($primary-color, 0.2) !important;
+    }
+  }
+
+  // Headings
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0 !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+  }
+
+  // Scrollbar styles
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+// Animation classes
+.ai-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.ai-fade-out {
+  animation: fadeOut 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  #backlog-ai-chatbot-container {
+    width: calc(100vw - 40px) !important;
+    height: calc(100vh - 140px) !important;
+    right: 20px !important;
+    left: 20px !important;
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  #backlog-ai-chatbot-container {
+    border: 2px solid #000 !important;
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  #backlog-ai-chatbot-container,
+  .ai-fade-in,
+  .ai-fade-out {
+    transition: none !important;
+    animation: none !important;
+  }
+}

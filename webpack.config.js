@@ -1,5 +1,6 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 module.exports = {
   mode: 'development',
@@ -8,7 +9,11 @@ module.exports = {
     content: './src/content/content.ts',
     background: './src/background/background.ts',
     popup: './src/popup/popup.tsx',
-    chatbot: './src/chatbot/chatbot.tsx'
+    chatbot: './src/chatbot/chatbot.tsx',
+    // SCSS entries
+    'content-styles': './src/content/content.scss',
+    'sidebar-styles': './src/content/sidebar.scss',
+    'chatbot-styles': './src/chatbot/chatbot.scss'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -30,25 +35,24 @@ module.exports = {
         use: ['style-loader', 'css-loader']
       },
       {
+        test: /\.scss$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader']
+      },
+      {
         test: /\.(png|jpg|jpeg|gif|svg)$/,
         type: 'asset/resource'
       }
     ]
   },
   plugins: [
+    new MiniCssExtractPlugin({
+      filename: '[name].css'
+    }),
     new CopyPlugin({
       patterns: [
         {
           from: 'src/popup/popup.html',
           to: 'popup.html'
-        },
-        {
-          from: 'src/content/content.css',
-          to: 'content.css'
-        },
-        {
-          from: 'src/chatbot/chatbot.css',
-          to: 'chatbot.css'
         },
         {
           from: 'src/assets/icons',
