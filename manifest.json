@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Backlog AI Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered assistant for Backlog ticket analysis and chat",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.backlog.com/*",
+    "*://*.backlog.jp/*",
+    "*://*.backlogtool.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.backlog.com/view/*",
+        "*://*.backlog.jp/view/*",
+        "*://*.backlogtool.com/view/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Backlog AI Assistant"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["chatbot.js", "chatbot.css"],
+      "matches": ["*://*.backlog.com/*", "*://*.backlog.jp/*", "*://*.backlogtool.com/*"]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
+# Backlog AI Extension - Copilot Instructions
+
+This is a Chrome extension project that integrates AI assistance into Backlog ticket pages. The extension provides intelligent ticket analysis and chat functionality to help users understand and work with tickets more effectively.
+
+## Project Overview
+
+- **Technology Stack**: TypeScript, React, Chrome Extension APIs, Webpack
+- **AI Integration**: OpenAI GPT models for ticket analysis and conversational assistance
+- **Target Platform**: Backlog.com, Backlog.jp, Backlogtool.com
+
+## Architecture
+
+### Core Components:
+1. **Content Script** (`src/content/content.ts`): Injects chatbot into Backlog pages
+2. **Background Script** (`src/background/background.ts`): Handles AI API calls and message routing
+3. **Popup** (`src/popup/popup.tsx`): Extension settings and configuration
+4. **Chatbot** (`src/chatbot/chatbot.tsx`): React-based chat interface
+5. **Shared Utilities** (`src/shared/`): Ticket analysis and chat management
+
+### Key Features:
+- Automatic ticket data extraction from Backlog pages
+- AI-powered ticket analysis and recommendations
+- Interactive chatbot for discussing tickets
+- Secure API key storage
+- Multi-language support (Vietnamese, English, Japanese)
+
+## Development Guidelines
+
+### Code Style:
+- Use TypeScript with strict mode
+- Follow React functional component patterns with hooks
+- Implement proper error handling and user feedback
+- Use Chrome extension APIs according to Manifest V3 specifications
+
+### Security:
+- Store API keys securely using Chrome storage APIs
+- Validate all user inputs
+- Handle API rate limiting gracefully
+- Follow content security policy guidelines
+
+### Performance:
+- Minimize bundle size using code splitting
+- Implement lazy loading for React components
+- Cache ticket data appropriately
+- Optimize DOM manipulation in content scripts
+
+### Testing:
+- Test on multiple Backlog domains and page types
+- Verify extension permissions and security
+- Test AI API integration with various scenarios
+- Ensure responsive design for different screen sizes
+
+## File Structure Guidelines:
+- Keep components small and focused
+- Separate business logic from UI components
+- Use TypeScript interfaces for all data structures
+- Implement proper error boundaries in React components
+
+## Chrome Extension Specific:
+- Follow Manifest V3 best practices
+- Use service workers for background processing
+- Implement proper message passing between scripts
+- Handle extension lifecycle events correctly

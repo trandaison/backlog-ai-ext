@@ -1,0 +1,39 @@
+{
+  "name": "backlog-ai-ext",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --mode=production",
+    "dev": "webpack --mode=development --watch",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chrome-extension",
+    "backlog",
+    "ai",
+    "chatbot",
+    "typescript",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "AI-powered assistant for Backlog ticket analysis and chat",
+  "devDependencies": {
+    "@types/chrome": "^0.1.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "copy-webpack-plugin": "^13.0.0",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.100.2",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}

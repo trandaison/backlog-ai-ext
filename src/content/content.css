@@ -1,0 +1,157 @@
+/* Content script styles for Backlog AI Extension */
+
+/* Reset and base styles for injected elements */
+#backlog-ai-chatbot-container *,
+#backlog-ai-toggle * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Toggle button styles */
+#backlog-ai-toggle {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 50px !important;
+  height: 50px !important;
+  z-index: 999999 !important;
+  background: #007acc !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s ease !important;
+}
+
+#backlog-ai-toggle:hover {
+  background: #005a9f !important;
+  transform: scale(1.05) !important;
+}
+
+#backlog-ai-toggle:active {
+  transform: scale(0.95) !important;
+}
+
+/* Chatbot container styles */
+#backlog-ai-chatbot-container {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 350px !important;
+  height: 500px !important;
+  z-index: 999998 !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  display: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  overflow: hidden !important;
+}
+
+/* Ensure chatbot is visible when shown */
+#backlog-ai-chatbot-container[style*="display: block"] {
+  display: block !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #backlog-ai-chatbot-container {
+    position: fixed !important;
+    top: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    height: 60vh !important;
+  }
+
+  #backlog-ai-toggle {
+    bottom: 20px !important;
+    top: auto !important;
+    right: 20px !important;
+  }
+}
+
+/* Animation for showing/hiding */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.chatbot-slide-in {
+  animation: slideIn 0.3s ease-out !important;
+}
+
+.chatbot-slide-out {
+  animation: slideOut 0.3s ease-out !important;
+}
+
+/* Override any conflicting styles from Backlog */
+#backlog-ai-chatbot-container,
+#backlog-ai-toggle {
+  all: initial !important;
+}
+
+/* Re-apply essential styles after reset */
+#backlog-ai-chatbot-container {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 350px !important;
+  height: 500px !important;
+  z-index: 999998 !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+
+#backlog-ai-toggle {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 50px !important;
+  height: 50px !important;
+  z-index: 999999 !important;
+  background: #007acc !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s ease !important;
+  font-weight: 600 !important;
+}
