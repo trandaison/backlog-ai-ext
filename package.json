@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm run clean && webpack --mode=production",
-    "build:dev": "npm run clean && webpack --mode=development",
+    "build:dev": "npm run clean:dev && webpack --config webpack.build-dev.js",
     "dev": "webpack --config webpack.dev.js",
     "dev:watch": "webpack --config webpack.dev.js --watch",
     "clean": "rm -rf dist dev-build",

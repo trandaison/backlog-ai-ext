@@ -63,3 +63,14 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
 - Use service workers for background processing
 - Implement proper message passing between scripts
 - Handle extension lifecycle events correctly
+
+## Development Commands:
+**IMPORTANT**: Always use the development helper script instead of direct npm commands:
+
+- **Build project**: Use `./dev.sh build` instead of `npm run build:dev`
+- **Start development**: Use `./dev.sh start` for watch mode
+- **Clean build**: Use `./dev.sh clean` to clean dev-build directory
+- **Check status**: Use `./dev.sh status` to check if watch mode is running
+- **Get help**: Use `./dev.sh help` for Chrome extension loading instructions
+
+The `dev.sh` script provides a standardized development workflow and should be used for all build operations.

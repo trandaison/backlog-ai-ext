@@ -166,19 +166,36 @@ class BacklogAIInjector {
     }
   }
 
-  private analyzeTicket() {
+  private async analyzeTicket() {
     try {
-      const ticketData = this.ticketAnalyzer.extractTicketData();
-      console.log('Ticket data extracted:', ticketData);
+      // Load Backlog settings first
+      const backlogSettings = await this.getBacklogSettings();
+      if (backlogSettings.configs && backlogSettings.configs.length > 0) {
+        this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
+      }
 
-      // Gửi dữ liệu ticket đến background script để xử lý AI
-      chrome.runtime.sendMessage({
-        action: 'analyzeTicket',
-        data: ticketData
-      });
+      const ticketData = await this.ticketAnalyzer.extractTicketData();
+
+      if (ticketData.id) {
+        // Send ticket data to background for analysis
+        chrome.runtime.sendMessage({
+          action: 'analyzeTicket',
+          data: ticketData
+        });
+      }
     } catch (error) {
       console.error('Error analyzing ticket:', error);
     }
+  }
+
+  private async getBacklogSettings(): Promise<{ configs: any[] }> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        action: 'getBacklogSettings'
+      }, (response) => {
+        resolve(response || { configs: [] });
+      });
+    });
   }
 }
 

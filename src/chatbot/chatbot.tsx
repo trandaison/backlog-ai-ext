@@ -13,6 +13,341 @@ interface ChatbotProps {
   messages: ChatMessage[];
 }
 
+interface BacklogSettings {
+  backlogApiKey: string;
+  backlogSpaceKey: string;
+}
+
+interface BacklogApiConfig {
+  id: string;
+  domain: string;
+  spaceKey: string;
+  apiKey: string;
+}
+
+interface BacklogMultiSettings {
+  configs: BacklogApiConfig[];
+}
+
+const SettingsModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  settings: BacklogMultiSettings;
+  onSave: (settings: BacklogMultiSettings) => void;
+}> = ({ isOpen, onClose, settings, onSave }) => {
+  const [localSettings, setLocalSettings] = useState<BacklogMultiSettings>(settings);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleAddConfig = () => {
+    const newConfig: BacklogApiConfig = {
+      id: Date.now().toString(),
+      domain: '',
+      spaceKey: '',
+      apiKey: ''
+    };
+    setLocalSettings(prev => ({
+      configs: [...prev.configs, newConfig]
+    }));
+  };
+
+  const handleUpdateConfig = (id: string, field: keyof BacklogApiConfig, value: string) => {
+    setLocalSettings(prev => ({
+      configs: prev.configs.map(config =>
+        config.id === id ? { ...config, [field]: value } : config
+      )
+    }));
+  };
+
+  const handleRemoveConfig = (id: string) => {
+    setLocalSettings(prev => ({
+      configs: prev.configs.filter(config => config.id !== id)
+    }));
+  };
+
+  const validateConfig = (config: BacklogApiConfig) => {
+    return config.domain && config.spaceKey && config.apiKey;
+  };
+
+  const handleSave = async () => {
+    // Validate all configs
+    const invalidConfigs = localSettings.configs.filter(config =>
+      config.domain || config.spaceKey || config.apiKey // Has some data
+    ).filter(config => !validateConfig(config));
+
+    if (invalidConfigs.length > 0) {
+      setMessage('❌ Vui lòng điền đầy đủ thông tin cho tất cả configs');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await onSave(localSettings);
+      setMessage('✅ Đã lưu cài đặt thành công');
+      setTimeout(() => {
+        setMessage('');
+        onClose();
+      }, 1500);
+    } catch (error) {
+      setMessage('❌ Lỗi khi lưu cài đặt');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        padding: '20px',
+        width: '400px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>⚙️ Cài đặt Backlog API</h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: '#666'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '16px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '12px'
+          }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Backlog API Configurations:
+            </label>
+            <button
+              onClick={handleAddConfig}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              + Thêm
+            </button>
+          </div>
+
+          {localSettings.configs.length === 0 ? (
+            <div style={{
+              padding: '20px',
+              textAlign: 'center',
+              color: '#666',
+              border: '2px dashed #ddd',
+              borderRadius: '4px'
+            }}>
+              Chưa có cấu hình nào. Click "Thêm" để thêm Backlog API.
+            </div>
+          ) : (
+            localSettings.configs.map((config, index) => (
+              <div key={config.id} style={{
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                padding: '12px',
+                marginBottom: '8px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: '500', color: '#666' }}>
+                    Config #{index + 1}
+                  </span>
+                  <button
+                    onClick={() => handleRemoveConfig(config.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#dc3545',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: '500'
+                  }}>
+                    Domain:
+                  </label>
+                  <select
+                    value={config.domain}
+                    onChange={(e) => handleUpdateConfig(config.id, 'domain', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <option value="">Chọn domain...</option>
+                    <option value="backlog.com">.backlog.com</option>
+                    <option value="backlog.jp">.backlog.jp</option>
+                    <option value="backlogtool.com">.backlogtool.com</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: '500'
+                  }}>
+                    Space Key:
+                  </label>
+                  <input
+                    type="text"
+                    value={config.spaceKey}
+                    onChange={(e) => handleUpdateConfig(config.id, 'spaceKey', e.target.value)}
+                    placeholder="your-space-key"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: '500'
+                  }}>
+                    API Key:
+                  </label>
+                  <input
+                    type="password"
+                    value={config.apiKey}
+                    onChange={(e) => handleUpdateConfig(config.id, 'apiKey', e.target.value)}
+                    placeholder="Nhập Backlog API key..."
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+
+          <small style={{ color: '#666', fontSize: '11px', display: 'block', marginTop: '8px' }}>
+            💡 Lấy API key từ: Backlog → Personal Settings → API
+          </small>
+        </div>
+
+        {message && (
+          <div style={{
+            padding: '8px 12px',
+            backgroundColor: message.includes('✅') ? '#d4edda' : '#f8d7da',
+            color: message.includes('✅') ? '#155724' : '#721c24',
+            borderRadius: '4px',
+            fontSize: '12px',
+            marginBottom: '16px'
+          }}>
+            {message}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          justifyContent: 'flex-end'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Hủy
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isLoading}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#007acc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              opacity: isLoading ? 0.6 : 1
+            }}
+          >
+            {isLoading ? 'Đang lưu...' : 'Lưu'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ChatMessage: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isUser = message.sender === 'user';
 
@@ -102,12 +437,48 @@ const TypingIndicator: React.FC = () => {
 const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [backlogSettings, setBacklogSettings] = useState<BacklogMultiSettings>({
+    configs: []
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    loadBacklogSettings();
+  }, []);
+
+  const loadBacklogSettings = async () => {
+    try {
+      const result = await chrome.storage.sync.get(['backlogConfigs']);
+      const configs = result.backlogConfigs || [];
+      setBacklogSettings({ configs });
+    } catch (error) {
+      console.error('Error loading Backlog settings:', error);
+    }
+  };
+
+  const saveBacklogSettings = async (settings: BacklogMultiSettings) => {
+    try {
+      await chrome.storage.sync.set({
+        backlogConfigs: settings.configs
+      });
+      setBacklogSettings(settings);
+
+      // Notify background script about updated settings
+      chrome.runtime.sendMessage({
+        action: 'updateBacklogSettings',
+        data: settings
+      });
+    } catch (error) {
+      console.error('Error saving Backlog settings:', error);
+      throw error;
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -171,24 +542,48 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
               AI Assistant
             </span>
           </div>
-          <button
-            onClick={() => {
-              const container = document.getElementById('backlog-ai-chatbot-container');
-              if (container) {
-                container.style.display = 'none';
-              }
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '16px',
-              cursor: 'pointer',
-              padding: '0',
-              color: '#666'
-            }}
-          >
-            ✕
-          </button>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <button
+              onClick={() => setShowSettings(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#666',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Cài đặt Backlog API"
+            >
+              ⚙️
+            </button>
+            <button
+              onClick={() => {
+                const container = document.getElementById('backlog-ai-chatbot-container');
+                if (container) {
+                  container.style.display = 'none';
+                }
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '0',
+                color: '#666'
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
       </div>
 
@@ -290,6 +685,14 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
           </button>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={backlogSettings}
+        onSave={saveBacklogSettings}
+      />
 
       <style>
         {`

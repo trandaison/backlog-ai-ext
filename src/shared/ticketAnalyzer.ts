@@ -1,4 +1,6 @@
-// Utility để phân tích và extract thông tin ticket từ trang Backlog
+// Utility để phân tích và extract thông tin ticket từ Backlog API
+import { BacklogApiService, BacklogTicketData, BacklogComment } from './backlogApi';
+
 export interface TicketData {
   id: string;
   title: string;
@@ -10,6 +12,15 @@ export interface TicketData {
   dueDate: string;
   labels: string[];
   comments: CommentData[];
+  // Extended fields from Backlog API
+  issueType?: string;
+  created?: string;
+  updated?: string;
+  estimatedHours?: number | null;
+  actualHours?: number | null;
+  parentIssueId?: number | null;
+  customFields?: any[];
+  attachments?: any[];
 }
 
 export interface CommentData {
@@ -19,7 +30,57 @@ export interface CommentData {
 }
 
 export class TicketAnalyzer {
-  extractTicketData(): TicketData {
+  private backlogApi: BacklogApiService;
+
+  constructor() {
+    this.backlogApi = new BacklogApiService();
+  }
+
+  /**
+   * Extract ticket data - tries API first, falls back to DOM if needed
+   */
+  async extractTicketData(): Promise<TicketData> {
+    try {
+      // Try to get data from Backlog API first
+      const apiData = await this.extractFromApi();
+      if (apiData) {
+        return apiData;
+      }
+    } catch (error) {
+      console.warn('Failed to extract from Backlog API, falling back to DOM:', error);
+    }
+
+    // Fallback to DOM extraction if API fails
+    return this.extractFromDom();
+  }
+
+  /**
+   * Extract ticket data using Backlog API
+   */
+  private async extractFromApi(): Promise<TicketData | null> {
+    const issueKey = BacklogApiService.extractIssueKeyFromUrl();
+    if (!issueKey) {
+      throw new Error('Could not extract issue key from URL');
+    }
+
+    try {
+      // Get issue data and comments in parallel
+      const [issueData, comments] = await Promise.all([
+        this.backlogApi.getIssue(issueKey),
+        this.backlogApi.getIssueComments(issueKey)
+      ]);
+
+      return this.backlogApi.convertToTicketData(issueData, comments);
+    } catch (error) {
+      console.error('Error extracting from Backlog API:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fallback DOM extraction method (existing implementation)
+   */
+  private extractFromDom(): TicketData {
     const ticketData: TicketData = {
       id: this.extractTicketId(),
       title: this.extractTitle(),
@@ -34,6 +95,19 @@ export class TicketAnalyzer {
     };
 
     return ticketData;
+  }
+
+  /**
+   * Update Backlog API settings
+   */
+  public updateBacklogSettings(settings: { configs: any[] } | { apiKey: string; spaceKey: string }) {
+    if ('configs' in settings) {
+      // New multi-config format
+      this.backlogApi.updateSettings(settings);
+    } else {
+      // Legacy format
+      this.backlogApi.updateSettingsLegacy(settings);
+    }
   }
 
   private extractTicketId(): string {

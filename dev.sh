@@ -31,12 +31,12 @@ function start_dev() {
     echo -e "${YELLOW}Files will auto-rebuild when you make changes${NC}"
     echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
     echo ""
-    npm run dev
+    npm run dev:watch
 }
 
 function build_once() {
     echo -e "${GREEN}Building for development...${NC}"
-    npm run clean:dev && npm run dev
+    npm run clean:dev && npm run build:dev
 }
 
 function clean_dev() {
@@ -68,9 +68,9 @@ function show_help() {
 }
 
 function check_status() {
-    if pgrep -f "webpack.*webpack.dev.js" > /dev/null; then
+    if pgrep -f "webpack.*webpack.dev.js.*watch" > /dev/null; then
         echo -e "${GREEN}✓ Development watch mode is running${NC}"
-        echo -e "${YELLOW}PID: $(pgrep -f 'webpack.*webpack.dev.js')${NC}"
+        echo -e "${YELLOW}PID: $(pgrep -f 'webpack.*webpack.dev.js.*watch')${NC}"
     else
         echo -e "${RED}✗ Development watch mode is not running${NC}"
         echo -e "${YELLOW}Run './dev.sh start' to begin development${NC}"
