@@ -7,7 +7,7 @@
 // Before
 bottom: 25% !important;
 
-// After  
+// After
 top: 165px !important;
 ```
 

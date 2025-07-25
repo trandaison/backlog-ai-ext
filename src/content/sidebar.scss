@@ -2,7 +2,7 @@
 
 // Variables
 $sidebar-width: 400px;
-$animation-duration: 0.3s;
+$animation-duration: 0.15s;
 $animation-easing: ease-in-out;
 $primary-color: #4CBA95;
 $border-color: #c4c4c4;
@@ -202,7 +202,7 @@ body.ai-ext-sidebar-open {
 @media (prefers-reduced-motion: reduce) {
   #backlog-ai-toggle {
     transition: none !important;
-    
+
     &:hover,
     &:active {
       transform: none !important;

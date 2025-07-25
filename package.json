@@ -5,8 +5,10 @@
   "scripts": {
     "build": "npm run clean && webpack --mode=production",
     "build:dev": "npm run clean && webpack --mode=development",
-    "dev": "webpack --mode=development --watch",
-    "clean": "rm -rf dist",
+    "dev": "webpack --config webpack.dev.js",
+    "dev:watch": "webpack --config webpack.dev.js --watch",
+    "clean": "rm -rf dist dev-build",
+    "clean:dev": "rm -rf dev-build",
     "lint": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

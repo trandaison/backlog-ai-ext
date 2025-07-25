@@ -78,7 +78,7 @@ height: 40px !important;
 @media (prefers-reduced-motion: reduce) {
   #backlog-ai-toggle {
     transition: none !important;
-    
+
     &:hover,
     &:active {
       transform: none !important;
@@ -113,7 +113,7 @@ height: 40px !important;
 // Chatbot container styles
 // Global resets
 
-/* sidebar.scss */  
+/* sidebar.scss */
 // Sidebar layout
 // Toggle button (complete)
 // Body state classes
@@ -193,7 +193,7 @@ height: 40px !important;
 ```scss
 // Prefix-based organization
 .ai-ext-toggle { }      // Toggle button
-.ai-ext-sidebar { }     // Sidebar styles  
+.ai-ext-sidebar { }     // Sidebar styles
 .ai-ext-chatbot { }     // Chatbot styles
 ```
 
@@ -208,7 +208,7 @@ height: 40px !important;
 // Toggle button
 // Layout states
 
-/* chatbot.scss - Component layer */  
+/* chatbot.scss - Component layer */
 // React component styles
 // Interactive elements
 ```
