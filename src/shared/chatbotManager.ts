@@ -26,6 +26,8 @@ export class ChatbotManager {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === 'aiResponse') {
         this.handleAIResponse(message.data);
+      } else if (message.action === 'ticketSummaryResponse') {
+        this.handleTicketSummaryResponse(message.data);
       }
     });
 
@@ -89,11 +91,46 @@ export class ChatbotManager {
     this.notifyChatbotComponent('messageAdded', userMessage);
   }
 
+  requestTicketSummary() {
+    if (!this.currentSession) {
+      throw new Error('No active chat session');
+    }
+
+    // Notify UI that AI is typing
+    this.notifyChatbotComponent('aiTyping');
+
+    // Send request to background script for ticket summary
+    chrome.runtime.sendMessage({
+      action: 'requestTicketSummary',
+      data: {
+        sessionId: this.currentSession.id,
+        ticketId: this.currentSession.ticketId
+      }
+    });
+  }
+
   private handleAIResponse(data: any) {
     if (!this.currentSession) return;
 
+    // Stop typing indicator
+    this.notifyChatbotComponent('aiStopped');
+
     const aiMessage = this.addMessage(data.response, 'ai');
     this.notifyChatbotComponent('messageAdded', aiMessage);
+  }
+
+  private handleTicketSummaryResponse(data: any) {
+    if (!this.currentSession) return;
+
+    // Stop typing indicator
+    this.notifyChatbotComponent('aiStopped');
+
+    // Add system message to indicate this is a ticket summary
+    const summaryMessage = this.addMessage(
+      `📋 **Tóm tắt ticket:**\n\n${data.response}`,
+      'ai'
+    );
+    this.notifyChatbotComponent('messageAdded', summaryMessage);
   }
 
   private handleChatbotMessage(data: any) {
@@ -106,6 +143,9 @@ export class ChatbotManager {
         break;
       case 'clearChat':
         this.clearChatSession();
+        break;
+      case 'requestTicketSummary':
+        this.requestTicketSummary();
         break;
     }
   }

@@ -11,17 +11,18 @@ interface ChatMessage {
 interface ChatbotProps {
   onSendMessage: (message: string) => void;
   messages: ChatMessage[];
+  isTyping?: boolean;
 }
 
 interface BacklogSettings {
   backlogApiKey: string;
-  backlogSpaceKey: string;
+  backlogSpaceName: string;
 }
 
 interface BacklogApiConfig {
   id: string;
   domain: string;
-  spaceKey: string;
+  spaceName: string;
   apiKey: string;
 }
 
@@ -45,7 +46,7 @@ const SettingsModal: React.FC<{
     const newConfig: BacklogApiConfig = {
       id: Date.now().toString(),
       domain: '',
-      spaceKey: '',
+      spaceName: '',
       apiKey: ''
     };
     setLocalSettings(prev => ({
@@ -68,13 +69,13 @@ const SettingsModal: React.FC<{
   };
 
   const validateConfig = (config: BacklogApiConfig) => {
-    return config.domain && config.spaceKey && config.apiKey;
+    return config.domain && config.spaceName && config.apiKey;
   };
 
   const handleSave = async () => {
     // Validate all configs
     const invalidConfigs = localSettings.configs.filter(config =>
-      config.domain || config.spaceKey || config.apiKey // Has some data
+      config.domain || config.spaceName || config.apiKey // Has some data
     ).filter(config => !validateConfig(config));
 
     if (invalidConfigs.length > 0) {
@@ -243,13 +244,13 @@ const SettingsModal: React.FC<{
                     fontSize: '12px',
                     fontWeight: '500'
                   }}>
-                    Space Key:
+                    Space Name:
                   </label>
                   <input
                     type="text"
-                    value={config.spaceKey}
-                    onChange={(e) => handleUpdateConfig(config.id, 'spaceKey', e.target.value)}
-                    placeholder="your-space-key"
+                    value={config.spaceName}
+                    onChange={(e) => handleUpdateConfig(config.id, 'spaceName', e.target.value)}
+                    placeholder="your-space-name"
                     style={{
                       width: '100%',
                       padding: '6px 8px',
@@ -434,7 +435,7 @@ const TypingIndicator: React.FC = () => {
   );
 };
 
-const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) => {
+const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isTyping: propIsTyping = false }) => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -444,9 +445,12 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Use prop isTyping if provided, otherwise use local state
+  const actualIsTyping = propIsTyping || isTyping;
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages, actualIsTyping]);
 
   useEffect(() => {
     loadBacklogSettings();
@@ -489,10 +493,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
 
     onSendMessage(inputValue.trim());
     setInputValue('');
-    setIsTyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => setIsTyping(false), 2000);
+    // Don't set typing here since it's handled by parent component
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -509,6 +510,18 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
     "Rủi ro tiềm ẩn",
     "Best practices"
   ];
+
+  const handleTicketSummary = async () => {
+    try {
+      // Send message to content script to get ticket data and request summary
+      window.postMessage({
+        source: 'backlog-ai-chatbot',
+        action: 'requestTicketSummary'
+      }, '*');
+    } catch (error) {
+      console.error('Error requesting ticket summary:', error);
+    }
+  };
 
   return (
     <div style={{
@@ -634,7 +647,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
           <ChatMessage key={message.id} message={message} />
         ))}
 
-        {isTyping && <TypingIndicator />}
+        {actualIsTyping && <TypingIndicator />}
 
         <div ref={messagesEndRef} />
       </div>
@@ -645,6 +658,36 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
         borderTop: '1px solid #e0e0e0',
         backgroundColor: 'white'
       }}>
+        {/* Quick Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={handleTicketSummary}
+            disabled={actualIsTyping}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '16px',
+              fontSize: '12px',
+              cursor: actualIsTyping ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              opacity: actualIsTyping ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>📋</span>
+            Summary nội dung ticket
+          </button>
+        </div>
+
         <div style={{
           display: 'flex',
           gap: '8px',
@@ -715,6 +758,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages }) =
 // Main chatbot app that handles message communication
 const ChatbotApp: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     // Lắng nghe messages từ content script
@@ -723,12 +767,19 @@ const ChatbotApp: React.FC = () => {
         switch (event.data.action) {
           case 'messageAdded':
             setMessages(prev => [...prev, event.data.data]);
+            setIsTyping(false); // Stop typing when AI responds
             break;
           case 'chatHistory':
             setMessages(event.data.data);
             break;
           case 'chatCleared':
             setMessages([]);
+            break;
+          case 'aiTyping':
+            setIsTyping(true);
+            break;
+          case 'aiStopped':
+            setIsTyping(false);
             break;
         }
       }
@@ -752,12 +803,15 @@ const ChatbotApp: React.FC = () => {
       action: 'sendMessage',
       message
     }, '*');
+
+    setIsTyping(true); // Start typing when user sends message
   };
 
   return (
     <ChatbotComponent
       onSendMessage={handleSendMessage}
       messages={messages}
+      isTyping={isTyping}
     />
   );
 };

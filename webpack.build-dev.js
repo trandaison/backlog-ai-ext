@@ -1,6 +1,7 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -28,7 +29,14 @@ module.exports = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            compilerOptions: {
+              removeComments: false,
+            },
+          },
+        },
         exclude: /node_modules/
       },
       {
@@ -70,6 +78,17 @@ module.exports = {
     })
   ],
   optimization: {
+    minimize: false,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          compress: {
+            drop_console: false,
+            drop_debugger: false,
+          },
+        },
+      }),
+    ],
     splitChunks: {
       chunks: 'all',
       cacheGroups: {

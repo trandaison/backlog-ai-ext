@@ -18,13 +18,13 @@ interface StoredSettings {
 
 interface BacklogSettings {
   backlogApiKey: string;
-  backlogSpaceKey: string;
+  backlogSpaceName: string;
 }
 
 interface BacklogApiConfig {
   id: string;
   domain: string;
-  spaceKey: string;
+  spaceName: string;
   apiKey: string;
 }
 
@@ -167,20 +167,21 @@ ${roleContext}
 
 Hãy phân tích ticket Backlog sau:
 
-**ID**: ${ticketData.id}
-**Tiêu đề**: ${ticketData.title}
-**Mô tả**: ${ticketData.description}
-**Trạng thái**: ${ticketData.status}
-**Độ ưu tiên**: ${ticketData.priority}
-**Người được gán**: ${ticketData.assignee}
-**Người báo cáo**: ${ticketData.reporter}
-**Hạn**: ${ticketData.dueDate}
-**Labels**: ${ticketData.labels.join(', ')}
+**ID**: ${ticketData.id || 'Unknown'}
+**Tiêu đề**: ${ticketData.title || 'No title'}
+**Mô tả**: ${ticketData.description || 'No description'}
+**Trạng thái**: ${ticketData.status || 'Unknown'}
+**Độ ưu tiên**: ${ticketData.priority || 'Unknown'}
+**Người được gán**: ${ticketData.assignee || 'Unassigned'}
+**Người báo cáo**: ${ticketData.reporter || 'Unknown'}
+**Hạn**: ${ticketData.dueDate || 'No due date'}
+**Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
 
 **Comments**:
-${ticketData.comments.map(comment =>
-  `- ${comment.author} (${comment.timestamp}): ${comment.content}`
-).join('\n')}
+${ticketData.comments.map(comment => {
+  const content = comment.content || '';
+  return `- ${comment.author} (${comment.timestamp}): ${content}`;
+}).join('\n')}
 
 Hãy đưa ra:
 1. Tóm tắt nội dung ticket
@@ -299,6 +300,10 @@ class BackgroundService {
           await this.handleUserMessage(message.data, sendResponse);
           break;
 
+        case 'requestTicketSummary':
+          await this.handleTicketSummary(message.data, sendResponse);
+          break;
+
         case 'saveApiKey':
           await this.saveSettings(message.data);
           sendResponse({ success: true });
@@ -377,6 +382,288 @@ class BackgroundService {
     sendResponse({ success: true, response });
   }
 
+  private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {
+    try {
+      let ticketData = data.ticketData;
+
+      // If ticket data is not provided, try to extract from active tab
+      if (!ticketData) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tabs[0]?.id || !tabs[0]?.url) {
+          throw new Error('No active tab found');
+        }
+        ticketData = await this.extractTicketDataFromActiveTab(tabs[0].id);
+      }
+
+      if (!ticketData) {
+        throw new Error('Could not extract ticket data');
+      }
+
+      // Cache the ticket data
+      this.ticketDataCache.set(ticketData.id, ticketData);
+
+      // Get user settings for personalized summary
+      const settings = await this.getSettings();
+
+      // Create specialized summary prompt
+      const summaryPrompt = this.buildTicketSummaryPrompt(ticketData, settings);
+      const summary = await this.callOpenAISummary(summaryPrompt, settings);
+
+      sendResponse({ success: true, summary });
+    } catch (error) {
+      console.error('Error handling ticket summary:', error);
+      sendResponse({ success: false, error: String(error) });
+    }
+  }
+
+  private async extractTicketDataFromActiveTab(tabId: number): Promise<TicketData | null> {
+    try {
+      // Get space info and issue key from URL first
+      const spaceInfo = await this.extractSpaceInfoFromTab(tabId);
+      if (!spaceInfo) {
+        throw new Error('Could not extract space information from URL');
+      }
+
+      const issueKey = await this.extractIssueKeyFromTab(tabId);
+      if (!issueKey) {
+        throw new Error('Could not extract issue key from URL');
+      }
+
+      // Try to get ticket data via Backlog API first
+      const apiData = await this.getTicketDataViaAPI(spaceInfo, issueKey);
+      if (apiData) {
+        return apiData;
+      }
+
+      // Fallback to DOM extraction
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          // This function runs in the context of the web page
+          if ((window as any).extractTicketData) {
+            return (window as any).extractTicketData();
+          } else {
+            // Fallback: basic DOM extraction
+            const titleElement = document.querySelector('h1.loom-issue-title, .ticket-title, [data-test="issue-title"]');
+            const descriptionElement = document.querySelector('.loom-issue-description, .ticket-description, [data-test="issue-description"]');
+
+            return {
+              id: window.location.pathname.split('/').pop() || 'unknown',
+              title: titleElement?.textContent?.trim() || 'No title found',
+              description: descriptionElement?.textContent?.trim() || 'No description found',
+              status: 'Unknown',
+              priority: 'Unknown',
+              assignee: 'Unknown',
+              reporter: 'Unknown',
+              dueDate: 'Unknown',
+              labels: [],
+              comments: []
+            };
+          }
+        }
+      });
+
+      return results[0]?.result || null;
+    } catch (error) {
+      console.error('Error extracting ticket data:', error);
+      return null;
+    }
+  }
+
+  private async extractSpaceInfoFromTab(tabId: number): Promise<{ spaceName: string; domain: string } | null> {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const url = window.location.href;
+          const match = url.match(/https:\/\/([^.]+)\.(backlog\.com|backlog\.jp|backlogtool\.com)/);
+
+          if (match) {
+            return {
+              spaceName: match[1],
+              domain: match[2]
+            };
+          }
+
+          return null;
+        }
+      });
+
+      return results[0]?.result || null;
+    } catch (error) {
+      console.error('Error extracting space info:', error);
+      return null;
+    }
+  }
+
+  private async extractIssueKeyFromTab(tabId: number): Promise<string | null> {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const url = window.location.href;
+          const match = url.match(/\/view\/([A-Z]+-\d+)/);
+          return match ? match[1] : null;
+        }
+      });
+
+      return results[0]?.result || null;
+    } catch (error) {
+      console.error('Error extracting issue key:', error);
+      return null;
+    }
+  }
+
+  private async getTicketDataViaAPI(spaceInfo: { spaceName: string; domain: string }, issueKey: string): Promise<TicketData | null> {
+    try {
+      // Get Backlog API configuration
+      const backlogSettings = await this.getBacklogMultiSettings();
+      const config = this.findMatchingBacklogConfig(backlogSettings.configs, spaceInfo);
+
+      if (!config) {
+        console.log('No matching Backlog API config found, using DOM extraction');
+        return null;
+      }
+
+      // Call Backlog API through background script (no CORS issues)
+      const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
+      const apiUrl = `${baseUrl}/issues/${issueKey}?apiKey=${encodeURIComponent(config.apiKey)}`;
+
+      console.log('Calling Backlog API:', apiUrl.replace(config.apiKey, '***'));
+
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      }
+
+      const issueData = await response.json();
+
+      // Get comments separately
+      const commentsUrl = `${baseUrl}/issues/${issueKey}/comments?apiKey=${encodeURIComponent(config.apiKey)}`;
+      const commentsResponse = await fetch(commentsUrl);
+      const comments = commentsResponse.ok ? await commentsResponse.json() : [];
+
+      // Convert to our TicketData format
+      return this.convertBacklogDataToTicketData(issueData, comments);
+
+    } catch (error) {
+      console.error('Error getting ticket data via API:', error);
+      return null;
+    }
+  }
+
+  private findMatchingBacklogConfig(configs: any[], spaceInfo: { spaceName: string; domain: string }): any | null {
+    return configs.find(config =>
+      config.domain === spaceInfo.domain &&
+      config.spaceName === spaceInfo.spaceName
+    ) || null;
+  }
+
+  private convertBacklogDataToTicketData(issueData: any, comments: any[]): TicketData {
+    return {
+      id: issueData.issueKey || issueData.id,
+      title: issueData.summary || 'No title',
+      description: issueData.description || 'No description',
+      status: issueData.status?.name || 'Unknown',
+      priority: issueData.priority?.name || 'Unknown',
+      assignee: issueData.assignee?.name || 'Unassigned',
+      reporter: issueData.createdUser?.name || 'Unknown',
+      dueDate: issueData.dueDate || 'No due date',
+      labels: (issueData.category || []).map((cat: any) => cat.name),
+      comments: comments.map(comment => ({
+        author: comment.createdUser?.name || 'Unknown',
+        content: comment.content || '',
+        timestamp: comment.created || ''
+      })),
+      // Extended fields
+      issueType: issueData.issueType?.name,
+      created: issueData.created,
+      updated: issueData.updated,
+      estimatedHours: issueData.estimatedHours,
+      actualHours: issueData.actualHours,
+      parentIssueId: issueData.parentIssueId,
+      customFields: issueData.customFields || [],
+      attachments: issueData.attachments || []
+    };
+  }
+
+  private buildTicketSummaryPrompt(ticketData: TicketData, settings?: Settings): string {
+    const roleContext = settings?.userRole ? this.getRoleContext(settings.userRole) : '';
+    const languagePrompt = settings?.language ? this.getLanguagePrompt(settings.language) : this.getLanguagePrompt('vi');
+
+    return `${languagePrompt}
+
+${roleContext}
+
+Hãy tạo một summary ngắn gọn và súc tích cho ticket Backlog sau:
+
+**ID**: ${ticketData.id || 'Unknown'}
+**Tiêu đề**: ${ticketData.title || 'No title'}
+**Mô tả**: ${ticketData.description || 'No description'}
+**Trạng thái**: ${ticketData.status || 'Unknown'}
+**Độ ưu tiên**: ${ticketData.priority || 'Unknown'}
+**Người được gán**: ${ticketData.assignee || 'Unassigned'}
+**Người báo cáo**: ${ticketData.reporter || 'Unknown'}
+**Hạn**: ${ticketData.dueDate || 'No due date'}
+**Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
+
+${ticketData.comments && ticketData.comments.length > 0 ? `**Comments gần đây**:
+${ticketData.comments.slice(-3).map(comment => {
+  const content = comment.content || '';
+  const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+  return `- ${comment.author}: ${truncatedContent}`;
+}).join('\n')}` : ''}
+
+Hãy tóm tắt trong 3-5 câu ngắn gọn:
+1. Vấn đề chính của ticket
+2. Trạng thái hiện tại
+3. Những điểm quan trọng cần lưu ý
+4. Next steps nếu có thể xác định được`;
+  }
+
+  private async callOpenAISummary(prompt: string, settings?: Settings): Promise<string> {
+    try {
+      const apiKey = settings?.apiKey;
+      if (!apiKey) {
+        return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
+      }
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: settings?.aiModel || 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'Bạn là một AI assistant giúp summarize ticket một cách chính xác và hữu ích.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.3
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.choices && data.choices[0]) {
+        return data.choices[0].message.content;
+      } else {
+        throw new Error('Invalid API response');
+      }
+    } catch (error) {
+      console.error('Error calling OpenAI API for summary:', error);
+      return `Lỗi khi gọi AI API: ${error}`;
+    }
+  }
+
   private async getSettings(): Promise<Settings> {
     try {
       const result = await chrome.storage.sync.get([
@@ -432,16 +719,16 @@ class BackgroundService {
 
   private async getBacklogSettings(): Promise<BacklogSettings> {
     try {
-      const result = await chrome.storage.sync.get(['backlogApiKey', 'backlogSpaceKey']);
+      const result = await chrome.storage.sync.get(['backlogApiKey', 'backlogSpaceName']);
       return {
         backlogApiKey: result.backlogApiKey || '',
-        backlogSpaceKey: result.backlogSpaceKey || ''
+        backlogSpaceName: result.backlogSpaceName || ''
       };
     } catch (error) {
       console.error('Error getting Backlog settings:', error);
       return {
         backlogApiKey: '',
-        backlogSpaceKey: ''
+        backlogSpaceName: ''
       };
     }
   }
@@ -464,7 +751,7 @@ class BackgroundService {
     try {
       await chrome.storage.sync.set({
         backlogApiKey: settings.backlogApiKey,
-        backlogSpaceKey: settings.backlogSpaceKey
+        backlogSpaceName: settings.backlogSpaceName
       });
     } catch (error) {
       console.error('Error saving Backlog settings:', error);
@@ -485,7 +772,7 @@ class BackgroundService {
 
   private async testBacklogConnection(config: BacklogApiConfig): Promise<{success: boolean, message: string, data?: any}> {
     try {
-      const baseUrl = `https://${config.spaceKey}.${config.domain}`;
+      const baseUrl = `https://${config.spaceName}.${config.domain}`;
       const apiUrl = `${baseUrl}/api/v2/space?apiKey=${encodeURIComponent(config.apiKey)}`;
 
       const response = await fetch(apiUrl, {
@@ -499,7 +786,7 @@ class BackgroundService {
         const spaceInfo = await response.json();
         return {
           success: true,
-          message: `Kết nối thành công! Space: ${spaceInfo.name || config.spaceKey}`,
+          message: `Kết nối thành công! Space: ${spaceInfo.name || config.spaceName}`,
           data: spaceInfo
         };
       } else if (response.status === 401 || response.status === 403) {
@@ -525,6 +812,64 @@ class BackgroundService {
         message: 'Lỗi kết nối. Kiểm tra internet và thông tin cấu hình.'
       };
     }
+  }
+
+  private getRoleContext(userRole: string): string {
+    const roleContexts = {
+      developer: `
+Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
+- Technical implementation details
+- Code architecture và design patterns
+- Performance và optimization
+- Security considerations
+- Development best practices`,
+      pm: `
+Bạn đang tương tác với một Project Manager. Hãy focus vào:
+- Project timeline và milestones
+- Resource planning và allocation
+- Risk assessment và mitigation
+- Stakeholder communication
+- Delivery estimation`,
+      qa: `
+Bạn đang tương tác với một QA/Testing specialist. Hãy focus vào:
+- Test cases và test scenarios
+- Quality assurance processes
+- Bug reproduction steps
+- Testing strategies
+- Quality metrics`,
+      designer: `
+Bạn đang tương tác với một Designer. Hãy focus vào:
+- User experience và user interface
+- Design consistency và guidelines
+- Accessibility considerations
+- Visual design elements
+- User journey optimization`,
+      devops: `
+Bạn đang tương tác với một DevOps engineer. Hãy focus vào:
+- Infrastructure và deployment
+- CI/CD pipeline optimization
+- Monitoring và alerting
+- System reliability
+- Performance tuning`,
+      other: `
+Bạn đang tương tác với một team member. Hãy cung cấp:
+- General overview và context
+- Clear explanations
+- Actionable insights
+- Collaborative recommendations`
+    };
+
+    return roleContexts[userRole as keyof typeof roleContexts] || roleContexts.other;
+  }
+
+  private getLanguagePrompt(language: string): string {
+    const languagePrompts = {
+      vi: `Hãy respond bằng tiếng Việt. Giữ technical terms bằng tiếng Anh khi cần thiết.`,
+      en: `Please respond in English with clear and professional language.`,
+      ja: `日本語で回答してください。技術用語は適切に使用してください。`
+    };
+
+    return languagePrompts[language as keyof typeof languagePrompts] || languagePrompts.vi;
   }
 }
 

@@ -27,6 +27,8 @@ interface StoredSettings {
 }
 
 const PopupApp: React.FC = () => {
+  console.log('PopupApp component rendering...');
+
   const [settings, setSettings] = useState<Settings>({
     apiKey: '',
     userRole: 'developer',
@@ -268,7 +270,7 @@ const PopupApp: React.FC = () => {
       // Use background script to test connection (avoid CORS issues)
       const testConfig = {
         ...config,
-        spaceKey: config.spaceName // background script expects spaceKey
+        spaceName: config.spaceName // background script expects spaceName
       };
 
       const response = await chrome.runtime.sendMessage({
@@ -908,8 +910,16 @@ const PopupApp: React.FC = () => {
 };
 
 // Render the popup
+console.log('Popup script loaded');
 const container = document.getElementById('popup-root');
+console.log('Container element:', container);
+
 if (container) {
+  console.log('Creating React root...');
   const root = createRoot(container);
+  console.log('Rendering PopupApp...');
   root.render(<PopupApp />);
+  console.log('PopupApp rendered successfully');
+} else {
+  console.error('popup-root element not found!');
 }

@@ -207,7 +207,7 @@ npm run lint
 - Settings integration với encrypted API key handling
 - Personalized system prompts dựa trên user role và language
 - API call optimization với proper error handling
-- **NEW**: Backlog API settings management (backlogApiKey, backlogSpaceKey)
+- **NEW**: Backlog API settings management (backlogApiKey, backlogSpaceName)
 
 ### ✅ Story 2.1: Ticket Information Extraction
 **NEW Implementation - Using Backlog API:**

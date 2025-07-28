@@ -72,6 +72,9 @@ module.exports = {
       ]
     })
   ],
+  optimization: {
+    minimize: false
+  },
   stats: {
     colors: true,
     modules: false,

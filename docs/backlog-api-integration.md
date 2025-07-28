@@ -18,9 +18,9 @@ Extension đã được upgrade để sử dụng **Backlog REST API** thay vì 
 2. Generate new API key nếu chưa có
 3. Copy API key (format: random string, không có prefix)
 
-**Space Key:**
-- Từ URL: `https://your-space-key.backlog.com`
-- Space key = `your-space-key`
+**Space Name:**
+- Từ URL: `https://your-space-name.backlog.com`
+- Space name = `your-space-name`
 
 ### 2. Extension Configuration
 
@@ -28,7 +28,7 @@ Extension đã được upgrade để sử dụng **Backlog REST API** thay vì 
 1. Mở any ticket page trong Backlog
 2. Click vào chatbot icon (💬)
 3. Click settings icon (⚙️) trong chatbot header
-4. Nhập **Backlog API Key** và **Space Key**
+4. Nhập **Backlog API Key** và **Space Name**
 5. Click **Lưu**
 
 **Storage:**
@@ -76,11 +76,11 @@ export class TicketAnalyzer {
 ```typescript
 // Base URL construction
 if (currentUrl.includes('.backlog.jp')) {
-  this.baseUrl = `https://${spaceKey}.backlog.jp/api/v2`;
+  this.baseUrl = `https://${spaceName}.backlog.jp/api/v2`;
 } else if (currentUrl.includes('.backlogtool.com')) {
-  this.baseUrl = `https://${spaceKey}.backlogtool.com/api/v2`;
+  this.baseUrl = `https://${spaceName}.backlogtool.com/api/v2`;
 } else {
-  this.baseUrl = `https://${spaceKey}.backlog.com/api/v2`;
+  this.baseUrl = `https://${spaceName}.backlog.com/api/v2`;
 }
 ```
 
@@ -132,7 +132,7 @@ interface TicketData {
 **API-First với DOM Fallback:**
 
 1. **Try API First**: Attempt to extract via Backlog API
-2. **Check Settings**: Verify API key và space key configured
+2. **Check Settings**: Verify API key và space name configured
 3. **Parse URL**: Extract issue key từ current URL
 4. **Make API Calls**: Parallel calls cho issue data và comments
 5. **Handle Errors**: Log API errors, fallback to DOM

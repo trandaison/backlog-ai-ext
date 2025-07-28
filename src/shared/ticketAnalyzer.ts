@@ -100,12 +100,15 @@ export class TicketAnalyzer {
   /**
    * Update Backlog API settings
    */
-  public updateBacklogSettings(settings: { configs: any[] } | { apiKey: string; spaceKey: string }) {
+  public updateBacklogSettings(settings: { configs: any[] } | { apiKey: string; spaceName: string }) {
+    console.log('🔧 ~ TicketAnalyzer ~ updateBacklogSettings ~ input settings:', settings);
     if ('configs' in settings) {
       // New multi-config format
+      console.log('🔧 ~ Using multi-config format, configs count:', settings.configs.length);
       this.backlogApi.updateSettings(settings);
     } else {
       // Legacy format
+      console.log('🔧 ~ Using legacy format');
       this.backlogApi.updateSettingsLegacy(settings);
     }
   }
