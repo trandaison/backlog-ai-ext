@@ -186,7 +186,7 @@
                 'error': '❌',
                 'warning': '⚠️'
             }[type] || 'ℹ️';
-            
+
             logElement.textContent += `[${testCounter}] ${timestamp} ${icon} ${message}\n`;
             logElement.scrollTop = logElement.scrollHeight;
         }
@@ -201,17 +201,17 @@
         function setApiKey() {
             const input = document.getElementById('gemini-api-key');
             apiKey = input.value.trim();
-            
+
             if (!apiKey) {
                 showStatus('key-status', 'Please enter a Gemini API key', 'error');
                 return;
             }
-            
+
             if (!apiKey.match(/^AI[a-zA-Z0-9_-]+$/)) {
                 showStatus('key-status', 'Invalid Gemini API key format (must start with AI)', 'error');
                 return;
             }
-            
+
             showStatus('key-status', '✅ API key set successfully', 'success');
             logTest(`API key set: ${apiKey.substring(0, 10)}...`, 'success');
         }
@@ -239,7 +239,7 @@
 
             try {
                 logTest(`Testing model: ${modelName}`, 'info');
-                
+
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -249,7 +249,7 @@
                 });
 
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     logTest(`✅ ${modelName}: SUCCESS`, 'success');
                     updateModelCard(modelName, 'success', 'Model available');
@@ -269,14 +269,14 @@
         function updateModelCard(modelName, status, message) {
             const grid = document.getElementById('model-grid');
             let card = document.getElementById(`card-${modelName}`);
-            
+
             if (!card) {
                 card = document.createElement('div');
                 card.id = `card-${modelName}`;
                 card.className = 'model-card';
                 grid.appendChild(card);
             }
-            
+
             card.className = `model-card ${status}`;
             card.innerHTML = `
                 <h4>${modelName}</h4>
@@ -293,13 +293,13 @@
             }
 
             logTest('🚀 Starting comprehensive model testing...', 'info');
-            
+
             for (const model of testModels) {
                 await testModel(model);
                 // Small delay between tests
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            
+
             logTest('🎉 All model tests completed', 'success');
         }
 
@@ -311,10 +311,10 @@
 
             try {
                 logTest('📋 Fetching available models from API...', 'info');
-                
+
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
                 const data = await response.json();
-                
+
                 if (response.ok && data.models) {
                     logTest(`✅ Found ${data.models.length} available models:`, 'success');
                     data.models.forEach(model => {
@@ -339,7 +339,7 @@
             testModels.forEach(model => {
                 updateModelCard(model, 'info', 'Not tested yet');
             });
-            
+
             logTest('🧪 Gemini model test page loaded', 'success');
             logTest('📝 Ready to test Gemini API models', 'info');
         });

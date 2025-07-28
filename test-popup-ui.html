@@ -85,7 +85,7 @@
 
     <div class="test-section">
         <div class="test-title">🎯 Test Scenarios</div>
-        
+
         <div style="margin: 10px 0;">
             <button onclick="testOpenAIProvider()">🔥 Test OpenAI Provider</button>
             <button onclick="testGeminiProvider()">✨ Test Gemini Provider</button>
@@ -169,7 +169,7 @@
             status.textContent = message;
             status.className = `status ${type}`;
             status.style.display = 'block';
-            
+
             // Add to test results
             const results = document.getElementById('test-results');
             const timestamp = new Date().toLocaleTimeString();
@@ -178,7 +178,7 @@
 
         function testOpenAIProvider() {
             showTestStatus('Testing OpenAI provider selection...', 'info');
-            
+
             // Simulate switching to OpenAI
             setTimeout(() => {
                 showTestStatus('✅ OpenAI provider selected. API key field should be visible.', 'success');
@@ -187,7 +187,7 @@
 
         function testGeminiProvider() {
             showTestStatus('Testing Gemini provider selection...', 'info');
-            
+
             // Simulate switching to Gemini
             setTimeout(() => {
                 showTestStatus('✅ Gemini provider selected. Gemini API key field should be visible.', 'success');
@@ -196,7 +196,7 @@
 
         function testModelSwitching() {
             showTestStatus('Testing model switching between providers...', 'info');
-            
+
             setTimeout(() => {
                 showTestStatus('✅ Model options should change based on selected provider.', 'success');
             }, 500);
@@ -204,7 +204,7 @@
 
         function testAPISave() {
             showTestStatus('Testing API key save functionality...', 'info');
-            
+
             setTimeout(() => {
                 showTestStatus('✅ API keys saved with encryption.', 'success');
             }, 500);
@@ -212,21 +212,21 @@
 
         function testValidation() {
             showTestStatus('Testing API key validation...', 'info');
-            
+
             const testCases = [
                 { key: 'sk-test123', provider: 'openai', expected: true },
                 { key: 'invalid-key', provider: 'openai', expected: false },
                 { key: 'AIzaSyTest123', provider: 'gemini', expected: true },
                 { key: 'invalid-gemini', provider: 'gemini', expected: false }
             ];
-            
+
             let results = '';
             testCases.forEach(test => {
                 const isValid = window.EncryptionService.validateApiKey(test.key);
                 const result = isValid === test.expected ? '✅' : '❌';
                 results += `${result} ${test.provider}: "${test.key}" - ${isValid ? 'Valid' : 'Invalid'}\n`;
             });
-            
+
             showTestStatus(`Validation tests:\n${results}`, 'info');
         }
 

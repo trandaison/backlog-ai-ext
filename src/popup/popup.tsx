@@ -70,12 +70,12 @@ const PopupApp: React.FC = () => {
   const loadSettings = async () => {
     try {
       const result = await chrome.storage.sync.get([
-        'encryptedApiKey', 
-        'encryptedGeminiApiKey', 
+        'encryptedApiKey',
+        'encryptedGeminiApiKey',
         'preferredProvider',
-        'userRole', 
-        'language', 
-        'aiModel', 
+        'userRole',
+        'language',
+        'aiModel',
         'backlogConfigs'
       ]);
 
@@ -92,7 +92,7 @@ const PopupApp: React.FC = () => {
       // Decrypt API keys if they exist
       let decryptedApiKey = '';
       let decryptedGeminiApiKey = '';
-      
+
       if (storedSettings.encryptedApiKey) {
         try {
           decryptedApiKey = await EncryptionService.decryptApiKey(storedSettings.encryptedApiKey);

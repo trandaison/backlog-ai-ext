@@ -303,7 +303,7 @@ class BacklogAIInjector {
           break;
 
         case 'CHAT_MESSAGE':
-          this.handleChatMessage(event.data.message, event.data.id);
+          this.handleChatMessage(event.data.message, event.data.id, event.data.ticketData, event.data.chatHistory);
           break;
 
         case 'REQUEST_SUMMARY':
@@ -332,12 +332,19 @@ class BacklogAIInjector {
     }
   }
 
-  private async handleChatMessage(message: string, messageId: string): Promise<void> {
+  private async handleChatMessage(message: string, messageId: string, ticketData?: any, chatHistory?: any[]): Promise<void> {
     try {
+      // Get ticket data if not provided
+      const finalTicketData = ticketData || await this.ticketAnalyzer.extractTicketData();
+
       // Handle chat messages via background script
       const response = await chrome.runtime.sendMessage({
-        action: 'chatWithAI',
-        data: { message }
+        action: 'processUserMessage',
+        data: {
+          message,
+          ticketId: finalTicketData?.id,
+          conversationHistory: chatHistory || []
+        }
       });
 
       window.postMessage({

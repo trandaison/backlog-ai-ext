@@ -392,6 +392,45 @@ body.ai-ext-sidebar-open {
       margin-bottom: 0;
     }
   }
+
+  .ai-ext-suggestion-buttons {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .ai-ext-suggestion-button {
+      padding: 10px 15px;
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #495057;
+      text-align: left;
+      @include transition(all, 0.2s);
+
+      &:hover:not(:disabled) {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      }
+
+      &:active:not(:disabled) {
+        background: #dee2e6;
+        transform: translateY(0);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+    }
+  }
 }
 
 // Message Styles
@@ -530,7 +569,7 @@ body.ai-ext-sidebar-open {
   }
 
   &:disabled {
-    background: #6c757d;
+    background: #d2d2d2;
     cursor: not-allowed;
     transform: none;
   }

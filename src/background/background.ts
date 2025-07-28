@@ -79,7 +79,7 @@ class GeminiService implements AIService {
     const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
     const role = settings?.userRole || 'developer';
 
-    return `Bạn là một AI assistant chuyên phân tích ticket/issue cho ${role}. 
+    return `Bạn là một AI assistant chuyên phân tích ticket/issue cho ${role}.
 Hãy phân tích ticket sau và đưa ra nhận xét hữu ích bằng ${language}:
 
 **Thông tin ticket:**
@@ -104,7 +104,7 @@ Hãy cung cấp:
     const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
     const role = settings?.userRole || 'developer';
 
-    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue. 
+    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
 Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
 
     if (context.ticketData) {
@@ -451,7 +451,7 @@ class BackgroundService {
   // Get the current AI service based on user settings
   private async getCurrentAIService(): Promise<AIService> {
     const settings = await this.getSettings();
-    
+
     if (settings.preferredProvider === 'gemini') {
       return this.geminiService;
     } else {
@@ -528,33 +528,42 @@ class BackgroundService {
 
   private async handleTicketAnalysis(ticketData: TicketData, sendResponse: (response?: any) => void) {
     try {
-      // Cache ticket data
+      // Cache ticket data only - no automatic AI analysis
       this.ticketDataCache.set(ticketData.id, ticketData);
 
-      // Get user settings for personalized analysis
-      const settings = await this.getSettings();
-      const aiService = await this.getCurrentAIService();
-      const analysis = await aiService.analyzeTicket(ticketData, settings);
+      console.log('🎯 [Background] Ticket data cached for:', ticketData.id);
+      console.log('💡 [Background] AI analysis will only run when user requests it');
 
-      // Gửi kết quả về content script
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          action: 'aiResponse',
-          data: { response: analysis, type: 'analysis' }
-        });
-      }
-
-      sendResponse({ success: true, analysis });
+      sendResponse({ success: true, cached: true });
     } catch (error) {
-      console.error('Error in ticket analysis:', error);
+      console.error('Error caching ticket data:', error);
       sendResponse({ success: false, error: String(error) });
     }
   }
 
   private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
     try {
+      console.log('🔍 [Background] handleUserMessage data:', data);
+
       const ticketData = this.ticketDataCache.get(data.ticketId);
+      console.log('🔍 [Background] ticketId:', data.ticketId);
+      console.log('🔍 [Background] ticketData from cache:', ticketData);
+      console.log('🔍 [Background] cache keys:', Array.from(this.ticketDataCache.keys()));
+
+      // Check if this is a suggestion button message and convert to detailed prompt
+      let processedMessage = data.message;
+      console.log('🔍 [Background] original message:', data.message);
+
+      if (data.message === 'Tóm tắt nội dung') {
+        processedMessage = this.buildSummaryPrompt(ticketData);
+        console.log('🔍 [Background] buildSummaryPrompt result:', processedMessage);
+      } else if (data.message === 'Giải thích yêu cầu ticket') {
+        processedMessage = this.buildExplainPrompt(ticketData);
+      } else if (data.message === 'Dịch nội dung ticket') {
+        processedMessage = this.buildTranslatePrompt(ticketData);
+      }
+
+      console.log('🔍 [Background] processedMessage:', processedMessage);
 
       const context = {
         conversationHistory: data.conversationHistory,
@@ -564,7 +573,7 @@ class BackgroundService {
       // Get user settings for personalized responses
       const settings = await this.getSettings();
       const aiService = await this.getCurrentAIService();
-      const response = await aiService.processUserMessage(data.message, context, settings);
+      const response = await aiService.processUserMessage(processedMessage, context, settings);
 
       // Gửi response về content script
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -611,7 +620,7 @@ class BackgroundService {
   private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {
     try {
       console.log('🔄 [Background] Handling ticket summary request:', data);
-      
+
       let ticketData = data.ticketData;
 
       // If ticket data is not provided, try to extract from active tab
@@ -650,10 +659,10 @@ class BackgroundService {
       // Create specialized summary prompt
       const summaryPrompt = this.buildTicketSummaryPrompt(ticketData, settings);
       console.log('🔧 [Background] Summary prompt length:', summaryPrompt.length);
-      
+
       const aiService = await this.getCurrentAIService();
       const summary = await aiService.processUserMessage(summaryPrompt, { ticketData }, settings);
-      
+
       console.log('✅ [Background] Summary generated, length:', summary.length);
 
       sendResponse({ success: true, summary });
@@ -866,6 +875,83 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
 2. Trạng thái hiện tại
 3. Những điểm quan trọng cần lưu ý
 4. Next steps nếu có thể xác định được`;
+  }
+
+  private sortCommentsByTime(comments: any[]): any[] {
+    return comments
+      .filter((comment: any) => comment.content && comment.content.trim())
+      .sort((a: any, b: any) => {
+        // Sort by timestamp ascending (oldest first) for proper conversation flow
+        const timeA = new Date(a.timestamp || 0).getTime();
+        const timeB = new Date(b.timestamp || 0).getTime();
+        return timeA - timeB;
+      });
+  }
+
+  private buildSummaryPrompt(ticketData: any): string {
+    if (!ticketData) {
+      return 'Hãy tóm tắt nội dung của ticket này một cách ngắn gọn và súc tích.';
+    }
+
+    const commentsSection = ticketData.comments && ticketData.comments.length > 0
+      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
+          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
+          .join('\n')}`
+      : '';
+
+    return `Hãy tóm tắt nội dung của ticket sau một cách ngắn gọn và súc tích:
+
+**Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
+**Mô tả**: ${ticketData.description || 'Không có mô tả'}
+**Trạng thái**: ${ticketData.status || 'Không rõ'}
+**Độ ưu tiên**: ${ticketData.priority || 'Không rõ'}
+**Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
+
+Bao gồm: mục tiêu chính, yêu cầu chức năng, và những điểm quan trọng cần lưu ý.`;
+  }
+
+  private buildExplainPrompt(ticketData: any): string {
+    if (!ticketData) {
+      return 'Hãy giải thích chi tiết yêu cầu và mục tiêu của ticket này.';
+    }
+
+    const commentsSection = ticketData.comments && ticketData.comments.length > 0
+      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
+          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
+          .join('\n')}`
+      : '';
+
+    return `Hãy giải thích chi tiết yêu cầu và mục tiêu của ticket sau:
+
+**Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
+**Mô tả**: ${ticketData.description || 'Không có mô tả'}
+**Trạng thái**: ${ticketData.status || 'Không rõ'}
+**Độ ưu tiên**: ${ticketData.priority || 'Không rõ'}
+**Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
+
+Phân tích các tác vụ cần thực hiện, dependencies, và impact của thay đổi này.`;
+  }
+
+  private buildTranslatePrompt(ticketData: any): string {
+    if (!ticketData) {
+      return 'Hãy dịch toàn bộ nội dung ticket sang tiếng Anh.';
+    }
+
+    const commentsSection = ticketData.comments && ticketData.comments.length > 0
+      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
+          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
+          .join('\n')}`
+      : '';
+
+    return `Hãy dịch toàn bộ nội dung của ticket sau sang tiếng Anh:
+
+**Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
+**Mô tả**: ${ticketData.description || 'Không có mô tả'}
+**Trạng thái**: ${ticketData.status || 'Không rõ'}
+**Độ ưu tiên**: ${ticketData.priority || 'Không rõ'}
+**Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
+
+Bao gồm title, description, và các thông tin quan trọng khác. Giữ nguyên format và structure của nội dung.`;
   }
 
   private async callOpenAISummary(prompt: string, settings?: Settings): Promise<string> {

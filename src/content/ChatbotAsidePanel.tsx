@@ -105,6 +105,20 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     }
   };
 
+  const handleSuggestionClick = (type: 'summary' | 'explain' | 'translate') => {
+    console.log('🎯 [ChatbotAsidePanel] Suggestion clicked:', type);
+
+    // Messages for each suggestion type - these will appear as user messages in chat
+    const suggestionMessages = {
+      summary: 'Tóm tắt nội dung',
+      explain: 'Giải thích yêu cầu ticket',
+      translate: 'Dịch nội dung ticket'
+    };
+
+    // Send the suggestion as a message
+    handleSendMessage(suggestionMessages[type]);
+  };
+
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || isTyping) return;
 
@@ -224,55 +238,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         </div>
       )}
 
-      {/* Summary Section */}
-      <div className="ai-ext-summary-section">
-        <button
-          className="ai-ext-summary-button"
-          onClick={handleTicketSummary}
-          disabled={isLoadingSummary || !ticketData}
-        >
-          {isLoadingSummary ? '⏳ Đang tạo summary...' : '📋 Summary nội dung ticket'}
-        </button>
-
-        {/* Summary Content */}
-        {summaryContent && (
-          <div className="ai-ext-summary-result">
-            <div className="ai-ext-summary-header">
-              <span className="ai-ext-summary-icon">📋</span>
-              <h4>Tóm tắt ticket</h4>
-              <button className="ai-ext-clear-button" onClick={clearSummary}>✕</button>
-            </div>
-            <div
-              className="ai-ext-summary-content"
-              dangerouslySetInnerHTML={{ __html: formatMessageContent(summaryContent) }}
-            />
-            <div className="ai-ext-summary-footer">
-              <small>Được tạo bởi AI • {new Date().toLocaleString('vi-VN')}</small>
-            </div>
-          </div>
-        )}
-
-        {/* Summary Error */}
-        {summaryError && (
-          <div className="ai-ext-summary-error">
-            <div className="ai-ext-error-icon">⚠️</div>
-            <div className="ai-ext-error-message">
-              <strong>Lỗi khi tạo summary:</strong>
-              <p>{summaryError}</p>
-            </div>
-            <button className="ai-ext-retry-button" onClick={clearSummary}>Đóng</button>
-          </div>
-        )}
-
-        {/* Loading Summary */}
-        {isLoadingSummary && (
-          <div className="ai-ext-loading">
-            <div className="ai-ext-spinner"></div>
-            <p>AI đang phân tích ticket...</p>
-          </div>
-        )}
-      </div>
-
       {/* Chat Section */}
       <div className="ai-ext-chatbot-content">
         <div className="ai-ext-chat-header">
@@ -285,6 +250,31 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
             <div className="ai-ext-welcome-message">
               <p>👋 Xin chào! Tôi có thể giúp bạn phân tích ticket này.</p>
               <p>Hãy hỏi tôi bất cứ điều gì về ticket!</p>
+
+              {/* Suggestion buttons */}
+              <div className="ai-ext-suggestion-buttons">
+                <button
+                  className="ai-ext-suggestion-button"
+                  onClick={() => handleSuggestionClick('summary')}
+                  disabled={isTyping}
+                >
+                  📝 Tóm tắt nội dung
+                </button>
+                <button
+                  className="ai-ext-suggestion-button"
+                  onClick={() => handleSuggestionClick('explain')}
+                  disabled={isTyping}
+                >
+                  💡 Giải thích yêu cầu ticket
+                </button>
+                <button
+                  className="ai-ext-suggestion-button"
+                  onClick={() => handleSuggestionClick('translate')}
+                  disabled={isTyping}
+                >
+                  🌍 Dịch nội dung ticket
+                </button>
+              </div>
             </div>
           ) : (
             messages.map((message) => (
