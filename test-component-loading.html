@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test React Component Loading</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .loading { color: orange; }
+        .chatbot-container {
+            width: 400px;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test React Component Loading</h1>
+
+    <div class="test-panel">
+        <h2>📋 Test Status</h2>
+        <div id="test-status">
+            <p class="loading">⏳ Loading components...</p>
+        </div>
+    </div>
+
+    <div class="test-panel">
+        <h2>🎯 Component Test</h2>
+        <div class="chatbot-container ai-ext-root" id="chatbot-test">
+            <!-- React component will render here -->
+        </div>
+    </div>
+
+    <!-- Load extension scripts -->
+    <script src="./dev-build/vendors.js"></script>
+    <script src="./dev-build/chatbot-aside-panel.js"></script>
+
+    <!-- Load CSS -->
+    <link rel="stylesheet" href="./dev-build/sidebar-styles.css">
+
+    <script>
+        // Mock chrome runtime for testing
+        window.chrome = {
+            runtime: {
+                sendMessage: (message, callback) => {
+                    console.log('📤 Mock message:', message);
+
+                    setTimeout(() => {
+                        if (message.action === 'requestTicketSummary') {
+                            callback({
+                                success: true,
+                                summary: '**Test Summary:**\n\n• Component loaded successfully\n• React integration working\n• All systems operational'
+                            });
+                        } else if (message.action === 'chatWithAI') {
+                            callback({
+                                success: true,
+                                response: `AI Response: "${message.data.message}"\n\nThis is a test response from the mock AI system.`
+                            });
+                        }
+                    }, 1000);
+                }
+            }
+        };
+
+        // Mock ticket analyzer
+        class TestTicketAnalyzer {
+            async extractTicketData() {
+                return {
+                    id: 'TEST-001',
+                    title: 'React Component Integration Test',
+                    description: 'Testing React component loading and rendering',
+                    status: 'Testing',
+                    priority: 'High',
+                    assignee: 'Test User',
+                    reporter: 'System',
+                    dueDate: '',
+                    labels: ['test', 'react', 'components'],
+                    comments: [
+                        {
+                            author: 'System',
+                            content: 'Component test initiated',
+                            timestamp: new Date().toISOString()
+                        }
+                    ]
+                };
+            }
+        }
+
+        function updateStatus(message, type = 'loading') {
+            const statusDiv = document.getElementById('test-status');
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⏳';
+            statusDiv.innerHTML = `<p class="${type}">${icon} ${message}</p>`;
+        }
+
+        function checkGlobals() {
+            // First check if components are loaded via postMessage
+            const messageId = Date.now() + Math.random();
+
+            const responseHandler = (event) => {
+                if (event.source !== window) return;
+
+                if (event.data.type === 'COMPONENTS_CHECK_RESPONSE' && event.data.id === messageId) {
+                    window.removeEventListener('message', responseHandler);
+
+                    if (event.data.available) {
+                        updateStatus('✅ Components loaded via postMessage! Rendering...', 'success');
+                        renderComponentViaMessage();
+                    } else {
+                        // Fallback to direct global check
+                        checkGlobalsDirect();
+                    }
+                }
+            };
+
+            window.addEventListener('message', responseHandler);
+
+            // Send check message
+            window.postMessage({
+                type: 'CHECK_COMPONENTS',
+                id: messageId
+            }, '*');
+
+            // Fallback timeout
+            setTimeout(() => {
+                window.removeEventListener('message', responseHandler);
+                checkGlobalsDirect();
+            }, 2000);
+        }
+
+        function checkGlobalsDirect() {
+            const tests = [
+                { name: 'React', value: window.React },
+                { name: 'ReactDOM', value: window.ReactDOM },
+                { name: 'ChatbotAsidePanel', value: window.ChatbotAsidePanel }
+            ];
+
+            let statusHTML = '<h3>Global Variables:</h3><ul>';
+            let allPassed = true;
+
+            tests.forEach(test => {
+                const status = test.value ? '✅' : '❌';
+                const type = typeof test.value;
+                statusHTML += `<li>${status} ${test.name}: ${type}</li>`;
+                if (!test.value) allPassed = false;
+            });
+
+            statusHTML += '</ul>';
+
+            if (allPassed) {
+                statusHTML += '<p class="success">✅ All globals loaded successfully!</p>';
+                renderComponent();
+            } else {
+                statusHTML += '<p class="error">❌ Some globals failed to load</p>';
+            }
+
+            document.getElementById('test-status').innerHTML = statusHTML;
+        }
+
+        function renderComponentViaMessage() {
+            const messageId = Date.now() + Math.random();
+
+            const responseHandler = (event) => {
+                if (event.source !== window) return;
+
+                if (event.data.type === 'COMPONENT_CREATED' && event.data.id === messageId) {
+                    window.removeEventListener('message', responseHandler);
+
+                    if (event.data.success) {
+                        updateStatus('✅ React component rendered via postMessage!', 'success');
+                    } else {
+                        updateStatus(`❌ Component creation failed: ${event.data.error}`, 'error');
+                    }
+                }
+            };
+
+            window.addEventListener('message', responseHandler);
+
+            // Send create component message
+            window.postMessage({
+                type: 'CREATE_COMPONENT',
+                id: messageId,
+                containerId: 'chatbot-test',
+                props: {}
+            }, '*');
+
+            // Timeout
+            setTimeout(() => {
+                window.removeEventListener('message', responseHandler);
+                updateStatus('❌ Timeout creating component via postMessage', 'error');
+            }, 5000);
+        }
+
+        function renderComponent() {
+            try {
+                const React = window.React;
+                const ReactDOM = window.ReactDOM;
+                const ChatbotAsidePanel = window.ChatbotAsidePanel;
+
+                const container = document.getElementById('chatbot-test');
+                const root = ReactDOM.createRoot(container);
+
+                root.render(React.createElement(ChatbotAsidePanel, {
+                    ticketAnalyzer: new TestTicketAnalyzer(),
+                    onClose: () => console.log('Test close')
+                }));
+
+                updateStatus('React component rendered successfully!', 'success');
+
+            } catch (error) {
+                console.error('Render error:', error);
+                updateStatus(`Render failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Wait for scripts to load then check
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                updateStatus('Checking component loading...');
+                checkGlobals();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

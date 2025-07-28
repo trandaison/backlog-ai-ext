@@ -304,6 +304,10 @@ class BackgroundService {
           await this.handleTicketSummary(message.data, sendResponse);
           break;
 
+        case 'chatWithAI':
+          await this.handleChatWithAI(message.data, sendResponse);
+          break;
+
         case 'saveApiKey':
           await this.saveSettings(message.data);
           sendResponse({ success: true });
@@ -380,6 +384,31 @@ class BackgroundService {
     }
 
     sendResponse({ success: true, response });
+  }
+
+  private async handleChatWithAI(data: any, sendResponse: (response?: any) => void) {
+    try {
+      const { message, ticketData, chatHistory } = data;
+
+      // Build context for AI conversation
+      const context = {
+        conversationHistory: chatHistory || [],
+        ticketData: ticketData || null,
+        currentMessage: message
+      };
+
+      // Get user settings for personalized responses
+      const settings = await this.getSettings();
+      const response = await this.aiService.processUserMessage(message, context, settings);
+
+      sendResponse({ success: true, response });
+    } catch (error) {
+      console.error('Error in handleChatWithAI:', error);
+      sendResponse({
+        success: false,
+        error: `Lỗi khi chat với AI: ${error}`
+      });
+    }
   }
 
   private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {

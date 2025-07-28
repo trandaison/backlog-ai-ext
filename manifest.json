@@ -39,7 +39,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["chatbot.js", "chatbot-styles.css", "sidebar-styles.css", "icons/icon.svg"],
+      "resources": [
+        "chatbot.js",
+        "chatbot-aside-panel.js",
+        "vendors.js",
+        "chatbot-styles.css",
+        "sidebar-styles.css",
+        "icons/icon.svg"
+      ],
       "matches": ["*://*.backlog.com/*", "*://*.backlog.jp/*", "*://*.backlogtool.com/*"]
     }
   ]

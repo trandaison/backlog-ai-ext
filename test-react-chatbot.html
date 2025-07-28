@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test React Chatbot Panel</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f0f0;
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .test-sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            border-left: 1px solid #ccc;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .test-content {
+            margin-right: 420px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mock-ticket {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .mock-ticket h3 {
+            color: #007bff;
+            margin: 0 0 8px 0;
+        }
+
+        .mock-ticket .status {
+            background: #d4edda;
+            color: #155724;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test React Chatbot Panel</h1>
+
+        <div class="test-content">
+            <h2>Mock Backlog Ticket Page</h2>
+
+            <div class="mock-ticket">
+                <h3>TEST-123: Implement React chatbot component</h3>
+                <p><span class="status">In Progress</span></p>
+                <p><strong>Description:</strong> Chuyển đổi chatbot từ vanilla JavaScript sang React component để dễ quản lý state và DOM interactions.</p>
+                <p><strong>Assignee:</strong> Developer</p>
+                <p><strong>Priority:</strong> High</p>
+            </div>
+
+            <div class="mock-ticket">
+                <h3>Comments:</h3>
+                <p>Comment 1: Cần tích hợp React vào content script...</p>
+                <p>Comment 2: Sử dụng dynamic import để tránh bundle size lớn...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar cho chatbot React component -->
+    <div class="test-sidebar ai-ext-root" id="ai-ext-root">
+        <!-- React component sẽ được render vào đây -->
+    </div>
+
+    <!-- Load React và component -->
+    <script src="./dev-build/vendors.js"></script>
+    <script>
+        // Mock ticket analyzer
+        class MockTicketAnalyzer {
+            async extractTicketData() {
+                return {
+                    id: 'TEST-123',
+                    title: 'Implement React chatbot component',
+                    description: 'Chuyển đổi chatbot từ vanilla JavaScript sang React component để dễ quản lý state và DOM interactions.',
+                    status: 'In Progress',
+                    priority: 'High',
+                    assignee: 'Developer',
+                    reporter: 'Product Manager',
+                    dueDate: '',
+                    labels: ['react', 'chatbot', 'enhancement'],
+                    comments: [
+                        {
+                            author: 'Developer',
+                            content: 'Cần tích hợp React vào content script...',
+                            timestamp: new Date().toISOString()
+                        },
+                        {
+                            author: 'Tech Lead',
+                            content: 'Sử dụng dynamic import để tránh bundle size lớn...',
+                            timestamp: new Date().toISOString()
+                        }
+                    ]
+                };
+            }
+        }
+
+        // Mock chrome runtime
+        window.chrome = {
+            runtime: {
+                sendMessage: (message, callback) => {
+                    console.log('📤 Mock message sent:', message);
+
+                    // Mock responses
+                    setTimeout(() => {
+                        if (message.action === 'requestTicketSummary') {
+                            callback({
+                                success: true,
+                                summary: '**Tóm tắt ticket TEST-123:**\n\n• **Mục tiêu:** Chuyển đổi chatbot từ vanilla JS sang React\n• **Lý do:** Quản lý state và DOM tốt hơn\n• **Trạng thái:** Đang phát triển\n• **Ưu tiên:** Cao\n\n**Nhận xét kỹ thuật:**\n- Sử dụng dynamic import để optimize bundle\n- Tích hợp React vào content script\n- Cải thiện user experience'
+                            });
+                        } else if (message.action === 'chatWithAI') {
+                            callback({
+                                success: true,
+                                response: `AI trả lời cho câu hỏi: "${message.data.message}"\n\nDựa trên thông tin ticket TEST-123, tôi có thể giúp bạn:\n\n• Phân tích technical approach\n• Suggest best practices cho React integration\n• Code review và optimization tips\n\nBạn có câu hỏi cụ thể nào không?`
+                            });
+                        }
+                    }, 1000);
+                }
+            }
+        };
+
+        // Load and render React component
+        async function loadChatbotPanel() {
+            try {
+                // Dynamically load React modules (giống như trong content script)
+                const React = window.React;
+                const ReactDOM = window.ReactDOM;
+
+                if (!React || !ReactDOM) {
+                    throw new Error('React libraries not loaded');
+                }
+
+                // Mock ChatbotAsidePanel component (simplified version)
+                const ChatbotAsidePanel = ({ ticketAnalyzer, onClose }) => {
+                    const [ticketData, setTicketData] = React.useState(null);
+                    const [summaryContent, setSummaryContent] = React.useState('');
+                    const [isLoadingSummary, setIsLoadingSummary] = React.useState(false);
+                    const [messages, setMessages] = React.useState([]);
+                    const [currentMessage, setCurrentMessage] = React.useState('');
+                    const [isTyping, setIsTyping] = React.useState(false);
+
+                    React.useEffect(() => {
+                        ticketAnalyzer.extractTicketData().then(setTicketData);
+                    }, []);
+
+                    const handleSummary = async () => {
+                        setIsLoadingSummary(true);
+                        chrome.runtime.sendMessage({
+                            action: 'requestTicketSummary',
+                            data: { ticketData }
+                        }, (response) => {
+                            setSummaryContent(response.summary);
+                            setIsLoadingSummary(false);
+                        });
+                    };
+
+                    const handleSendMessage = async () => {
+                        if (!currentMessage.trim()) return;
+
+                        const userMsg = {
+                            id: Date.now(),
+                            content: currentMessage,
+                            sender: 'user',
+                            timestamp: new Date()
+                        };
+
+                        setMessages(prev => [...prev, userMsg]);
+                        setCurrentMessage('');
+                        setIsTyping(true);
+
+                        chrome.runtime.sendMessage({
+                            action: 'chatWithAI',
+                            data: { message: currentMessage, ticketData, chatHistory: messages }
+                        }, (response) => {
+                            const aiMsg = {
+                                id: Date.now() + 1,
+                                content: response.response,
+                                sender: 'ai',
+                                timestamp: new Date()
+                            };
+                            setMessages(prev => [...prev, aiMsg]);
+                            setIsTyping(false);
+                        });
+                    };
+
+                    return React.createElement('div', { className: 'ai-ext-aside-content' }, [
+                        // Header
+                        React.createElement('div', { key: 'header', className: 'ai-ext-header' }, [
+                            React.createElement('h3', { key: 'title', className: 'ai-ext-title' }, '🤖 AI Assistant'),
+                            React.createElement('button', {
+                                key: 'close',
+                                className: 'ai-ext-close-button',
+                                onClick: onClose
+                            }, '✕')
+                        ]),
+
+                        // Ticket Info
+                        ticketData && React.createElement('div', { key: 'ticket-info', className: 'ai-ext-ticket-info' }, [
+                            React.createElement('div', { key: 'title', className: 'ai-ext-ticket-title' },
+                                `${ticketData.id}: ${ticketData.title}`),
+                            React.createElement('div', { key: 'meta', className: 'ai-ext-ticket-meta' }, [
+                                React.createElement('span', { key: 'status', className: 'ai-ext-status' }, ticketData.status),
+                                React.createElement('span', { key: 'assignee', className: 'ai-ext-assignee' }, `👤 ${ticketData.assignee}`),
+                                React.createElement('span', { key: 'priority', className: 'ai-ext-priority' }, `⚡ ${ticketData.priority}`)
+                            ])
+                        ]),
+
+                        // Summary Section
+                        React.createElement('div', { key: 'summary-section', className: 'ai-ext-summary-section' }, [
+                            React.createElement('button', {
+                                key: 'summary-btn',
+                                className: 'ai-ext-summary-button',
+                                onClick: handleSummary,
+                                disabled: isLoadingSummary
+                            }, isLoadingSummary ? '⏳ Đang tạo summary...' : '📋 Summary nội dung ticket'),
+
+                            summaryContent && React.createElement('div', { key: 'summary-result', className: 'ai-ext-summary-result', style: { margin: '0 20px 16px' } }, [
+                                React.createElement('div', { key: 'summary-header', className: 'ai-ext-summary-header' }, [
+                                    React.createElement('span', { key: 'icon', className: 'ai-ext-summary-icon' }, '📋'),
+                                    React.createElement('h4', { key: 'title' }, 'Tóm tắt ticket'),
+                                    React.createElement('button', {
+                                        key: 'clear',
+                                        className: 'ai-ext-clear-button',
+                                        onClick: () => setSummaryContent('')
+                                    }, '✕')
+                                ]),
+                                React.createElement('div', {
+                                    key: 'content',
+                                    className: 'ai-ext-summary-content',
+                                    dangerouslySetInnerHTML: {
+                                        __html: summaryContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+                                    }
+                                })
+                            ])
+                        ]),
+
+                        // Chat Section
+                        React.createElement('div', { key: 'chat', className: 'ai-ext-chatbot-content' }, [
+                            React.createElement('div', { key: 'chat-header', className: 'ai-ext-chat-header' },
+                                React.createElement('h4', {}, '💬 Chat với AI')),
+
+                            React.createElement('div', { key: 'messages', className: 'ai-ext-messages-container', style: { minHeight: '300px' } }, [
+                                messages.length === 0 ?
+                                    React.createElement('div', { key: 'welcome', className: 'ai-ext-welcome-message' }, [
+                                        React.createElement('p', { key: 'p1' }, '👋 Xin chào! Tôi có thể giúp bạn phân tích ticket này.'),
+                                        React.createElement('p', { key: 'p2' }, 'Hãy hỏi tôi bất cứ điều gì về ticket!')
+                                    ]) :
+                                    messages.map(msg =>
+                                        React.createElement('div', {
+                                            key: msg.id,
+                                            className: `ai-ext-message ai-ext-message-${msg.sender}`
+                                        }, [
+                                            React.createElement('div', { key: 'avatar', className: 'ai-ext-message-avatar' },
+                                                msg.sender === 'user' ? '👤' : '🤖'),
+                                            React.createElement('div', { key: 'content', className: 'ai-ext-message-content' }, [
+                                                React.createElement('div', {
+                                                    key: 'text',
+                                                    className: 'ai-ext-message-text',
+                                                    dangerouslySetInnerHTML: {
+                                                        __html: msg.content.replace(/\n/g, '<br>')
+                                                    }
+                                                }),
+                                                React.createElement('div', { key: 'time', className: 'ai-ext-message-time' },
+                                                    msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }))
+                                            ])
+                                        ])
+                                    ),
+
+                                isTyping && React.createElement('div', { key: 'typing', className: 'ai-ext-message ai-ext-message-ai' }, [
+                                    React.createElement('div', { key: 'avatar', className: 'ai-ext-message-avatar' }, '🤖'),
+                                    React.createElement('div', { key: 'content', className: 'ai-ext-message-content' },
+                                        React.createElement('div', { className: 'ai-ext-typing-indicator' }, [
+                                            React.createElement('span', { key: '1' }),
+                                            React.createElement('span', { key: '2' }),
+                                            React.createElement('span', { key: '3' })
+                                        ])
+                                    )
+                                ])
+                            ]),
+
+                            React.createElement('div', { key: 'input', className: 'ai-ext-chat-input-container' },
+                                React.createElement('div', { className: 'ai-ext-chat-input-wrapper' }, [
+                                    React.createElement('input', {
+                                        key: 'input',
+                                        type: 'text',
+                                        className: 'ai-ext-chat-input',
+                                        placeholder: 'Nhập câu hỏi về ticket...',
+                                        value: currentMessage,
+                                        onChange: (e) => setCurrentMessage(e.target.value),
+                                        onKeyPress: (e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleSendMessage();
+                                            }
+                                        },
+                                        disabled: isTyping
+                                    }),
+                                    React.createElement('button', {
+                                        key: 'send',
+                                        className: 'ai-ext-send-button',
+                                        onClick: handleSendMessage,
+                                        disabled: !currentMessage.trim() || isTyping
+                                    }, isTyping ? '⏳' : '📤')
+                                ])
+                            )
+                        ])
+                    ]);
+                };
+
+                const container = document.getElementById('ai-ext-root');
+                const root = ReactDOM.createRoot(container);
+
+                root.render(React.createElement(ChatbotAsidePanel, {
+                    ticketAnalyzer: new MockTicketAnalyzer(),
+                    onClose: () => console.log('Close chatbot')
+                }));
+
+                console.log('✅ React ChatbotAsidePanel loaded successfully');
+
+                // Load CSS
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = './dev-build/sidebar-styles.css';
+                document.head.appendChild(link);
+
+            } catch (error) {
+                console.error('❌ Failed to load React chatbot:', error);
+                document.getElementById('ai-ext-root').innerHTML = `
+                    <div style="padding: 20px; color: red;">
+                        <h3>❌ Load Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load when page is ready
+        window.addEventListener('load', loadChatbotPanel);
+    </script>
+</body>
+</html>

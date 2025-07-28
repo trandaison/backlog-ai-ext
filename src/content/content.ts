@@ -8,6 +8,7 @@ class BacklogAIInjector {
   private chatbotAsideContainer: HTMLElement | null = null;
   private chatbotToggleButton: HTMLButtonElement | null = null;
   private isChatbotOpen: boolean = false;
+  private reactRoot: any = null; // React root for cleanup
 
   constructor() {
     this.ticketAnalyzer = new TicketAnalyzer();
@@ -60,53 +61,12 @@ class BacklogAIInjector {
 
     // Tạo aside container cho chatbot panel
     this.chatbotAsideContainer = document.createElement('aside');
-    this.chatbotAsideContainer.id = 'ai-ext-root';
-
-    // Tạo nội dung bên trong chatbot aside panel
-    const asideContent = document.createElement('div');
-    asideContent.className = 'ai-ext-aside-content';
-
-    // Tạo header với title và nút đóng chatbot panel
-    const header = document.createElement('div');
-    header.className = 'ai-ext-header';
-
-    const title = document.createElement('h3');
-    title.className = 'ai-ext-title';
-    title.textContent = '🤖 AI Assistant';
-
-    const closeButton = document.createElement('button');
-    closeButton.className = 'ai-ext-close-button';
-    closeButton.innerHTML = '✕';
-    closeButton.addEventListener('click', () => this.closeChatbotPanel());
-
-    header.appendChild(title);
-    header.appendChild(closeButton);
-
-    // Tạo summary button trong chatbot panel
-    const summaryButton = document.createElement('button');
-    summaryButton.className = 'ai-ext-summary-button';
-    summaryButton.innerHTML = '📋 Summary nội dung ticket';
-    summaryButton.addEventListener('click', () => this.handleTicketSummary());
-
-    // Tạo khu vực hiển thị summary trong chatbot panel
-    const summaryContainer = document.createElement('div');
-    summaryContainer.id = 'ai-ext-summary-container';
-    summaryContainer.className = 'ai-ext-summary-content';
-
-    // Tạo nội dung chatbot interaction area
-    const chatbotContent = document.createElement('div');
-    chatbotContent.id = 'backlog-ai-chatbot-container';
-    chatbotContent.className = 'ai-ext-chatbot-content';
-
-    asideContent.appendChild(header);
-    asideContent.appendChild(summaryButton);
-    asideContent.appendChild(summaryContainer);
-    asideContent.appendChild(chatbotContent);
-    this.chatbotAsideContainer.appendChild(asideContent);
+    this.chatbotAsideContainer.id = 'ai-ext-chatbot-aside';
+    this.chatbotAsideContainer.className = 'ai-ext-root';
 
     // Tạo toggle button để mở/đóng chatbot panel
     this.chatbotToggleButton = document.createElement('button');
-    this.chatbotToggleButton.id = 'backlog-ai-toggle';
+    this.chatbotToggleButton.className = 'backlog-ai-toggle';
 
     // Tạo img element cho toggle button icon
     const iconImg = document.createElement('img');
@@ -120,8 +80,8 @@ class BacklogAIInjector {
     container.appendChild(this.chatbotAsideContainer);
     document.body.appendChild(this.chatbotToggleButton);
 
-    // Load chatbot React component vào chatbot panel
-    this.loadChatbotComponent();
+    // Load React chatbot component vào chatbot panel
+    this.loadReactChatbotComponent();
   }
 
   private toggleChatbotPanel() {
@@ -151,35 +111,343 @@ class BacklogAIInjector {
     }
   }
 
-  private async loadChatbotComponent() {
-    const chatbotContainer = document.getElementById('backlog-ai-chatbot-container');
-    if (!chatbotContainer) {
-      console.error('Chatbot container not found in aside panel');
+  private async loadReactChatbotComponent() {
+    if (!this.chatbotAsideContainer) {
+      console.error('Chatbot container not found');
       return;
     }
 
     try {
-      // Import và render React chatbot component vào aside panel
-      const { default: React } = await import('react');
-      const { createRoot } = await import('react-dom/client');
-      const { default: ChatbotApp } = await import('../chatbot/chatbot');
+      // Load Backlog settings first
+      const backlogSettings = await this.getBacklogSettings();
+      if (backlogSettings.configs && backlogSettings.configs.length > 0) {
+        this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
+      }
 
-      // Extract ticket data
-      const ticketData = this.ticketAnalyzer.extractTicketData();
+      // Load React and ChatbotAsidePanel from main world
+      await this.loadChatbotAsidePanelScript();
 
-      const root = createRoot(chatbotContainer);
-      root.render(React.createElement(ChatbotApp));
+      // Use postMessage to create component in main world
+      await this.createComponentInMainWorld();
+
+      console.log('✅ [ContentScript] React ChatbotAsidePanel loaded successfully');
 
     } catch (error) {
-      console.error('Failed to load chatbot component:', error);
-      chatbotContainer.innerHTML = `
+      console.error('Failed to load React chatbot component:', error);
+      // Fallback UI
+      this.chatbotAsideContainer.innerHTML = `
         <div style="padding: 20px; text-align: center; color: #666;">
           <p>⚠️ Không thể tải AI Chatbot</p>
           <p style="font-size: 12px;">Vui lòng reload trang để thử lại</p>
+          <button onclick="window.location.reload()" style="margin-top: 10px; padding: 8px 16px;">
+            🔄 Reload trang
+          </button>
         </div>
       `;
     }
   }
+
+  private async loadChatbotAsidePanelScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Check if already loaded using postMessage communication
+      this.checkComponentsReady().then(resolve).catch(() => {
+
+        // Set up message listener for component loading
+        const messageHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (event.data.type === 'REACT_COMPONENTS_LOADED') {
+            console.log('🎯 [ContentScript] Received components loaded message');
+            window.removeEventListener('message', messageHandler);
+
+            // Small delay then check components
+            setTimeout(() => {
+              this.checkComponentsReady().then(resolve).catch(reject);
+            }, 100);
+          }
+        };
+
+        window.addEventListener('message', messageHandler);
+
+        // Inject scripts into main world using chrome.scripting API
+        this.injectMainWorldScripts().then(() => {
+          console.log('🔧 [ContentScript] Scripts injected to main world');
+        }).catch((error) => {
+          console.error('❌ [ContentScript] Failed to inject scripts:', error);
+          window.removeEventListener('message', messageHandler);
+          reject(error);
+        });
+
+        // Fallback timeout
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+          reject(new Error('Timeout waiting for React components to load'));
+        }, 15000);
+      });
+    });
+  }
+
+  private async injectMainWorldScripts(): Promise<void> {
+    // Create script elements and inject them into main world
+    const injectScript = (src: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL(src);
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+
+        // Insert into head to run in main world
+        (document.head || document.documentElement).appendChild(script);
+      });
+    };
+
+    // Load vendors first, then components
+    await injectScript('vendors.js');
+    await injectScript('chatbot-aside-panel.js');
+  }
+
+  private async checkComponentsReady(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Use postMessage to check if components are available in main world
+      const messageId = Date.now() + Math.random();
+
+      const responseHandler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+
+        if (event.data.type === 'COMPONENTS_CHECK_RESPONSE' && event.data.id === messageId) {
+          window.removeEventListener('message', responseHandler);
+
+          if (event.data.available) {
+            console.log('✅ [ContentScript] Components are ready in main world');
+            resolve();
+          } else {
+            reject(new Error('Components not available in main world'));
+          }
+        }
+      };
+
+      window.addEventListener('message', responseHandler);
+
+      // Send check message to main world
+      window.postMessage({
+        type: 'CHECK_COMPONENTS',
+        id: messageId
+      }, '*');
+
+      // Timeout
+      setTimeout(() => {
+        window.removeEventListener('message', responseHandler);
+        reject(new Error('Timeout checking components'));
+      }, 5000);
+    });
+  }
+
+  private async createComponentInMainWorld(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const messageId = Date.now() + Math.random();
+
+      const responseHandler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+
+        if (event.data.type === 'COMPONENT_CREATED' && event.data.id === messageId) {
+          window.removeEventListener('message', responseHandler);
+
+          if (event.data.success) {
+            console.log('✅ [ContentScript] Component created successfully in main world');
+            // Set up ongoing message handlers for component interactions
+            this.setupComponentMessageHandlers();
+            resolve();
+          } else {
+            reject(new Error(`Failed to create component: ${event.data.error}`));
+          }
+        }
+      };
+
+      window.addEventListener('message', responseHandler);
+
+      // Send create component message to main world
+      const containerId = this.chatbotAsideContainer?.id || 'ai-ext-chatbot-aside';
+
+      console.log('🔧 [ContentScript] Creating component with container ID:', containerId);
+
+      window.postMessage({
+        type: 'CREATE_COMPONENT',
+        id: messageId,
+        containerId,
+        props: {
+          // Don't pass functions - handle via separate messages
+          // We'll set up message handlers for component interactions
+        }
+      }, '*');
+
+      // Timeout
+      setTimeout(() => {
+        window.removeEventListener('message', responseHandler);
+        reject(new Error('Timeout creating component'));
+      }, 5000);
+    });
+  }
+
+  private setupComponentMessageHandlers(): void {
+    // Listen for component events
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+
+      switch (event.data.type) {
+        case 'CHATBOT_CLOSE':
+          this.closeChatbotPanel();
+          break;
+
+        case 'REQUEST_TICKET_DATA':
+          this.handleTicketDataRequest(event.data.id);
+          break;
+
+        case 'CHAT_MESSAGE':
+          this.handleChatMessage(event.data.message, event.data.id);
+          break;
+
+        case 'REQUEST_SUMMARY':
+          this.handleSummaryRequest(event.data.ticketData, event.data.id);
+          break;
+      }
+    });
+  }
+
+  private async handleTicketDataRequest(messageId: string): Promise<void> {
+    try {
+      const ticketData = await this.ticketAnalyzer.extractTicketData();
+      window.postMessage({
+        type: 'TICKET_DATA_RESPONSE',
+        id: messageId,
+        success: true,
+        data: ticketData
+      }, '*');
+    } catch (error) {
+      window.postMessage({
+        type: 'TICKET_DATA_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleChatMessage(message: string, messageId: string): Promise<void> {
+    try {
+      // Handle chat messages via background script
+      const response = await chrome.runtime.sendMessage({
+        action: 'chatWithAI',
+        data: { message }
+      });
+
+      window.postMessage({
+        type: 'CHAT_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.response : null,
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      window.postMessage({
+        type: 'CHAT_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleSummaryRequest(ticketData: any, messageId: string): Promise<void> {
+    try {
+      // Handle summary request via background script
+      const response = await chrome.runtime.sendMessage({
+        action: 'requestTicketSummary',
+        data: {
+          ticketId: ticketData.id,
+          ticketData: ticketData
+        }
+      });
+
+      window.postMessage({
+        type: 'SUMMARY_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.summary : null,
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      window.postMessage({
+        type: 'SUMMARY_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async waitForGlobals(maxAttempts = 10, delay = 200): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+
+      const checkGlobals = () => {
+        attempts++;
+        console.log(`🔍 [ContentScript] Checking globals (attempt ${attempts}/${maxAttempts})`);
+
+        // Try to access globals in different ways
+        let React, ReactDOM, ChatbotAsidePanel;
+
+        try {
+          React = (window as any).React;
+          ReactDOM = (window as any).ReactDOM;
+          ChatbotAsidePanel = (window as any).ChatbotAsidePanel;
+        } catch (error) {
+          console.warn('🔍 [ContentScript] Error accessing window globals:', error);
+        }
+
+        // Also try accessing through document or other means
+        if (!React) {
+          try {
+            React = (document as any).React || (globalThis as any).React;
+          } catch (e) {}
+        }
+
+        if (!ReactDOM) {
+          try {
+            ReactDOM = (document as any).ReactDOM || (globalThis as any).ReactDOM;
+          } catch (e) {}
+        }
+
+        if (!ChatbotAsidePanel) {
+          try {
+            ChatbotAsidePanel = (document as any).ChatbotAsidePanel || (globalThis as any).ChatbotAsidePanel;
+          } catch (e) {}
+        }
+
+        console.log('🔍 [ContentScript] Globals check:', {
+          React: !!React,
+          ReactDOM: !!ReactDOM,
+          ChatbotAsidePanel: !!ChatbotAsidePanel,
+          windowKeys: Object.keys(window).filter(k => k.includes('React')).slice(0, 5)
+        });
+
+        if (React && ReactDOM && ChatbotAsidePanel) {
+          console.log('✅ [ContentScript] All globals found!');
+          // Store them for later use
+          this.reactGlobals = { React, ReactDOM, ChatbotAsidePanel };
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          console.error('❌ [ContentScript] Failed to find globals. Window keys:', Object.keys(window).slice(0, 20));
+          reject(new Error(`Globals not available after ${maxAttempts} attempts. React: ${!!React}, ReactDOM: ${!!ReactDOM}, ChatbotAsidePanel: ${!!ChatbotAsidePanel}`));
+        } else {
+          setTimeout(checkGlobals, delay);
+        }
+      };
+
+      checkGlobals();
+    });
+  }
+
+  private reactGlobals: any = {};
 
   private async analyzeTicket() {
     try {
@@ -218,130 +486,28 @@ class BacklogAIInjector {
     return this.ticketAnalyzer;
   }
 
-  private async handleTicketSummary() {
-    const summaryContainer = document.getElementById('ai-ext-summary-container');
-    const summaryButton = document.querySelector('.ai-ext-summary-button') as HTMLButtonElement;
-
-    if (!summaryContainer || !summaryButton) {
-      console.error('Summary container or button not found');
-      return;
+  // Cleanup method when extension is disabled/removed
+  public cleanup() {
+    if (this.reactRoot) {
+      try {
+        this.reactRoot.unmount();
+        this.reactRoot = null;
+      } catch (error) {
+        console.error('Error unmounting React component:', error);
+      }
     }
 
-    try {
-      // Disable button and show loading
-      summaryButton.disabled = true;
-      summaryButton.innerHTML = '⏳ Đang tạo summary...';
-
-      // Clear previous content
-      summaryContainer.innerHTML = `
-        <div class="ai-ext-loading">
-          <div class="ai-ext-spinner"></div>
-          <p>AI đang phân tích ticket...</p>
-        </div>
-      `;
-
-      // Load Backlog settings first
-      const backlogSettings = await this.getBacklogSettings();
-      console.warn('🔎 [DEBUG] BacklogAIInjector ~ handleTicketSummary ~ backlogSettings:', backlogSettings);
-      console.warn('🔎 [DEBUG] BacklogAIInjector ~ handleTicketSummary ~ configs:', backlogSettings.configs);
-      console.warn('🔎 [DEBUG] BacklogAIInjector ~ handleTicketSummary ~ current URL:', window.location.href);
-
-      if (backlogSettings.configs && backlogSettings.configs.length > 0) {
-        console.warn('🔎 [DEBUG] Updating ticketAnalyzer with settings...');
-        this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
-      } else {
-        console.error('⚠️ [DEBUG] No Backlog configs found in settings');
-      }
-
-      // Extract ticket data
-      const ticketData = await this.ticketAnalyzer.extractTicketData();
-      console.warn('🔎 [DEBUG] BacklogAIInjector ~ handleTicketSummary ~ ticketData:', ticketData);
-
-      if (!ticketData || !ticketData.id) {
-        throw new Error('Không thể trích xuất thông tin ticket');
-      }
-
-      // Send request to background script for AI summary
-      const response = await this.requestAISummary(ticketData);
-
-      // Display the summary
-      this.displaySummary(response.summary || response.response);
-
-    } catch (error) {
-      console.error('Error getting ticket summary:', error);
-      this.displayError(String(error));
-    } finally {
-      // Re-enable button
-      summaryButton.disabled = false;
-      summaryButton.innerHTML = '📋 Summary nội dung ticket';
+    if (this.chatbotAsideContainer) {
+      this.chatbotAsideContainer.remove();
+      this.chatbotAsideContainer = null;
     }
-  }
 
-  private async requestAISummary(ticketData: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: 'requestTicketSummary',
-        data: {
-          ticketId: ticketData.id,
-          ticketData: ticketData
-        }
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else if (response && response.success) {
-          resolve(response);
-        } else {
-          reject(new Error(response?.error || 'Unknown error'));
-        }
-      });
-    });
-  }
+    if (this.chatbotToggleButton) {
+      this.chatbotToggleButton.remove();
+      this.chatbotToggleButton = null;
+    }
 
-  private displaySummary(summary: string) {
-    const summaryContainer = document.getElementById('ai-ext-summary-container');
-    if (!summaryContainer) return;
-
-    summaryContainer.innerHTML = `
-      <div class="ai-ext-summary-result">
-        <div class="ai-ext-summary-header">
-          <span class="ai-ext-summary-icon">📋</span>
-          <h4>Tóm tắt ticket</h4>
-          <button class="ai-ext-clear-button" onclick="this.parentElement.parentElement.parentElement.innerHTML = ''">✕</button>
-        </div>
-        <div class="ai-ext-summary-content">
-          ${this.formatSummaryContent(summary)}
-        </div>
-        <div class="ai-ext-summary-footer">
-          <small>Được tạo bởi AI • ${new Date().toLocaleString('vi-VN')}</small>
-        </div>
-      </div>
-    `;
-  }
-
-  private displayError(error: string) {
-    const summaryContainer = document.getElementById('ai-ext-summary-container');
-    if (!summaryContainer) return;
-
-    summaryContainer.innerHTML = `
-      <div class="ai-ext-summary-error">
-        <div class="ai-ext-error-icon">⚠️</div>
-        <div class="ai-ext-error-message">
-          <strong>Lỗi khi tạo summary:</strong>
-          <p>${error}</p>
-        </div>
-        <button class="ai-ext-retry-button" onclick="this.parentElement.parentElement.innerHTML = ''">Thử lại</button>
-      </div>
-    `;
-  }
-
-  private formatSummaryContent(content: string): string {
-    // Convert markdown-like formatting to HTML
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^(.*)$/, '<p>$1</p>');
+    document.body.classList.remove('ai-ext-sidebar-open');
   }
 }
 
@@ -357,3 +523,17 @@ const injector = new BacklogAIInjector();
     return null;
   }
 };
+
+// Expose cleanup function for extension lifecycle
+(window as any).cleanupBacklogAI = () => {
+  try {
+    injector.cleanup();
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+};
+
+// Cleanup when page is unloaded
+window.addEventListener('beforeunload', () => {
+  injector.cleanup();
+});

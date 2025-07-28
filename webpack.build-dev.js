@@ -12,6 +12,7 @@ module.exports = {
     background: './src/background/background.ts',
     popup: './src/popup/popup.tsx',
     chatbot: './src/chatbot/chatbot.tsx',
+    'chatbot-aside-panel': './src/content/ChatbotAsidePanelEntry.tsx',
     // SCSS entries
     'content-styles': './src/content/content.scss',
     'sidebar-styles': './src/content/sidebar.scss',
