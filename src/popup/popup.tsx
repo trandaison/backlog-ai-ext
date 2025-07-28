@@ -16,6 +16,8 @@ interface Settings {
   language: string;
   aiModel: string;
   backlogConfigs: BacklogApiConfig[];
+  geminiApiKey?: string;
+  preferredProvider?: 'openai' | 'gemini';
 }
 
 interface StoredSettings {
@@ -24,6 +26,8 @@ interface StoredSettings {
   language: string;
   aiModel: string;
   backlogConfigs?: BacklogApiConfig[];
+  encryptedGeminiApiKey?: string;
+  preferredProvider?: 'openai' | 'gemini';
 }
 
 const PopupApp: React.FC = () => {
@@ -34,7 +38,9 @@ const PopupApp: React.FC = () => {
     userRole: 'developer',
     language: 'vi',
     aiModel: 'gpt-3.5-turbo',
-    backlogConfigs: []
+    backlogConfigs: [],
+    geminiApiKey: '',
+    preferredProvider: 'openai'
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +48,7 @@ const PopupApp: React.FC = () => {
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   const [isValidatingKey, setIsValidatingKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showGeminiApiKey, setShowGeminiApiKey] = useState(false);
   const [showBacklogSection, setShowBacklogSection] = useState(false);
   const [editingBacklogConfig, setEditingBacklogConfig] = useState<BacklogApiConfig | null>(null);
   const [showBacklogApiKey, setShowBacklogApiKey] = useState<{[key: string]: boolean}>({});
@@ -62,29 +69,52 @@ const PopupApp: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const result = await chrome.storage.sync.get(['encryptedApiKey', 'userRole', 'language', 'aiModel', 'backlogConfigs']);
+      const result = await chrome.storage.sync.get([
+        'encryptedApiKey', 
+        'encryptedGeminiApiKey', 
+        'preferredProvider',
+        'userRole', 
+        'language', 
+        'aiModel', 
+        'backlogConfigs'
+      ]);
 
       const storedSettings: StoredSettings = {
         encryptedApiKey: result.encryptedApiKey || '',
+        encryptedGeminiApiKey: result.encryptedGeminiApiKey || '',
+        preferredProvider: result.preferredProvider || 'openai',
         userRole: result.userRole || 'developer',
         language: result.language || 'vi',
         aiModel: result.aiModel || 'gpt-3.5-turbo',
         backlogConfigs: result.backlogConfigs || []
       };
 
-      // Decrypt API key if exists
+      // Decrypt API keys if they exist
       let decryptedApiKey = '';
+      let decryptedGeminiApiKey = '';
+      
       if (storedSettings.encryptedApiKey) {
         try {
           decryptedApiKey = await EncryptionService.decryptApiKey(storedSettings.encryptedApiKey);
         } catch (error) {
-          console.error('Failed to decrypt API key:', error);
-          showMessage('Lỗi khi giải mã API key. Vui lòng nhập lại.', 'error');
+          console.error('Failed to decrypt OpenAI API key:', error);
+          showMessage('Lỗi khi giải mã OpenAI API key. Vui lòng nhập lại.', 'error');
+        }
+      }
+
+      if (storedSettings.encryptedGeminiApiKey) {
+        try {
+          decryptedGeminiApiKey = await EncryptionService.decryptApiKey(storedSettings.encryptedGeminiApiKey);
+        } catch (error) {
+          console.error('Failed to decrypt Gemini API key:', error);
+          showMessage('Lỗi khi giải mã Gemini API key. Vui lòng nhập lại.', 'error');
         }
       }
 
       setSettings({
         apiKey: decryptedApiKey,
+        geminiApiKey: decryptedGeminiApiKey,
+        preferredProvider: storedSettings.preferredProvider,
         userRole: storedSettings.userRole,
         language: storedSettings.language,
         aiModel: storedSettings.aiModel,
@@ -95,31 +125,52 @@ const PopupApp: React.FC = () => {
       showMessage('Lỗi khi tải cài đặt', 'error');
     }
   };  const saveSettings = async () => {
-    if (!settings.apiKey.trim()) {
-      showMessage('Vui lòng nhập API key', 'error');
-      return;
-    }
-
-    // Validate OpenAI API key format
-    if (!EncryptionService.validateApiKey(settings.apiKey)) {
-      showMessage('OpenAI API key không đúng định dạng. API key phải bắt đầu bằng "sk-"', 'error');
-      return;
+    // Validate based on preferred provider
+    if (settings.preferredProvider === 'openai') {
+      if (!settings.apiKey.trim()) {
+        showMessage('Vui lòng nhập OpenAI API key', 'error');
+        return;
+      }
+      if (!EncryptionService.validateApiKey(settings.apiKey)) {
+        showMessage('OpenAI API key không đúng định dạng. API key phải bắt đầu bằng "sk-"', 'error');
+        return;
+      }
+    } else if (settings.preferredProvider === 'gemini') {
+      if (!settings.geminiApiKey?.trim()) {
+        showMessage('Vui lòng nhập Gemini API key', 'error');
+        return;
+      }
+      // Gemini API keys start with "AI" followed by letters/numbers
+      if (!settings.geminiApiKey.match(/^AI[a-zA-Z0-9_-]+$/)) {
+        showMessage('Gemini API key không đúng định dạng', 'error');
+        return;
+      }
     }
 
     setIsLoading(true);
     showMessage('Đang lưu...', 'success');
 
     try {
-      // Encrypt API key before storing
-      const encryptedApiKey = await EncryptionService.encryptApiKey(settings.apiKey);
-
+      // Encrypt API keys before storing
       const dataToStore: StoredSettings = {
-        encryptedApiKey,
+        encryptedApiKey: '',
+        encryptedGeminiApiKey: '',
+        preferredProvider: settings.preferredProvider,
         userRole: settings.userRole,
         language: settings.language,
         aiModel: settings.aiModel,
         backlogConfigs: settings.backlogConfigs
       };
+
+      // Encrypt OpenAI API key if provided
+      if (settings.apiKey.trim()) {
+        dataToStore.encryptedApiKey = await EncryptionService.encryptApiKey(settings.apiKey);
+      }
+
+      // Encrypt Gemini API key if provided
+      if (settings.geminiApiKey?.trim()) {
+        dataToStore.encryptedGeminiApiKey = await EncryptionService.encryptApiKey(settings.geminiApiKey);
+      }
 
       await chrome.storage.sync.set(dataToStore);
 
@@ -296,6 +347,37 @@ const PopupApp: React.FC = () => {
     }));
   };
 
+  // Get available models based on selected provider
+  const getAvailableModels = () => {
+    if (settings.preferredProvider === 'gemini') {
+      return [
+        { value: 'gemini-pro', label: 'Gemini Pro' },
+        { value: 'gemini-pro-vision', label: 'Gemini Pro Vision' }
+      ];
+    } else {
+      return [
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+        { value: 'gpt-4', label: 'GPT-4' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+        { value: 'gpt-4o', label: 'GPT-4o' }
+      ];
+    }
+  };
+
+  // Update model when provider changes
+  const handleProviderChange = (provider: 'openai' | 'gemini') => {
+    const defaultModels = {
+      openai: 'gpt-3.5-turbo',
+      gemini: 'gemini-pro'
+    };
+
+    setSettings(prev => ({
+      ...prev,
+      preferredProvider: provider,
+      aiModel: defaultModels[provider]
+    }));
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
@@ -315,6 +397,7 @@ const PopupApp: React.FC = () => {
         </p>
       </div>
 
+      {/* AI Provider Selection */}
       <div style={{ marginBottom: '20px' }}>
         <label style={{
           display: 'block',
@@ -322,47 +405,131 @@ const PopupApp: React.FC = () => {
           fontSize: '14px',
           fontWeight: '500'
         }}>
-          OpenAI API Key:
+          🤖 AI Provider:
         </label>
-        <div style={{ position: 'relative' }}>
-          <input
-            type={showApiKey ? 'text' : 'password'}
-            value={settings.apiKey}
-            onChange={(e) => setSettings(prev => ({
-              ...prev,
-              apiKey: e.target.value
-            }))}
-            placeholder="sk-..."
-            style={{
-              width: '100%',
-              padding: '8px 40px 8px 12px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => setShowApiKey(!showApiKey)}
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
-          >
-            {showApiKey ? '🙈' : '👁️'}
-          </button>
-        </div>
+        <select
+          value={settings.preferredProvider}
+          onChange={(e) => handleProviderChange(e.target.value as 'openai' | 'gemini')}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+            boxSizing: 'border-box'
+          }}
+        >
+          <option value="openai">OpenAI (GPT Models)</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
         <small style={{ color: '#666', fontSize: '11px' }}>
-          API key sẽ được lưu trữ cục bộ và an toàn
+          Chọn nhà cung cấp AI cho chatbot
         </small>
       </div>
+
+      {/* OpenAI API Key - only show when OpenAI is selected */}
+      {settings.preferredProvider === 'openai' && (
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}>
+            OpenAI API Key:
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              value={settings.apiKey}
+              onChange={(e) => setSettings(prev => ({
+                ...prev,
+                apiKey: e.target.value
+              }))}
+              placeholder="sk-..."
+              style={{
+                width: '100%',
+                padding: '8px 40px 8px 12px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {showApiKey ? '🙈' : '👁️'}
+            </button>
+          </div>
+          <small style={{ color: '#666', fontSize: '11px' }}>
+            API key sẽ được lưu trữ cục bộ và an toàn
+          </small>
+        </div>
+      )}
+
+      {/* Gemini API Key - only show when Gemini is selected */}
+      {settings.preferredProvider === 'gemini' && (
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}>
+            Gemini API Key:
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showGeminiApiKey ? 'text' : 'password'}
+              value={settings.geminiApiKey || ''}
+              onChange={(e) => setSettings(prev => ({
+                ...prev,
+                geminiApiKey: e.target.value
+              }))}
+              placeholder="AI..."
+              style={{
+                width: '100%',
+                padding: '8px 40px 8px 12px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowGeminiApiKey(!showGeminiApiKey)}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {showGeminiApiKey ? '🙈' : '👁️'}
+            </button>
+          </div>
+          <small style={{ color: '#666', fontSize: '11px' }}>
+            Lấy API key từ Google AI Studio
+          </small>
+        </div>
+      )}
 
       <div style={{ marginBottom: '20px' }}>
         <label style={{
@@ -388,9 +555,11 @@ const PopupApp: React.FC = () => {
             boxSizing: 'border-box'
           }}
         >
-          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-          <option value="gpt-4">GPT-4</option>
-          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+          {getAvailableModels().map(model => (
+            <option key={model.value} value={model.value}>
+              {model.label}
+            </option>
+          ))}
         </select>
       </div>
 

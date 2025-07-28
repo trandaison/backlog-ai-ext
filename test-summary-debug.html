@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Summary Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .loading { color: orange; }
+        .debug { background: #f0f0f0; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .logs { background: #333; color: #fff; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto; font-family: monospace; }
+        input, textarea, button { margin: 5px; padding: 8px; }
+        .flex { display: flex; gap: 10px; align-items: center; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Summary Debug</h1>
+    
+    <div class="test-panel">
+        <h2>📋 API Configuration</h2>
+        <div>
+            <h3>OpenAI API Key</h3>
+            <div class="flex">
+                <input type="password" id="openaiApiKey" placeholder="Enter OpenAI API Key" style="width: 300px;">
+                <button onclick="testOpenAIKey()">Test OpenAI</button>
+            </div>
+            <div id="openaiStatus"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Gemini API Key</h3>
+            <div class="flex">
+                <input type="password" id="geminiApiKey" placeholder="Enter Gemini API Key" style="width: 300px;">
+                <button onclick="testGeminiKey()">Test Gemini</button>
+            </div>
+            <div id="geminiStatus"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Preferred Provider</h3>
+            <select id="preferredProvider">
+                <option value="openai">OpenAI (GPT)</option>
+                <option value="gemini">Google Gemini</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="test-panel">
+        <h2>🎯 AI Summary Test</h2>
+        <div class="flex">
+            <button onclick="testSummaryGeneration()">Generate Summary</button>
+            <button onclick="testSummaryWithFallback()">Test with Fallback</button>
+        </div>
+        <div id="summaryStatus"></div>
+        <div id="summaryResult"></div>
+    </div>
+    
+    <div class="test-panel">
+        <h2>📝 Debug Logs</h2>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="logs" class="logs"></div>
+    </div>
+    
+    <script>
+        // Mock chrome APIs
+        window.chrome = {
+            runtime: {
+                sendMessage: async (message) => {
+                    log(`📤 Sending message: ${message.action}`);
+                    
+                    if (message.action === 'requestTicketSummary') {
+                        return await mockSummaryRequest(message.data);
+                    }
+                    
+                    return { success: false, error: 'Unknown action' };
+                },
+                getURL: (path) => `./${path}`
+            },
+            storage: {
+                sync: {
+                    get: async (keys) => {
+                        log(`📤 Storage get: ${JSON.stringify(keys)}`);
+                        const openaiKey = document.getElementById('openaiApiKey').value;
+                        const geminiKey = document.getElementById('geminiApiKey').value;
+                        const preferredProvider = document.getElementById('preferredProvider').value;
+                        
+                        const result = {};
+                        
+                        if (openaiKey) {
+                            result.encryptedApiKey = btoa(openaiKey);
+                        }
+                        if (geminiKey) {
+                            result.encryptedGeminiApiKey = btoa(geminiKey);
+                        }
+                        
+                        result.userRole = 'developer';
+                        result.language = 'vi';
+                        result.aiModel = 'gpt-3.5-turbo';
+                        result.preferredProvider = preferredProvider;
+                        
+                        return result;
+                    },
+                    set: async (data) => {
+                        log(`📤 Storage set: ${JSON.stringify(Object.keys(data))}`);
+                        return true;
+                    }
+                }
+            }
+        };
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        async function testOpenAIKey() {
+            const apiKey = document.getElementById('openaiApiKey').value;
+            const status = document.getElementById('openaiStatus');
+            
+            if (!apiKey) {
+                status.innerHTML = '<p class="error">❌ Please enter OpenAI API key</p>';
+                return;
+            }
+            
+            status.innerHTML = '<p class="loading">⏳ Testing OpenAI API key...</p>';
+            log(`🔑 Testing OpenAI API key: ${apiKey.substring(0, 8)}...`);
+            
+            try {
+                const response = await fetch('https://api.openai.com/v1/models', {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+                
+                if (response.ok) {
+                    status.innerHTML = '<p class="success">✅ OpenAI API key is valid</p>';
+                    log('✅ OpenAI API key validation successful');
+                } else {
+                    const errorText = await response.text();
+                    status.innerHTML = `<p class="error">❌ OpenAI API key invalid: ${response.status}</p>`;
+                    log(`❌ OpenAI API key validation failed: ${response.status} - ${errorText}`);
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error testing OpenAI API key: ${error.message}</p>`;
+                log(`❌ OpenAI API key test error: ${error.message}`);
+            }
+        }
+        
+        async function testGeminiKey() {
+            const apiKey = document.getElementById('geminiApiKey').value;
+            const status = document.getElementById('geminiStatus');
+            
+            if (!apiKey) {
+                status.innerHTML = '<p class="error">❌ Please enter Gemini API key</p>';
+                return;
+            }
+            
+            status.innerHTML = '<p class="loading">⏳ Testing Gemini API key...</p>';
+            log(`🔑 Testing Gemini API key: ${apiKey.substring(0, 8)}...`);
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: "Test connection"
+                            }]
+                        }]
+                    })
+                });
+                
+                if (response.ok) {
+                    status.innerHTML = '<p class="success">✅ Gemini API key is valid</p>';
+                    log('✅ Gemini API key validation successful');
+                } else {
+                    const errorText = await response.text();
+                    status.innerHTML = `<p class="error">❌ Gemini API key invalid: ${response.status}</p>`;
+                    log(`❌ Gemini API key validation failed: ${response.status} - ${errorText}`);
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error testing Gemini API key: ${error.message}</p>`;
+                log(`❌ Gemini API key test error: ${error.message}`);
+            }
+        }
+        
+        async function testApiKey() {
+            // Test both keys
+            await testOpenAIKey();
+            await testGeminiKey();
+        }
+        
+        async function testSummaryGeneration() {
+            const status = document.getElementById('summaryStatus');
+            const result = document.getElementById('summaryResult');
+            
+            status.innerHTML = '<p class="loading">⏳ Generating summary...</p>';
+            result.innerHTML = '';
+            
+            const mockTicketData = {
+                id: 'TEST-001',
+                title: 'Bug trong chức năng đăng nhập',
+                description: 'Người dùng không thể đăng nhập vào hệ thống khi sử dụng email có ký tự đặc biệt.',
+                status: 'Open',
+                priority: 'High',
+                assignee: 'John Doe',
+                reporter: 'Jane Smith',
+                dueDate: '2025-02-01',
+                labels: ['bug', 'authentication', 'urgent']
+            };
+            
+            log('🎯 Starting summary generation...');
+            log(`📝 Mock ticket: ${mockTicketData.id} - ${mockTicketData.title}`);
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'requestTicketSummary',
+                    data: {
+                        ticketId: mockTicketData.id,
+                        ticketData: mockTicketData
+                    }
+                });
+                
+                log(`📥 Summary response: ${JSON.stringify(response)}`);
+                
+                if (response.success) {
+                    status.innerHTML = '<p class="success">✅ Summary generated successfully</p>';
+                    result.innerHTML = `<div class="debug"><strong>Summary:</strong><br>${response.summary}</div>`;
+                } else {
+                    status.innerHTML = `<p class="error">❌ Summary generation failed: ${response.error}</p>`;
+                    result.innerHTML = `<div class="debug"><strong>Error:</strong><br>${response.error}</div>`;
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                log(`❌ Summary generation error: ${error.message}`);
+            }
+        }
+        
+        async function testSummaryWithFallback() {
+            const status = document.getElementById('summaryStatus');
+            const result = document.getElementById('summaryResult');
+            
+            status.innerHTML = '<p class="loading">⏳ Testing summary with fallback...</p>';
+            result.innerHTML = '';
+            
+            const mockTicketData = {
+                id: 'TEST-001',
+                title: 'Bug trong chức năng đăng nhập',
+                description: 'Người dùng không thể đăng nhập vào hệ thống khi sử dụng email có ký tự đặc biệt.',
+                status: 'Open',
+                priority: 'High',
+                assignee: 'John Doe',
+                reporter: 'Jane Smith',
+                dueDate: '2025-02-01',
+                labels: ['bug', 'authentication', 'urgent']
+            };
+            
+            log('🎯 Starting summary generation with fallback test...');
+            
+            // First try with invalid OpenAI key to test fallback
+            document.getElementById('openaiApiKey').value = 'invalid-key';
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'requestTicketSummary',
+                    data: {
+                        ticketId: mockTicketData.id,
+                        ticketData: mockTicketData
+                    }
+                });
+                
+                log(`📥 Summary response: ${JSON.stringify(response)}`);
+                
+                if (response.success) {
+                    status.innerHTML = '<p class="success">✅ Summary generated with fallback</p>';
+                    result.innerHTML = `<div class="debug"><strong>Summary:</strong><br>${response.summary}</div>`;
+                } else {
+                    status.innerHTML = `<p class="error">❌ Summary generation failed: ${response.error}</p>`;
+                    result.innerHTML = `<div class="debug"><strong>Error:</strong><br>${response.error}</div>`;
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                log(`❌ Summary generation error: ${error.message}`);
+            }
+        }
+            const status = document.getElementById('summaryStatus');
+            const result = document.getElementById('summaryResult');
+            
+            status.innerHTML = '<p class="loading">⏳ Generating summary...</p>';
+            result.innerHTML = '';
+            
+            const mockTicketData = {
+                id: 'TEST-001',
+                title: 'Bug trong chức năng đăng nhập',
+                description: 'Người dùng không thể đăng nhập vào hệ thống khi sử dụng email có ký tự đặc biệt.',
+                status: 'Open',
+                priority: 'High',
+                assignee: 'John Doe',
+                reporter: 'Jane Smith',
+                dueDate: '2025-02-01',
+                labels: ['bug', 'authentication', 'urgent'],
+                comments: [
+                    {
+                        author: 'Jane Smith',
+                        content: 'Lỗi xảy ra khi email chứa ký tự + hoặc .',
+                        timestamp: '2025-01-28T10:00:00Z'
+                    }
+                ]
+            };
+            
+            log('🎯 Starting mock summary generation...');
+            log(`📝 Mock ticket: ${mockTicketData.id} - ${mockTicketData.title}`);
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'requestTicketSummary',
+                    data: {
+                        ticketId: mockTicketData.id,
+                        ticketData: mockTicketData
+                    }
+                });
+                
+                log(`📥 Summary response: ${JSON.stringify(response)}`);
+                
+                if (response.success) {
+                    status.innerHTML = '<p class="success">✅ Summary generated successfully</p>';
+                    result.innerHTML = `<div class="debug"><strong>Summary:</strong><br>${response.summary}</div>`;
+                } else {
+                    status.innerHTML = `<p class="error">❌ Summary generation failed: ${response.error}</p>`;
+                    result.innerHTML = `<div class="debug"><strong>Error:</strong><br>${response.error}</div>`;
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                log(`❌ Summary generation error: ${error.message}`);
+            }
+        }
+        
+        async function testSummaryWithFallback() {
+            const status = document.getElementById('summaryStatus');
+            const result = document.getElementById('summaryResult');
+            
+            status.innerHTML = '<p class="loading">⏳ Testing summary with fallback...</p>';
+            result.innerHTML = '';
+            
+            const mockTicketData = {
+                id: 'TEST-FALLBACK',
+                title: 'Test fallback mechanism',
+                description: 'Testing if system can fallback from OpenAI to Gemini when quota exceeded',
+                status: 'Testing',
+                priority: 'High'
+            };
+            
+            log('🎯 Starting summary generation with fallback test...');
+            
+            // Temporarily set invalid OpenAI key to test fallback
+            const originalOpenAI = document.getElementById('openaiApiKey').value;
+            document.getElementById('openaiApiKey').value = 'sk-invalid-key-to-test-fallback';
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'requestTicketSummary',
+                    data: {
+                        ticketId: mockTicketData.id,
+                        ticketData: mockTicketData
+                    }
+                });
+                
+                log(`📥 Fallback test response: ${JSON.stringify(response)}`);
+                
+                if (response.success) {
+                    status.innerHTML = '<p class="success">✅ Summary generated with fallback mechanism</p>';
+                    result.innerHTML = `<div class="debug"><strong>Fallback Summary:</strong><br>${response.summary}</div>`;
+                } else {
+                    status.innerHTML = `<p class="error">❌ Fallback test failed: ${response.error}</p>`;
+                    result.innerHTML = `<div class="debug"><strong>Error:</strong><br>${response.error}</div>`;
+                }
+            } catch (error) {
+                status.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                log(`❌ Fallback test error: ${error.message}`);
+            } finally {
+                // Restore original OpenAI key
+                document.getElementById('openaiApiKey').value = originalOpenAI;
+            }
+        }
+        
+        async function mockSummaryRequest(data) {
+            log('🔄 Mock summary request processing...');
+            
+            const apiKey = document.getElementById('apiKey').value;
+            if (!apiKey) {
+                log('❌ No API key provided');
+                return { success: false, error: 'API key chưa được cấu hình' };
+            }
+            
+            log(`🔧 Using API key: ${apiKey.substring(0, 8)}...`);
+            log(`📝 Ticket data: ${JSON.stringify(data.ticketData, null, 2)}`);
+            
+            // Mock the summary prompt building
+            const prompt = `Hãy tạo tóm tắt cho ticket sau:
+ID: ${data.ticketData.id}
+Title: ${data.ticketData.title}
+Description: ${data.ticketData.description}
+Status: ${data.ticketData.status}
+Priority: ${data.ticketData.priority}`;
+            
+            log(`📝 Generated prompt (${prompt.length} chars)`);
+            
+            try {
+                log('🔄 Calling OpenAI API...');
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'Bạn là một AI assistant giúp summarize ticket một cách chính xác và hữu ích.'
+                            },
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        max_tokens: 500,
+                        temperature: 0.3
+                    })
+                });
+                
+                log(`🔧 Response status: ${response.status}`);
+                log(`🔧 Response ok: ${response.ok}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ API Error Response: ${errorText}`);
+                    throw new Error(`API Error ${response.status}: ${errorText}`);
+                }
+                
+                const responseData = await response.json();
+                log(`🔧 API Response structure: ${JSON.stringify({
+                    hasChoices: !!responseData.choices,
+                    choicesLength: responseData.choices?.length,
+                    hasError: !!responseData.error
+                })}`);
+                
+                if (responseData.error) {
+                    throw new Error(`OpenAI API Error: ${responseData.error.message}`);
+                }
+                
+                if (responseData.choices && responseData.choices[0] && responseData.choices[0].message && responseData.choices[0].message.content) {
+                    const summary = responseData.choices[0].message.content;
+                    log(`✅ Summary generated successfully (${summary.length} chars)`);
+                    return { success: true, summary };
+                } else {
+                    log('❌ Invalid API response structure');
+                    throw new Error('Invalid API response - no content in choices');
+                }
+            } catch (error) {
+                log(`❌ Error calling OpenAI API: ${error.message}`);
+                return { success: false, error: `Lỗi khi gọi AI API: ${error.message}` };
+            }
+        }
+        
+        // Auto-focus on first API key input
+        window.addEventListener('load', () => {
+            document.getElementById('openaiApiKey').focus();
+            log('🚀 Multi-AI summary debug test page loaded');
+            log('💡 Configure API keys and test the AI integration with fallback support');
+        });
+    </script>
+</body>
+</html>

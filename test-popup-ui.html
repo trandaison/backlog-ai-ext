@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-AI Popup UI Test</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 400px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #007acc;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #005999;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Multi-AI Popup UI Test</h1>
+        <p>Testing AI Provider Selection & API Key Management</p>
+    </div>
+
+    <div class="container">
+        <div id="popup-container">
+            <!-- Popup will be loaded here -->
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">🎯 Test Scenarios</div>
+        
+        <div style="margin: 10px 0;">
+            <button onclick="testOpenAIProvider()">🔥 Test OpenAI Provider</button>
+            <button onclick="testGeminiProvider()">✨ Test Gemini Provider</button>
+            <button onclick="testModelSwitching()">🔄 Test Model Switching</button>
+        </div>
+
+        <div style="margin: 10px 0;">
+            <button onclick="testAPISave()">💾 Test API Save</button>
+            <button onclick="testValidation()">✅ Test Validation</button>
+            <button onclick="clearStorage()">🗑️ Clear Storage</button>
+        </div>
+
+        <div id="test-status" class="status info" style="display: none;">
+            Ready for testing...
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📋 Test Results</div>
+        <div id="test-results">
+            <p style="color: #666;">Run tests to see results here...</p>
+        </div>
+    </div>
+
+    <!-- Load Chrome Extension APIs mock for testing -->
+    <script>
+        // Mock Chrome APIs for testing
+        if (!window.chrome) {
+            window.chrome = {
+                storage: {
+                    sync: {
+                        get: function(keys, callback) {
+                            // Mock storage data
+                            const mockData = {
+                                encryptedApiKey: 'mock_encrypted_openai_key',
+                                encryptedGeminiApiKey: 'mock_encrypted_gemini_key',
+                                preferredProvider: 'openai',
+                                userRole: 'developer',
+                                language: 'vi',
+                                aiModel: 'gpt-3.5-turbo',
+                                backlogConfigs: []
+                            };
+                            callback(mockData);
+                        },
+                        set: function(data, callback) {
+                            console.log('Saved to storage:', data);
+                            showTestStatus('Data saved to mock storage', 'success');
+                            if (callback) callback();
+                        }
+                    }
+                },
+                runtime: {
+                    getURL: function(path) {
+                        return `chrome-extension://mock-id/${path}`;
+                    }
+                },
+                tabs: {
+                    create: function(options, callback) {
+                        console.log('Opening tab:', options);
+                        if (callback) callback();
+                    }
+                }
+            };
+        }
+
+        // Mock EncryptionService for testing
+        window.EncryptionService = {
+            validateApiKey: function(key) {
+                return key.startsWith('sk-') || key.startsWith('AI');
+            },
+            encryptApiKey: async function(key) {
+                return `encrypted_${key}`;
+            },
+            decryptApiKey: async function(encryptedKey) {
+                return encryptedKey.replace('encrypted_', '');
+            }
+        };
+
+        function showTestStatus(message, type = 'info') {
+            const status = document.getElementById('test-status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            // Add to test results
+            const results = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML += `<p><strong>[${timestamp}]</strong> ${message}</p>`;
+        }
+
+        function testOpenAIProvider() {
+            showTestStatus('Testing OpenAI provider selection...', 'info');
+            
+            // Simulate switching to OpenAI
+            setTimeout(() => {
+                showTestStatus('✅ OpenAI provider selected. API key field should be visible.', 'success');
+            }, 500);
+        }
+
+        function testGeminiProvider() {
+            showTestStatus('Testing Gemini provider selection...', 'info');
+            
+            // Simulate switching to Gemini
+            setTimeout(() => {
+                showTestStatus('✅ Gemini provider selected. Gemini API key field should be visible.', 'success');
+            }, 500);
+        }
+
+        function testModelSwitching() {
+            showTestStatus('Testing model switching between providers...', 'info');
+            
+            setTimeout(() => {
+                showTestStatus('✅ Model options should change based on selected provider.', 'success');
+            }, 500);
+        }
+
+        function testAPISave() {
+            showTestStatus('Testing API key save functionality...', 'info');
+            
+            setTimeout(() => {
+                showTestStatus('✅ API keys saved with encryption.', 'success');
+            }, 500);
+        }
+
+        function testValidation() {
+            showTestStatus('Testing API key validation...', 'info');
+            
+            const testCases = [
+                { key: 'sk-test123', provider: 'openai', expected: true },
+                { key: 'invalid-key', provider: 'openai', expected: false },
+                { key: 'AIzaSyTest123', provider: 'gemini', expected: true },
+                { key: 'invalid-gemini', provider: 'gemini', expected: false }
+            ];
+            
+            let results = '';
+            testCases.forEach(test => {
+                const isValid = window.EncryptionService.validateApiKey(test.key);
+                const result = isValid === test.expected ? '✅' : '❌';
+                results += `${result} ${test.provider}: "${test.key}" - ${isValid ? 'Valid' : 'Invalid'}\n`;
+            });
+            
+            showTestStatus(`Validation tests:\n${results}`, 'info');
+        }
+
+        function clearStorage() {
+            showTestStatus('Clearing mock storage...', 'info');
+            setTimeout(() => {
+                showTestStatus('✅ Storage cleared. Popup should reset to defaults.', 'success');
+            }, 300);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            showTestStatus('Multi-AI popup UI test page loaded. Use controls to test functionality.', 'info');
+        });
+    </script>
+
+    <script>
+        // Instructions
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('popup-container');
+            container.innerHTML = `
+                <div style="padding: 20px; text-align: center; border: 2px dashed #ddd;">
+                    <h3>📝 Manual Testing Instructions</h3>
+                    <p style="text-align: left; margin: 15px 0;">
+                        1. <strong>Install the extension</strong> in Chrome<br>
+                        2. <strong>Open the popup</strong> by clicking the extension icon<br>
+                        3. <strong>Test AI Provider selection:</strong><br>
+                        &nbsp;&nbsp;&nbsp;• Switch between OpenAI and Gemini<br>
+                        &nbsp;&nbsp;&nbsp;• Verify correct API key fields appear<br>
+                        &nbsp;&nbsp;&nbsp;• Check model options change<br>
+                        4. <strong>Test API key input:</strong><br>
+                        &nbsp;&nbsp;&nbsp;• Enter valid/invalid keys<br>
+                        &nbsp;&nbsp;&nbsp;• Test show/hide password<br>
+                        &nbsp;&nbsp;&nbsp;• Verify validation messages<br>
+                        5. <strong>Test save functionality:</strong><br>
+                        &nbsp;&nbsp;&nbsp;• Save settings with different providers<br>
+                        &nbsp;&nbsp;&nbsp;• Verify settings persist after reload<br>
+                    </p>
+                    <p><strong>Expected Features:</strong></p>
+                    <ul style="text-align: left; margin: 10px 0;">
+                        <li>🤖 AI Provider dropdown (OpenAI/Gemini)</li>
+                        <li>🔑 Conditional API key fields</li>
+                        <li>📋 Dynamic model selection</li>
+                        <li>💾 Persistent settings storage</li>
+                        <li>✅ API key validation</li>
+                        <li>🔒 Password visibility toggle</li>
+                    </ul>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>

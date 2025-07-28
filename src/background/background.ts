@@ -7,6 +7,8 @@ interface Settings {
   userRole: string;
   language: string;
   aiModel: string;
+  geminiApiKey?: string;
+  preferredProvider?: 'openai' | 'gemini';
 }
 
 interface StoredSettings {
@@ -14,6 +16,8 @@ interface StoredSettings {
   userRole: string;
   language: string;
   aiModel: string;
+  encryptedGeminiApiKey?: string;
+  preferredProvider?: 'openai' | 'gemini';
 }
 
 interface BacklogSettings {
@@ -35,6 +39,159 @@ interface BacklogMultiSettings {
 interface AIService {
   analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string>;
   processUserMessage(message: string, context: any, settings?: Settings): Promise<string>;
+}
+
+class GeminiService implements AIService {
+  private apiKey: string = '';
+  private baseApiUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+  constructor() {
+    this.loadApiKey();
+  }
+
+  private async loadApiKey() {
+    try {
+      const result = await chrome.storage.sync.get(['encryptedGeminiApiKey']);
+      if (result.encryptedGeminiApiKey) {
+        this.apiKey = await EncryptionService.decryptApiKey(result.encryptedGeminiApiKey);
+        console.log('🔑 [Gemini] API key loaded successfully');
+      }
+    } catch (error) {
+      console.error('❌ [Gemini] Error loading API key:', error);
+    }
+  }
+
+  private getApiUrl(model: string = 'gemini-pro'): string {
+    return `${this.baseApiUrl}/${model}:generateContent`;
+  }
+
+  async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
+    const prompt = this.buildAnalysisPrompt(ticketData, settings);
+    return await this.callGeminiAPI(prompt, settings);
+  }
+
+  async processUserMessage(message: string, context: any, settings?: Settings): Promise<string> {
+    const prompt = this.buildChatPrompt(message, context, settings);
+    return await this.callGeminiAPI(prompt, settings);
+  }
+
+  private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
+    const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
+    const role = settings?.userRole || 'developer';
+
+    return `Bạn là một AI assistant chuyên phân tích ticket/issue cho ${role}. 
+Hãy phân tích ticket sau và đưa ra nhận xét hữu ích bằng ${language}:
+
+**Thông tin ticket:**
+- ID: ${ticketData.id}
+- Tiêu đề: ${ticketData.title}
+- Mô tả: ${ticketData.description}
+- Trạng thái: ${ticketData.status}
+- Độ ưu tiên: ${ticketData.priority}
+- Người được giao: ${ticketData.assignee}
+- Người báo cáo: ${ticketData.reporter}
+- Hạn chót: ${ticketData.dueDate}
+- Nhãn: ${ticketData.labels?.join(', ')}
+
+Hãy cung cấp:
+1. Tóm tắt ngắn gọn
+2. Mức độ phức tạp và ước tính thời gian
+3. Các bước xử lý được đề xuất
+4. Rủi ro và lưu ý cần chú ý`;
+  }
+
+  private buildChatPrompt(message: string, context: any, settings?: Settings): string {
+    const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
+    const role = settings?.userRole || 'developer';
+
+    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue. 
+Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
+
+    if (context.ticketData) {
+      prompt += `**Bối cảnh ticket hiện tại:**
+- ID: ${context.ticketData.id}
+- Tiêu đề: ${context.ticketData.title}
+- Trạng thái: ${context.ticketData.status}\n\n`;
+    }
+
+    if (context.chatHistory && context.chatHistory.length > 0) {
+      prompt += `**Lịch sử chat gần đây:**\n`;
+      context.chatHistory.slice(-3).forEach((msg: any) => {
+        prompt += `${msg.sender}: ${msg.content}\n`;
+      });
+      prompt += '\n';
+    }
+
+    prompt += `**Câu hỏi:** ${message}`;
+
+    return prompt;
+  }
+
+  private async callGeminiAPI(prompt: string, settings?: Settings): Promise<string> {
+    try {
+      const apiKey = settings?.geminiApiKey || this.apiKey;
+      if (!apiKey) {
+        return 'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
+      }
+
+      // Get model from settings or default to gemini-pro
+      const model = settings?.aiModel || 'gemini-pro';
+      const apiUrl = this.getApiUrl(model);
+
+      console.log('🔄 [Gemini] Calling Gemini API with model:', model);
+
+      const response = await fetch(`${apiUrl}?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+      });
+
+      console.log('🔧 [Gemini] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Gemini] API Error Response:', errorText);
+        throw new Error(`Gemini API Error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('🔧 [Gemini] API Response structure:', {
+        hasCandidates: !!data.candidates,
+        candidatesLength: data.candidates?.length,
+        hasError: !!data.error
+      });
+
+      if (data.error) {
+        throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+        const content = data.candidates[0].content.parts[0].text;
+        console.log('✅ [Gemini] Response generated successfully');
+        return content;
+      } else {
+        console.error('❌ [Gemini] Invalid API response structure:', data);
+        throw new Error('Invalid Gemini API response - no content in candidates');
+      }
+    } catch (error) {
+      console.error('❌ [Gemini] Error calling API:', error);
+      throw error;
+    }
+  }
 }
 
 class OpenAIService implements AIService {
@@ -59,6 +216,13 @@ class OpenAIService implements AIService {
     }
   }
 
+  private getOpenAIModel(settings?: Settings): string {
+    const model = settings?.aiModel || 'gpt-3.5-turbo';
+    // Ensure we only use OpenAI models
+    const openAIModels = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'];
+    return openAIModels.includes(model) ? model : 'gpt-3.5-turbo';
+  }
+
   async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
     if (!this.apiKey) {
       await this.loadApiKey(); // Try to reload in case it was updated
@@ -77,7 +241,7 @@ class OpenAIService implements AIService {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
-          model: settings?.aiModel || 'gpt-3.5-turbo',
+          model: this.getOpenAIModel(settings),
           messages: [
             {
               role: 'system',
@@ -137,7 +301,7 @@ class OpenAIService implements AIService {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: this.getOpenAIModel(settings),
           messages,
           max_tokens: 800,
           temperature: 0.7
@@ -274,12 +438,32 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 }
 
 class BackgroundService {
-  private aiService: AIService;
+  private openaiService: OpenAIService;
+  private geminiService: GeminiService;
   private ticketDataCache: Map<string, TicketData> = new Map();
 
   constructor() {
-    this.aiService = new OpenAIService();
+    this.openaiService = new OpenAIService();
+    this.geminiService = new GeminiService();
     this.setupMessageListeners();
+  }
+
+  // Get the current AI service based on user settings
+  private async getCurrentAIService(): Promise<AIService> {
+    const settings = await this.getSettings();
+    
+    if (settings.preferredProvider === 'gemini') {
+      return this.geminiService;
+    } else {
+      return this.openaiService;
+    }
+  }
+
+  // Helper to get safe OpenAI model name
+  private getOpenAIModelName(settings?: Settings): string {
+    const model = settings?.aiModel || 'gpt-3.5-turbo';
+    const openAIModels = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'];
+    return openAIModels.includes(model) ? model : 'gpt-3.5-turbo';
   }
 
   private setupMessageListeners() {
@@ -343,47 +527,59 @@ class BackgroundService {
   }
 
   private async handleTicketAnalysis(ticketData: TicketData, sendResponse: (response?: any) => void) {
-    // Cache ticket data
-    this.ticketDataCache.set(ticketData.id, ticketData);
+    try {
+      // Cache ticket data
+      this.ticketDataCache.set(ticketData.id, ticketData);
 
-    // Get user settings for personalized analysis
-    const settings = await this.getSettings();
-    const analysis = await this.aiService.analyzeTicket(ticketData, settings);
+      // Get user settings for personalized analysis
+      const settings = await this.getSettings();
+      const aiService = await this.getCurrentAIService();
+      const analysis = await aiService.analyzeTicket(ticketData, settings);
 
-    // Gửi kết quả về content script
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'aiResponse',
-        data: { response: analysis, type: 'analysis' }
-      });
+      // Gửi kết quả về content script
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'aiResponse',
+          data: { response: analysis, type: 'analysis' }
+        });
+      }
+
+      sendResponse({ success: true, analysis });
+    } catch (error) {
+      console.error('Error in ticket analysis:', error);
+      sendResponse({ success: false, error: String(error) });
     }
-
-    sendResponse({ success: true, analysis });
   }
 
   private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
-    const ticketData = this.ticketDataCache.get(data.ticketId);
+    try {
+      const ticketData = this.ticketDataCache.get(data.ticketId);
 
-    const context = {
-      conversationHistory: data.conversationHistory,
-      ticketData: ticketData
-    };
+      const context = {
+        conversationHistory: data.conversationHistory,
+        ticketData: ticketData
+      };
 
-    // Get user settings for personalized responses
-    const settings = await this.getSettings();
-    const response = await this.aiService.processUserMessage(data.message, context, settings);
+      // Get user settings for personalized responses
+      const settings = await this.getSettings();
+      const aiService = await this.getCurrentAIService();
+      const response = await aiService.processUserMessage(data.message, context, settings);
 
-    // Gửi response về content script
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'aiResponse',
-        data: { response, type: 'chat' }
-      });
+      // Gửi response về content script
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'aiResponse',
+          data: { response, type: 'chat' }
+        });
+      }
+
+      sendResponse({ success: true, response });
+    } catch (error) {
+      console.error('Error in user message processing:', error);
+      sendResponse({ success: false, error: String(error) });
     }
-
-    sendResponse({ success: true, response });
   }
 
   private async handleChatWithAI(data: any, sendResponse: (response?: any) => void) {
@@ -399,7 +595,8 @@ class BackgroundService {
 
       // Get user settings for personalized responses
       const settings = await this.getSettings();
-      const response = await this.aiService.processUserMessage(message, context, settings);
+      const aiService = await this.getCurrentAIService();
+      const response = await aiService.processUserMessage(message, context, settings);
 
       sendResponse({ success: true, response });
     } catch (error) {
@@ -413,10 +610,13 @@ class BackgroundService {
 
   private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {
     try {
+      console.log('🔄 [Background] Handling ticket summary request:', data);
+      
       let ticketData = data.ticketData;
 
       // If ticket data is not provided, try to extract from active tab
       if (!ticketData) {
+        console.log('🔧 [Background] No ticket data provided, extracting from active tab...');
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tabs[0]?.id || !tabs[0]?.url) {
           throw new Error('No active tab found');
@@ -428,19 +628,37 @@ class BackgroundService {
         throw new Error('Could not extract ticket data');
       }
 
+      console.log('🔧 [Background] Ticket data for summary:', {
+        id: ticketData.id,
+        title: ticketData.title,
+        status: ticketData.status,
+        hasDescription: !!ticketData.description
+      });
+
       // Cache the ticket data
       this.ticketDataCache.set(ticketData.id, ticketData);
 
       // Get user settings for personalized summary
       const settings = await this.getSettings();
+      console.log('🔧 [Background] Settings for summary:', {
+        hasApiKey: !!settings.apiKey,
+        userRole: settings.userRole,
+        language: settings.language,
+        aiModel: settings.aiModel
+      });
 
       // Create specialized summary prompt
       const summaryPrompt = this.buildTicketSummaryPrompt(ticketData, settings);
-      const summary = await this.callOpenAISummary(summaryPrompt, settings);
+      console.log('🔧 [Background] Summary prompt length:', summaryPrompt.length);
+      
+      const aiService = await this.getCurrentAIService();
+      const summary = await aiService.processUserMessage(summaryPrompt, { ticketData }, settings);
+      
+      console.log('✅ [Background] Summary generated, length:', summary.length);
 
       sendResponse({ success: true, summary });
     } catch (error) {
-      console.error('Error handling ticket summary:', error);
+      console.error('❌ [Background] Error handling ticket summary:', error);
       sendResponse({ success: false, error: String(error) });
     }
   }
@@ -657,6 +875,10 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
         return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
       }
 
+      console.log('🔄 [Background] Calling OpenAI API for summary...');
+      console.log('🔧 [Background] API Key exists:', !!apiKey);
+      console.log('🔧 [Background] Model:', settings?.aiModel || 'gpt-3.5-turbo');
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -664,7 +886,7 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: settings?.aiModel || 'gpt-3.5-turbo',
+          model: this.getOpenAIModelName(settings),
           messages: [
             {
               role: 'system',
@@ -680,15 +902,40 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
         })
       });
 
-      const data = await response.json();
+      console.log('🔧 [Background] Response status:', response.status);
+      console.log('🔧 [Background] Response ok:', response.ok);
 
-      if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Background] API Error Response:', errorText);
+        throw new Error(`API Error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('🔧 [Background] API Response:', {
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+        firstChoice: data.choices?.[0] ? {
+          hasMessage: !!data.choices[0].message,
+          hasContent: !!data.choices[0].message?.content
+        } : null,
+        error: data.error
+      });
+
+      if (data.error) {
+        throw new Error(`OpenAI API Error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+
+      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+        const summary = data.choices[0].message.content;
+        console.log('✅ [Background] Summary generated successfully');
+        return summary;
       } else {
-        throw new Error('Invalid API response');
+        console.error('❌ [Background] Invalid API response structure:', data);
+        throw new Error('Invalid API response - no content in choices');
       }
     } catch (error) {
-      console.error('Error calling OpenAI API for summary:', error);
+      console.error('❌ [Background] Error calling OpenAI API for summary:', error);
       return `Lỗi khi gọi AI API: ${error}`;
     }
   }
@@ -697,34 +944,50 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
     try {
       const result = await chrome.storage.sync.get([
         'encryptedApiKey',
+        'encryptedGeminiApiKey',
         'userRole',
         'language',
-        'aiModel'
+        'aiModel',
+        'preferredProvider'
       ]);
 
-      // Decrypt API key if exists
+      // Decrypt OpenAI API key if exists
       let apiKey = '';
       if (result.encryptedApiKey) {
         try {
           apiKey = await EncryptionService.decryptApiKey(result.encryptedApiKey);
         } catch (error) {
-          console.error('Failed to decrypt API key in getSettings:', error);
+          console.error('Failed to decrypt OpenAI API key in getSettings:', error);
+        }
+      }
+
+      // Decrypt Gemini API key if exists
+      let geminiApiKey = '';
+      if (result.encryptedGeminiApiKey) {
+        try {
+          geminiApiKey = await EncryptionService.decryptApiKey(result.encryptedGeminiApiKey);
+        } catch (error) {
+          console.error('Failed to decrypt Gemini API key in getSettings:', error);
         }
       }
 
       return {
         apiKey,
+        geminiApiKey,
         userRole: result.userRole || 'developer',
         language: result.language || 'vi',
-        aiModel: result.aiModel || 'gpt-3.5-turbo'
+        aiModel: result.aiModel || 'gpt-3.5-turbo',
+        preferredProvider: result.preferredProvider || 'openai'
       };
     } catch (error) {
       console.error('Error getting settings:', error);
       return {
         apiKey: '',
+        geminiApiKey: '',
         userRole: 'developer',
         language: 'vi',
-        aiModel: 'gpt-3.5-turbo'
+        aiModel: 'gpt-3.5-turbo',
+        preferredProvider: 'openai' as const
       };
     }
   }

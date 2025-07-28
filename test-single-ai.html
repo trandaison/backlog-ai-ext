@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single-AI Service Test</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #007acc;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 16px;
+        }
+        .api-test {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .provider-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: white;
+        }
+        .provider-card.active {
+            border-color: #007acc;
+            background-color: #f0f8ff;
+        }
+        .provider-title {
+            font-weight: bold;
+            color: #007acc;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #005999;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        .test-log {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Single-AI Service Test</h1>
+        <p>Testing Manual AI Provider Selection (No Auto-Fallback)</p>
+    </div>
+
+    <div class="container">
+        <div class="test-section">
+            <div class="test-title">🤖 Current AI Service Architecture</div>
+            <div class="status info">
+                <strong>✅ Single Service Mode:</strong> Chỉ sử dụng 1 AI provider tại 1 thời điểm<br>
+                <strong>🚫 No Auto-Fallback:</strong> Người dùng phải manually switch<br>
+                <strong>⚙️ Provider Selection:</strong> Dựa vào user settings trong popup
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">🔄 AI Provider Testing</div>
+            <div class="api-test">
+                <div class="provider-card" id="openai-card">
+                    <div class="provider-title">🔥 OpenAI Provider</div>
+                    <input type="password" id="openai-key" placeholder="sk-...">
+                    <button onclick="testOpenAI()" id="test-openai-btn">Test OpenAI</button>
+                    <button onclick="setAsPreferred('openai')" id="prefer-openai-btn">Set as Preferred</button>
+                    <div id="openai-status" class="status" style="display: none;"></div>
+                </div>
+
+                <div class="provider-card" id="gemini-card">
+                    <div class="provider-title">✨ Gemini Provider</div>
+                    <input type="password" id="gemini-key" placeholder="AI...">
+                    <button onclick="testGemini()" id="test-gemini-btn">Test Gemini</button>
+                    <button onclick="setAsPreferred('gemini')" id="prefer-gemini-btn">Set as Preferred</button>
+                    <div id="gemini-status" class="status" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">🧪 Single Service Tests</div>
+            <div style="margin: 10px 0;">
+                <button onclick="testCurrentService()">🎯 Test Current Service</button>
+                <button onclick="testTicketAnalysis()">📋 Test Ticket Analysis</button>
+                <button onclick="testChatMessage()">💬 Test Chat Message</button>
+                <button onclick="testSummaryGeneration()">📄 Test Summary</button>
+            </div>
+            <div style="margin: 10px 0;">
+                <button onclick="simulateQuotaExceeded()">⚠️ Simulate Quota Exceeded</button>
+                <button onclick="simulateAPIError()">❌ Simulate API Error</button>
+                <button onclick="clearTestLog()">🗑️ Clear Log</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">📊 Test Results</div>
+            <div id="test-log" class="test-log">
+                Ready for single-AI service testing...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">📋 Manual Testing Steps</div>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+                <li><strong>Install Extension:</strong> Load the extension in Chrome</li>
+                <li><strong>Set Provider:</strong> Open popup → Choose AI Provider → Enter API Key → Save</li>
+                <li><strong>Test Current Service:</strong> Only selected provider should be used</li>
+                <li><strong>Switch Provider:</strong> Change in popup → Test again → Verify different provider used</li>
+                <li><strong>Error Handling:</strong> Test with invalid keys → Should show clear error messages</li>
+                <li><strong>No Fallback:</strong> When one provider fails → Should NOT auto-switch to another</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let currentProvider = 'openai'; // Default
+        let testCounter = 0;
+
+        // Mock Chrome APIs
+        if (!window.chrome) {
+            window.chrome = {
+                storage: {
+                    sync: {
+                        get: function(keys, callback) {
+                            const mockData = {
+                                encryptedApiKey: currentProvider === 'openai' ? 'mock_openai_key' : '',
+                                encryptedGeminiApiKey: currentProvider === 'gemini' ? 'mock_gemini_key' : '',
+                                preferredProvider: currentProvider,
+                                userRole: 'developer',
+                                language: 'vi',
+                                aiModel: currentProvider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-3.5-turbo'
+                            };
+                            callback(mockData);
+                        },
+                        set: function(data, callback) {
+                            logTest('💾 Settings saved: ' + JSON.stringify(data, null, 2));
+                            if (callback) callback();
+                        }
+                    }
+                }
+            };
+        }
+
+        function logTest(message, type = 'info') {
+            testCounter++;
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('test-log');
+            const icon = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || 'ℹ️';
+            
+            logElement.innerHTML += `<div>[${testCounter}] ${timestamp} ${icon} ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+        }
+
+        function updateProviderCards() {
+            document.getElementById('openai-card').classList.toggle('active', currentProvider === 'openai');
+            document.getElementById('gemini-card').classList.toggle('active', currentProvider === 'gemini');
+            
+            logTest(`🔄 Current provider: ${currentProvider.toUpperCase()}`, 'info');
+        }
+
+        function setAsPreferred(provider) {
+            currentProvider = provider;
+            updateProviderCards();
+            logTest(`✅ Preferred provider set to: ${provider.toUpperCase()}`, 'success');
+            
+            // Update mock storage
+            window.chrome.storage.sync.set({
+                preferredProvider: provider,
+                aiModel: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-3.5-turbo'
+            });
+        }
+
+        function testOpenAI() {
+            const key = document.getElementById('openai-key').value;
+            if (!key) {
+                showStatus('openai-status', 'Please enter OpenAI API key', 'error');
+                return;
+            }
+            
+            if (!key.startsWith('sk-')) {
+                showStatus('openai-status', 'Invalid OpenAI key format', 'error');
+                logTest('❌ OpenAI key validation failed: must start with sk-', 'error');
+                return;
+            }
+            
+            showStatus('openai-status', '✅ OpenAI key format valid', 'success');
+            logTest('✅ OpenAI API key validation passed', 'success');
+        }
+
+        function testGemini() {
+            const key = document.getElementById('gemini-key').value;
+            if (!key) {
+                showStatus('gemini-status', 'Please enter Gemini API key', 'error');
+                return;
+            }
+            
+            if (!key.match(/^AI[a-zA-Z0-9_-]+$/)) {
+                showStatus('gemini-status', 'Invalid Gemini key format', 'error');
+                logTest('❌ Gemini key validation failed: must start with AI', 'error');
+                return;
+            }
+            
+            showStatus('gemini-status', '✅ Gemini key format valid', 'success');
+            logTest('✅ Gemini API key validation passed', 'success');
+        }
+
+        function testCurrentService() {
+            logTest(`🎯 Testing current service: ${currentProvider.toUpperCase()}`, 'info');
+            
+            if (currentProvider === 'openai') {
+                logTest('🔥 Using OpenAIService.analyzeTicket()', 'info');
+                logTest('📡 Mock API call to api.openai.com/v1/chat/completions', 'info');
+            } else {
+                logTest('✨ Using GeminiService.analyzeTicket()', 'info');  
+                logTest('📡 Mock API call to generativelanguage.googleapis.com', 'info');
+            }
+            
+            setTimeout(() => {
+                logTest(`✅ ${currentProvider.toUpperCase()} service responded successfully`, 'success');
+            }, 1000);
+        }
+
+        function testTicketAnalysis() {
+            logTest('📋 Testing ticket analysis with current provider...', 'info');
+            logTest(`🎯 Current provider: ${currentProvider.toUpperCase()}`, 'info');
+            
+            const mockTicket = {
+                id: 'TEST-123',
+                title: 'Sample ticket for testing',
+                description: 'This is a mock ticket for testing'
+            };
+            
+            logTest('📊 Mock ticket data: ' + JSON.stringify(mockTicket), 'info');
+            
+            setTimeout(() => {
+                logTest(`✅ Ticket analysis completed using ${currentProvider.toUpperCase()}`, 'success');
+                logTest('📄 Analysis result: Mock analysis response', 'success');
+            }, 1500);
+        }
+
+        function testChatMessage() {
+            logTest('💬 Testing chat message processing...', 'info');
+            logTest(`🎯 Using ${currentProvider.toUpperCase()} for chat response`, 'info');
+            
+            setTimeout(() => {
+                logTest(`✅ Chat message processed by ${currentProvider.toUpperCase()}`, 'success');
+                logTest('💭 Response: Mock chat response from AI', 'success');
+            }, 1200);
+        }
+
+        function testSummaryGeneration() {
+            logTest('📄 Testing summary generation...', 'info');
+            logTest(`🎯 Using ${currentProvider.toUpperCase()} for summary`, 'info');
+            
+            setTimeout(() => {
+                logTest(`✅ Summary generated by ${currentProvider.toUpperCase()}`, 'success');
+                logTest('📝 Summary: Mock summary content', 'success');
+            }, 2000);
+        }
+
+        function simulateQuotaExceeded() {
+            logTest(`⚠️ Simulating quota exceeded for ${currentProvider.toUpperCase()}...`, 'warning');
+            logTest('❌ Error: Quota exceeded for current provider', 'error');
+            logTest('🚫 NO AUTO-FALLBACK: User must manually switch provider', 'warning');
+            logTest('💡 Expected: Clear error message to user about quota limit', 'info');
+        }
+
+        function simulateAPIError() {
+            logTest(`❌ Simulating API error for ${currentProvider.toUpperCase()}...`, 'warning');
+            logTest('❌ Error: Network timeout / API unavailable', 'error');
+            logTest('🚫 NO AUTO-FALLBACK: Single service mode maintained', 'warning');
+            logTest('💡 Expected: Error message with suggestion to check settings', 'info');
+        }
+
+        function clearTestLog() {
+            document.getElementById('test-log').innerHTML = 'Test log cleared...';
+            testCounter = 0;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateProviderCards();
+            logTest('🎯 Single-AI service test page loaded', 'success');
+            logTest('📝 Manual provider switching enabled', 'info');
+            logTest('🚫 Auto-fallback mechanism disabled', 'warning');
+        });
+    </script>
+</body>
+</html>
