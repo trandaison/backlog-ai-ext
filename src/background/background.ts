@@ -517,6 +517,11 @@ class BackgroundService {
           sendResponse(testResult);
           break;
 
+        case 'getCurrentUser':
+          const currentUser = await this.getCurrentUser();
+          sendResponse(currentUser);
+          break;
+
         default:
           sendResponse({ error: 'Unknown action' });
       }
@@ -1188,6 +1193,65 @@ Bao gồm title, description, và các thông tin quan trọng khác. Giữ nguy
       return {
         success: false,
         message: 'Lỗi kết nối. Kiểm tra internet và thông tin cấu hình.'
+      };
+    }
+  }
+
+  private async getCurrentUser(): Promise<{success: boolean, data?: any, error?: string}> {
+    try {
+      // Get space info from current tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs[0]?.id || !tabs[0]?.url) {
+        throw new Error('No active tab found');
+      }
+
+      const spaceInfo = await this.extractSpaceInfoFromTab(tabs[0].id);
+      if (!spaceInfo) {
+        throw new Error('Could not extract space information from URL');
+      }
+
+      // Get Backlog API configuration
+      const backlogSettings = await this.getBacklogMultiSettings();
+      const config = this.findMatchingBacklogConfig(backlogSettings.configs, spaceInfo);
+
+      if (!config) {
+        return {
+          success: false,
+          error: 'No matching Backlog API config found'
+        };
+      }
+
+      // Call Backlog API to get current user
+      const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
+      const apiUrl = `${baseUrl}/users/myself?apiKey=${encodeURIComponent(config.apiKey)}`;
+
+      console.log('Getting current user from Backlog API:', apiUrl.replace(config.apiKey, '***'));
+
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      }
+
+      const userData = await response.json();
+      console.log('Current user data:', userData);
+
+      return {
+        success: true,
+        data: {
+          id: userData.id,
+          name: userData.name,
+          avatar: userData.nulabAccount?.iconUrl || '', // Access correct avatar path
+          mailAddress: userData.mailAddress,
+          userId: userData.userId,
+          nulabAccount: userData.nulabAccount // Include full nulabAccount for debugging
+        }
+      };
+
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return {
+        success: false,
+        error: String(error)
       };
     }
   }

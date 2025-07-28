@@ -366,7 +366,12 @@ export class BacklogApiService {
    */
   public static extractIssueKeyFromUrl(): string | null {
     const url = window.location.href;
-    const match = url.match(/\/view\/([A-Z]+-\d+)/);
+    // Comprehensive regex to support various Backlog issue key formats:
+    // - PROJ-123
+    // - PROJ_SUB-123
+    // - PROJECTKEY_2405-1603
+    // - PROJECT123_ABC-999
+    const match = url.match(/\/view\/([A-Z][A-Z0-9_]*-\d+)/);
     return match ? match[1] : null;
   }
 

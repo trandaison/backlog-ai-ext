@@ -309,6 +309,10 @@ class BacklogAIInjector {
         case 'REQUEST_SUMMARY':
           this.handleSummaryRequest(event.data.ticketData, event.data.id);
           break;
+
+        case 'GET_USER_INFO':
+          this.handleGetUserInfo(event.data.id);
+          break;
       }
     });
   }
@@ -385,6 +389,35 @@ class BacklogAIInjector {
     } catch (error) {
       window.postMessage({
         type: 'SUMMARY_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleGetUserInfo(messageId: string): Promise<void> {
+    try {
+      console.log('🔍 [Content] Handling get user info request');
+
+      // Request user info via background script
+      const response = await chrome.runtime.sendMessage({
+        action: 'getCurrentUser'
+      });
+
+      console.log('🔍 [Content] User info response:', response);
+
+      window.postMessage({
+        type: 'USER_INFO_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.data : null,
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      console.error('Error getting user info:', error);
+      window.postMessage({
+        type: 'USER_INFO_RESPONSE',
         id: messageId,
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
