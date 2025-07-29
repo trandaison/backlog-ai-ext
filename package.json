@@ -10,7 +10,8 @@
     "clean": "rm -rf dist",
     "clean:dev": "rm -rf dev-build",
     "lint": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "changelogen --release"
   },
   "keywords": [
     "chrome-extension",

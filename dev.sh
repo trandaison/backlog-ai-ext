@@ -24,6 +24,7 @@ function show_menu() {
     echo "4. clean    - Clean dev-build directory"
     echo "5. help     - Show Chrome extension loading instructions"
     echo "6. status   - Check if watch mode is running"
+    echo "7. release  - Preview changelog for next release"
     echo ""
     echo -e "${BLUE}Note:${NC}"
     echo "• Development builds preserve dev-build/ when running production builds"
@@ -89,6 +90,28 @@ function check_status() {
     fi
 }
 
+function preview_release() {
+    echo -e "${BLUE}Previewing changelog for next release...${NC}"
+    echo ""
+    if command -v changelogen &> /dev/null; then
+        npx changelogen
+    else
+        echo -e "${RED}❌ changelogen not found. Install it with: npm install -g changelogen${NC}"
+        echo -e "${YELLOW}Or run: npx changelogen${NC}"
+    fi
+    echo ""
+    echo -e "${YELLOW}💡 To create actual release:${NC}"
+    echo "1. Make sure all changes are committed with conventional commit format"
+    echo "2. Go to GitHub → Actions → Release workflow"
+    echo "3. Click 'Run workflow' and select release type (patch/minor/major)"
+    echo "4. Review the generated draft release and publish when ready"
+    echo ""
+    echo -e "${BLUE}Release types:${NC}"
+    echo "• patch: Bug fixes (1.0.0 → 1.0.1)"
+    echo "• minor: New features (1.0.0 → 1.1.0)"  
+    echo "• major: Breaking changes (1.0.0 → 2.0.0)"
+}
+
 # Main script logic
 print_header
 
@@ -115,6 +138,9 @@ case "$1" in
         ;;
     "status")
         check_status
+        ;;
+    "release")
+        preview_release
         ;;
     *)
         echo -e "${RED}Unknown command: $1${NC}"

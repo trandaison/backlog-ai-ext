@@ -9,6 +9,9 @@ dist/
 build/
 dev-build/
 
+# Release artifacts
+release_notes.txt
+
 # IDE files
 .vscode/
 .idea/
