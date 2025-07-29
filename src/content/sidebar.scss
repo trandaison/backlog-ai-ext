@@ -470,12 +470,100 @@ body.ai-ext-sidebar-open {
   border-bottom: 1px solid $border-light;
   background: #f8f9fa;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 
   h4 {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
     color: $text-color;
+  }
+
+  .ai-ext-chat-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .ai-ext-control-button {
+      background: none;
+      border: none;
+      color: #6c757d;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      @include transition(all, 0.2s);
+
+      &:hover {
+        background-color: #f8f9fa;
+        transform: scale(1.1);
+      }
+
+      &.ai-ext-save-button:hover {
+        color: #007bff;
+        background-color: rgba(0, 123, 255, 0.1);
+      }
+
+      &.ai-ext-clear-button:hover {
+        color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.1);
+      }
+    }
+
+    .ai-ext-loading-indicator {
+      font-size: 12px;
+      color: #6c757d;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+  }
+}
+
+// Storage Warning Banner
+.ai-ext-storage-warning {
+  padding: 8px 12px;
+  margin: 0 16px 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid;
+  animation: slideIn 0.3s ease-out;
+  
+  &.warning {
+    background: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+  }
+  
+  &.success {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+  }
+
+  &.info {
+    background: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+  }
+  
+  .ai-ext-manual-save-btn {
+    background: none;
+    border: 1px solid currentColor;
+    color: inherit;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    @include transition(all, 0.2s);
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.1);
+      transform: scale(1.05);
+    }
   }
 }
 
@@ -852,6 +940,26 @@ body.ai-ext-sidebar-open {
   30% {
     transform: translateY(-8px);
     opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 

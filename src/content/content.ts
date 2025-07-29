@@ -1,6 +1,7 @@
 // Content script chính để inject chatbot aside panel vào trang Backlog
 import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
+import { ChatMessage } from '../shared/chatStorageService';
 
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
@@ -378,6 +379,18 @@ class BacklogAIInjector {
         case 'GET_USER_INFO':
           this.handleGetUserInfo(event.data.id);
           break;
+
+        case 'CHAT_STORAGE_LOAD':
+          this.handleChatStorageLoad(event.data.id, event.data.ticketKey);
+          break;
+
+        case 'CHAT_STORAGE_SAVE':
+          this.handleChatStorageSave(event.data.id, event.data.ticketKey || event.data.data?.ticketId, event.data.data);
+          break;
+
+        case 'CHAT_STORAGE_CLEAR':
+          this.handleChatStorageClear(event.data.id, event.data.ticketKey);
+          break;
       }
     });
   }
@@ -508,6 +521,95 @@ class BacklogAIInjector {
       console.error('Error getting user info:', error);
       window.postMessage({
         type: 'USER_INFO_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleChatStorageLoad(messageId: string, ticketKey: string): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get([`chat-history-${ticketKey}`]);
+      const historyData = result[`chat-history-${ticketKey}`];
+      
+      // Extract messages array from the ChatHistoryData structure
+      const messages = historyData?.messages || [];
+      
+      window.postMessage({
+        type: 'CHAT_STORAGE_LOAD_RESPONSE',
+        id: messageId,
+        success: true,
+        data: messages
+      }, '*');
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      window.postMessage({
+        type: 'CHAT_STORAGE_LOAD_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleChatStorageSave(messageId: string, ticketKey: string, saveData: any): Promise<void> {
+    try {
+      // Construct ChatHistoryData structure
+      const historyData = {
+        ticketId: saveData.ticketId || ticketKey,
+        ticketUrl: window.location.href,
+        messages: (saveData.messages || []).slice(-100), // Keep only recent 100 messages
+        lastUpdated: new Date().toISOString(),
+        userInfo: saveData.userInfo,
+        ticketInfo: {
+          title: (saveData.ticketData?.title || '').slice(0, 200),
+          status: saveData.ticketData?.status || '',
+          assignee: (saveData.ticketData?.assignee || '').slice(0, 100)
+        }
+      };
+      
+      await chrome.storage.local.set({
+        [`chat-history-${ticketKey}`]: historyData
+      });
+      
+      window.postMessage({
+        type: 'CHAT_STORAGE_SAVE_RESPONSE',
+        id: messageId,
+        success: true
+      }, '*');
+    } catch (error) {
+      console.error('Error saving chat history:', error);
+      window.postMessage({
+        type: 'CHAT_STORAGE_SAVE_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleChatStorageClear(messageId: string, ticketKey?: string): Promise<void> {
+    try {
+      if (ticketKey) {
+        await chrome.storage.local.remove([`chat-history-${ticketKey}`]);
+      } else {
+        const result = await chrome.storage.local.get(null);
+        const keysToRemove = Object.keys(result).filter(key => key.startsWith('chat-history-'));
+        if (keysToRemove.length > 0) {
+          await chrome.storage.local.remove(keysToRemove);
+        }
+      }
+      
+      window.postMessage({
+        type: 'CHAT_STORAGE_CLEAR_RESPONSE',
+        id: messageId,
+        success: true
+      }, '*');
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      window.postMessage({
+        type: 'CHAT_STORAGE_CLEAR_RESPONSE',
         id: messageId,
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

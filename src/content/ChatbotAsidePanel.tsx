@@ -1,29 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TicketAnalyzer, TicketData } from '../shared/ticketAnalyzer';
+import { ChatStorageService, ChatMessage, UserInfo, SaveResult } from '../shared/chatStorageService';
 
 // AI Icon as data URL
 const aiIcon = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgdmlld0JveD0iMCAwIDE0MiAxNDIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNzk2XzQ1OSkiPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTExMi41MjEgMTQxLjI3N0gyOS41NDk0QzEzLjgyNDMgMTQxLjI3NyAwLjk1NzAzMSAxMjguMzkgMC45NTcwMzEgMTEyLjYzOVYyOS41MzEyQzAuOTU3MDMxIDEzLjc4MDQgMTMuODI0MyAwLjg5MzU1NSAyOS41NDk0IDAuODkzNTU1SDExMi41MjFDMTI4LjI0NiAwLjg5MzU1NSAxNDEuMTEyIDEzLjc4MDQgMTQxLjExMiAyOS41MzEyVjExMi42MzlDMTQxLjExMiAxMjguMzkgMTI4LjI0NiAxNDEuMjc3IDExMi41MjEgMTQxLjI3N1oiIGZpbGw9IiM0MkNFOUYiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01Mi4xOTkgNjEuMzI0MkM1Mi4xNDQzIDcyLjk3NTIgNTIuMTE0OCA4NC4zMTI3IDUyLjE0NDIgOTEuMDk2NEM2Mi4yNzU4IDkwLjU0NjcgNjcuMjkzOSA4OC40ODI3IDcxLjI2MzQgODMuNzEzOEM3NC4wNzc3IDgwLjMzMjUgNzQuNjg2OSA3Ni40NTkxIDcyLjk4IDcyLjgwNzlDNzAuNzQ2OCA2OC4wMzMzIDY0LjE4MDYgNjIuOTkwMiA1Mi4xOTkgNjEuMzI0MlpNNDUuNTM1OSAxMDQuNzk2QzQzLjczNSAxMDQuNzk2IDQyLjAwNzEgMTA0LjA3NiA0MC43MzgyIDEwMi43OTdMNDAuNzM1NCAxMDIuNzk0QzM4Ljc0MzYgMTAwLjc4NSAzOC43MTU1IDk4Ljg2MjggMzguNjY1IDk1LjM3NDdDMzguNjM5NyA5My42NTEgMzguNjI0MyA5MS4yMDg5IDM4LjYxNzMgODguMjkwMUMzOC42MDYgODMuMTcyNSAzOC42MTg3IDc2LjA3MTEgMzguNjUzOCA2Ny4xODEzQzM4LjcxNTUgNTEuODg2MSAzOC44MjY0IDM2LjYzODcgMzguODI2NCAzNi42Mzg3TDUyLjM0NSAzNi43MzcxQzUyLjMxOTcgNDAuMTE1NiA1Mi4yOTU4IDQzLjgzMDEgNTIuMjcyIDQ3LjcwNjJDNjguMjY4IDQ5LjU1MzYgODAuMjgzMiA1Ni41MDA0IDg1LjIyMjcgNjcuMDY2Qzg5LjE2NDEgNzUuNDk0NiA4Ny44MjY1IDg0Ljk1OTQgODEuNjQ3NiA5Mi4zODQyQzcyLjExNjggMTAzLjgzNyA1OC41ODE0IDEwNC43OTYgNDUuNTM1OSAxMDQuNzk2WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTk4LjQ0MTQgMjcuMzY3MkM5OC40MzM1IDI2LjI2MiA5OC43NzM2IDI1LjE4MzEgOTkuNDEyMSAyNC4yODIyQzEwMC4wMTEgMjMuNDM3NiAxMDAuODQ0IDIyLjc4ODcgMTAxLjgwNiAyMi40MTVMMTAyIDIyLjM0MzdMMTAyLjAzMSAyMi4zMzRMMTA1LjE4OSAyMS4zMDQ3TDEwNS4zMTkgMjEuMjU2OEMxMDUuNjIgMjEuMTM2NSAxMDUuODk0IDIwLjk1NiAxMDYuMTI0IDIwLjcyNTZDMTA2LjM4NSAyMC40NjQgMTA2LjU4MSAyMC4xNDUgMTA2LjY5NyAxOS43OTQ5TDEwNy43MDQgMTYuNjk1M0MxMDguMDI5IDE1LjY3NDIgMTA4LjY1MyAxNC43NzYxIDEwOS40OTIgMTQuMTE2MkwxMDkuNjYyIDEzLjk4NzNMMTA5LjY2OSAxMy45ODI0TDEwOS42NzUgMTMuOTc4NUMxMTAuNTY4IDEzLjM0MjQgMTExLjYzOCAxMyAxMTIuNzM1IDEzQzExMy44MzIgMTMgMTE0LjkwMiAxMy4zNDIgMTE1Ljc5NiAxMy45Nzg1TDExNS43OTUgMTMuOTc5NUMxMTYuNjg1IDE0LjYxMTIgMTE3LjM2IDE1LjUwMTMgMTE3LjcyNiAxNi41MzAzTDExNy43MzUgMTYuNTU2NkwxMTcuNzQ0IDE2LjU4M0wxMTguNzc1IDE5Ljc2MjdDMTE4Ljg5NCAyMC4xMDcyIDExOS4wOSAyMC40MTk5IDExOS4zNDkgMjAuNjc3N0MxMTkuNjEyIDIwLjkzOTkgMTE5LjkzMiAyMS4xMzczIDEyMC4yODQgMjEuMjUzOUwxMjMuMzkzIDIyLjI2NTZMMTIzLjQxMiAyMi4yNzE1QzEyNC40NzIgMjIuNjI4NiAxMjUuMzk0IDIzLjMxMjQgMTI2LjA0MiAyNC4yMjU2TDEyNi4xNjMgMjQuNDA3MkMxMjYuNzEgMjUuMjU4MSAxMjcgMjYuMjQ5MSAxMjYuOTk5IDI3LjI2MjdDMTI2Ljk5OSAyNy4yNjgyIDEyNyAyNy4yNzM4IDEyNyAyNy4yNzkzTDEyNi45OTkgMjcuMjc5M0MxMjcgMjguMjk5MyAxMjYuNzA1IDI5LjI5NiAxMjYuMTUyIDMwLjE0OTRMMTI2LjAzOCAzMC4zMTkzQzEyNS40MDggMzEuMjEyNCAxMjQuNTE2IDMxLjg4OTQgMTIzLjQ4MyAzMi4yNTM5TDEyMy40NTkgMzIuMjYyN0wxMjMuNDM2IDMyLjI2OTVMMTIwLjI2OSAzMy4yOTg4QzExOS45MTUgMzMuNDE1IDExOS41OTQgMzMuNjEyMiAxMTkuMzMxIDMzLjg3NUwxMTkuMzMgMzMuODc1QzExOS4wNjkgMzQuMTM1MyAxMTguODcyIDM0LjQ1MjYgMTE4Ljc1NSAzNC44MDE4TDExNy43NCAzNy45MjA5TDExNy43MzggMzcuOTI4N0wxMTcuNzM1IDM3LjkzNTVDMTE3LjM4MiAzOC45OTM0IDExNi43MDUgMzkuOTEyMyAxMTUuOCA0MC41NjI1TDExNS43OTQgNDAuNTY2NEMxMTQuOSA0MS4yMDM2IDExMy44MyA0MS41NDU5IDExMi43MzIgNDEuNTQ1OUMxMTEuNzA0IDQxLjU0NTkgMTEwLjcgNDEuMjQ0OCAxMDkuODQyIDQwLjY4MjZMMTA5LjY3MiA0MC41Njc0QzEwOC43ODIgMzkuOTM1NyAxMDguMTA4IDM5LjA0NDMgMTA3Ljc0MiAzOC4wMTU2TDEwNy43MzIgMzcuOTg5M0wxMDcuNzI0IDM3Ljk2MjlMMTA2LjcwMSAzNC44MTE1QzEwNi41NzkgMzQuNDc1NyAxMDYuMzgzIDM0LjE3MDkgMTA2LjEyNyAzMy45MjA5QzEwNS44NjUgMzMuNjY1NSAxMDUuNTQ4IDMzLjQ3NDEgMTA1LjIgMzMuMzYwM0wxMDIuMDc0IDMyLjMzOThMMTAyLjA3MSAzMi4zMzg5QzEwMS4wMjIgMzEuOTk0OCAxMDAuMTA2IDMxLjMyOTYgOTkuNDU1MSAzMC40Mzc1Qzk4LjgwMzcgMjkuNTQ1MSA5OC40NDkzIDI4LjQ3MTQgOTguNDQxNCAyNy4zNjcyWk02MyA1My4yOTU5QzYzIDUyLjA1NzUgNjMuMzUzNiA1MC44NDY5IDY0LjAxNTYgNDkuODA0N0w2NC4xNTE0IDQ5LjU5NzdMNjQuMTU4MiA0OS41ODg5TDY0LjE2NDEgNDkuNTgwMUM2NC44ODM5IDQ4LjU2MTEgNjUuODg0NCA0Ny43NzQ3IDY3LjA0MSA0Ny4zMTU0TDY3LjI3NDQgNDcuMjI3NUw2Ny4yOTc5IDQ3LjIxOTdMNjcuMzIyMyA0Ny4yMTE5TDczLjQwOTIgNDUuMjM0NEw3My44NjgyIDQ1LjA2NjRDNzQuOTI3NiA0NC42NDI2IDc1Ljg5MTggNDQuMDA3MSA3Ni43MDAyIDQzLjE5NzNDNzcuNjIxMSA0Mi4yNzQ0IDc4LjMxNDUgNDEuMTUwMyA3OC43MjY2IDM5LjkxNDFMODAuNjc5NyAzMy45MTAyTDgwLjY3OTcgMzMuOTA5Mkw4MC42OTE0IDMzLjg3NEw4MC42OTE0IDMzLjg3NUM4MC45ODk5IDMyLjkxNTggODEuNTA4NSAzMi4wMzg3IDgyLjIwOCAzMS4zMTY0QzgyLjkxNTYgMzAuNTg1NSA4My43ODcgMzAuMDMzMyA4NC43NSAyOS43MDUxQzg1LjcxMzEgMjkuMzc2NyA4Ni43NDAxIDI5LjI4MjcgODcuNzQ2MSAyOS40Mjg3Qzg4Ljc0OTQgMjkuNTc0MyA4OS43MDI5IDI5Ljk1NjEgOTAuNTMwMyAzMC41NDFMOTAuNTMxMiAzMC41NEM5MS42MjUxIDMxLjMwNzMgOTIuNDUxNSAzMi4zOTgzIDkyLjg5MzYgMzMuNjU5Mkw5Mi45MDE0IDMzLjY4MDdMOTIuOTA4MiAzMy43MDMxTDk0Ljg4NTcgMzkuNzkxTDk0Ljg4NjcgMzkuNzlDOTUuMjQ5MiA0MC44NzUzIDk1LjgyODggNDEuODczNiA5Ni41ODc5IDQyLjcyNTZMOTYuOTIzOCA0My4wODJDOTcuODQ2OCA0NC4wMDQ0IDk4Ljk3MTkgNDQuNzAxNCAxMDAuMjEgNDUuMTE1MkwxMDAuMjExIDQ1LjExNDNMMTA2LjU5NSA0Ny4yMTA5TDEwNi42ODYgNDcuMjQxMkwxMDYuNzcyIDQ3LjI3ODNDMTA3LjkxOSA0Ny43Nzk3IDEwOC44OTQgNDguNjA0NyAxMDkuNTc5IDQ5LjY1MTRMMTA5LjU4IDQ5LjY1MTRDMTEwLjI2NSA1MC42OTgxIDExMC42MyA1MS45MjI1IDExMC42MzEgNTMuMTczOEwxMTAuNjMxIDUzLjE3NThDMTEwLjYzIDU0LjUwNzQgMTEwLjIxNSA1NS44MDU0IDEwOS40NDYgNTYuODkxNkwxMDkuNDQ2IDU2Ljg5MjZDMTA4LjY3NyA1Ny45NzkgMTA3LjU4OSA1OC44MDAxIDEwNi4zMzMgNTkuMjQzMkwxMDYuMzExIDU5LjI1MUwxMDYuMjg3IDU5LjI1ODhMMTAwLjE5NiA2MS4yNDMyQzk5LjI5MDQgNjEuNTQwMyA5OC40NDE4IDYxLjk5MDggOTcuNjg4NSA2Mi41NzUyTDk3LjY4MjYgNjIuNTgwMUM5Ny40MDU4IDYyLjc5MzEgOTcuMTQyNSA2My4wMjMyIDk2Ljg5NTUgNjMuMjY5NUM5NS45NjYzIDY0LjIwMDUgOTUuMjY2MSA2NS4zMzQ5IDk0Ljg0ODYgNjYuNTgyTDk0Ljg0ODYgNjYuNTgzTDkyLjg5MjYgNzIuNjA2NEw5Mi44ODQ4IDcyLjYzMThDOTIuNDU1MiA3My44OTg4IDkxLjY0MDYgNzUuMDAwMyA5MC41NTU3IDc1Ljc4MzJDODkuNDcwOCA3Ni41NjU5IDg4LjE2ODggNzYuOTkxMiA4Ni44MzExIDc3Qzg1LjQ5MzQgNzcuMDA4NyA4NC4xODU4IDc2LjU5OTggODMuMDkwOCA3NS44MzExTDgzLjA5MDggNzUuODMyQzgxLjk5NTcgNzUuMDYzNCA4MS4xNjY4IDczLjk3MjMgODAuNzIwNyA3Mi43MTA5TDgwLjcxMTkgNzIuNjg2NUw4MC43MDQxIDcyLjY2MTFMNzguNzMwNSA2Ni41ODU5Qzc4LjMxMTYgNjUuMzgzNCA3Ny42MjU2IDY0LjI5MTMgNzYuNzIyNyA2My4zOTI2Qzc1LjgyMDkgNjIuNDk1MSA3NC43MjY5IDYxLjgxNDMgNzMuNTIzNCA2MS40MDA0TDY3LjM2MjMgNTkuMzk1NUw2Ny4zNDY3IDU5LjM5MDZMNjcuMzMxMSA1OS4zODQ4QzY2LjA1MjkgNTguOTQ1NiA2NC45NDUgNTguMTE1NSA2NC4xNjUgNTcuMDExN0w2NC4xNTgyIDU3LjAwMjlMNjQuMTUyMyA1Ni45OTMyQzYzLjQwMjIgNTUuOTA2MSA2My4wMDAxIDU0LjYxNjYgNjMgNTMuMjk1OVoiIGZpbGw9IiNGRkY2MDAiIHN0cm9rZT0iIzQyQ0U5RiIgc3Ryb2tlLXdpZHRoPSI0Ii8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfMTc5Nl80NTkiPgo8cmVjdCB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K";
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-}
-
-interface UserInfo {
-  id: number;
-  name: string;
-  avatar: string;
-  mailAddress: string;
-  userId: string;
-  nulabAccount?: {
-    nulabId: string;
-    name: string;
-    uniqueId: string;
-    iconUrl: string;
-  };
-}
 
 interface ChatbotAsidePanelProps {
   ticketAnalyzer: TicketAnalyzer;
@@ -44,6 +24,11 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   // Resize functionality state
   const [isResizing, setIsResizing] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(initialWidth || 400); // Use initialWidth if provided
+
+  // Chat storage state
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -103,6 +88,82 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       window.removeEventListener('message', handleWidthUpdate);
     };
   }, []);
+
+  // Load chat history when ticket data is available
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (ticketData?.id) {
+        try {
+          setIsLoadingHistory(true);
+          
+          const savedMessages = await ChatStorageService.loadChatHistory(ticketData.id);
+          if (savedMessages.length > 0) {
+            setMessages(savedMessages);
+            setStorageWarning(`Đã tải ${savedMessages.length} tin nhắn từ lịch sử.`);
+            setTimeout(() => setStorageWarning(null), 3000);
+          }
+        } catch (error) {
+          console.error('❌ [ChatbotAsidePanel] Failed to load chat history:', error);
+          setStorageWarning('Không thể tải lịch sử chat.');
+          setTimeout(() => setStorageWarning(null), 5000);
+        } finally {
+          setIsLoadingHistory(false);
+        }
+      }
+    };
+
+    loadChatHistory();
+  }, [ticketData?.id]);
+
+  // Auto-save messages when they change
+  useEffect(() => {
+    const saveChatHistory = async () => {
+      if (!autoSaveEnabled || !ticketData?.id || !userInfo || messages.length === 0) {
+        return;
+      }
+
+      try {
+        console.log('💾 [ChatbotAsidePanel] Auto-saving chat history...');
+        
+        const result = await ChatStorageService.saveChatHistory(
+          ticketData.id, 
+          messages, 
+          ticketData, 
+          userInfo
+        );
+
+        if (!result.success) {
+          setStorageWarning(result.error || 'Lỗi lưu chat history');
+          
+          // Disable auto-save if storage is consistently failing
+          if (result.error?.includes('đầy') || result.error?.includes('quota')) {
+            setAutoSaveEnabled(false);
+            console.warn('⚠️ [ChatbotAsidePanel] Auto-save disabled due to storage issues');
+          }
+        } else {
+          // Clear any previous warnings on successful save
+          if (storageWarning && !storageWarning.includes('thành công')) {
+            setStorageWarning(null);
+          }
+          
+          if (result.cleaned) {
+            // Show user that cleanup happened
+            setStorageWarning('Đã dọn dẹp dữ liệu cũ để tiết kiệm bộ nhớ.');
+            setTimeout(() => setStorageWarning(null), 5000);
+          }
+        }
+
+      } catch (error) {
+        console.error('❌ [ChatbotAsidePanel] Auto-save failed:', error);
+        setStorageWarning('Không thể lưu chat history tự động.');
+        setTimeout(() => setStorageWarning(null), 5000);
+      }
+    };
+
+    // Debounce save operations to avoid excessive saves
+    const saveTimeout = setTimeout(saveChatHistory, 2000);
+    return () => clearTimeout(saveTimeout);
+  }, [messages, ticketData?.id, userInfo, autoSaveEnabled]);
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -245,7 +306,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     try {
       const data = await ticketAnalyzer.extractTicketData();
       setTicketData(data);
-      console.log('🎯 [ChatbotAsidePanel] Loaded ticket data:', data);
     } catch (error) {
       console.error('Error loading ticket data:', error);
     }
@@ -311,8 +371,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       setSummaryError('');
       setSummaryContent('');
 
-      console.log('🔄 [ChatbotAsidePanel] Requesting summary for ticket:', ticketData.id);
-
+      
       // Request summary via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
         const messageId = Date.now() + Math.random();
@@ -476,6 +535,69 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     setSummaryError('');
   };
 
+  // Manual save function
+  const handleManualSave = async () => {
+    if (!ticketData?.id || !userInfo) {
+      setStorageWarning('Thiếu thông tin ticket hoặc user để lưu.');
+      setTimeout(() => setStorageWarning(null), 3000);
+      return;
+    }
+
+    try {
+      console.log('💾 [ChatbotAsidePanel] Manual save triggered');
+      
+      const result = await ChatStorageService.saveChatHistory(
+        ticketData.id, 
+        messages, 
+        ticketData, 
+        userInfo
+      );
+
+      if (result.success) {
+        setStorageWarning('✅ Chat history đã được lưu thành công!');
+        setAutoSaveEnabled(true); // Re-enable auto-save on successful manual save
+        setTimeout(() => setStorageWarning(null), 3000);
+      } else {
+        setStorageWarning(result.error || 'Lỗi khi lưu chat history');
+        setTimeout(() => setStorageWarning(null), 5000);
+      }
+    } catch (error) {
+      console.error('❌ [ChatbotAsidePanel] Manual save failed:', error);
+      setStorageWarning('Không thể lưu chat history.');
+      setTimeout(() => setStorageWarning(null), 5000);
+    }
+  };
+
+  // Clear chat history function
+  const handleClearHistory = async () => {
+    if (!ticketData?.id) {
+      setStorageWarning('Không có thông tin ticket để xóa.');
+      setTimeout(() => setStorageWarning(null), 3000);
+      return;
+    }
+
+    if (!window.confirm('Bạn có chắc muốn xóa toàn bộ lịch sử chat cho ticket này? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+
+    try {
+      const success = await ChatStorageService.clearChatHistory(ticketData.id);
+      
+      if (success) {
+        setMessages([]);
+        setStorageWarning('🗑️ Đã xóa lịch sử chat thành công.');
+        setTimeout(() => setStorageWarning(null), 3000);
+      } else {
+        setStorageWarning('Không thể xóa lịch sử chat.');
+        setTimeout(() => setStorageWarning(null), 5000);
+      }
+    } catch (error) {
+      console.error('❌ [ChatbotAsidePanel] Failed to clear chat history:', error);
+      setStorageWarning('Lỗi khi xóa lịch sử chat.');
+      setTimeout(() => setStorageWarning(null), 5000);
+    }
+  };
+
   const formatMessageContent = (content: string): string => {
     return content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -508,6 +630,25 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         </button>
       </div>
 
+      {/* Storage warning banner */}
+      {storageWarning && (
+        <div className={`ai-ext-storage-warning ${
+          storageWarning.includes('thành công') || storageWarning.includes('✅') ? 'success' : 
+          storageWarning.includes('dọn dẹp') ? 'info' : 'warning'
+        }`}>
+          <span>{storageWarning}</span>
+          {!autoSaveEnabled && (
+            <button 
+              className="ai-ext-manual-save-btn"
+              onClick={handleManualSave}
+              title="Lưu chat history thủ công"
+            >
+              💾 Lưu
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Ticket Info */}
       {ticketData && (
         <div className="ai-ext-ticket-info">
@@ -530,6 +671,33 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       <div className="ai-ext-chatbot-content">
         <div className="ai-ext-chat-header">
           <h4>💬 Chat với AI</h4>
+          <div className="ai-ext-chat-controls">
+            {messages.length > 0 && (
+              <>
+                {!autoSaveEnabled && (
+                  <button
+                    className="ai-ext-control-button ai-ext-save-button"
+                    onClick={handleManualSave}
+                    title="Lưu chat history thủ công"
+                  >
+                    💾
+                  </button>
+                )}
+                <button
+                  className="ai-ext-control-button ai-ext-clear-button"
+                  onClick={handleClearHistory}
+                  title="Xóa lịch sử chat"
+                >
+                  🗑️
+                </button>
+              </>
+            )}
+            {isLoadingHistory && (
+              <div className="ai-ext-loading-indicator" title="Đang tải lịch sử chat...">
+                ⏳
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Messages */}
