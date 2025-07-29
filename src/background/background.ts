@@ -1,6 +1,8 @@
 // Background script để xử lý AI API và communication
 import { TicketData } from '../shared/ticketAnalyzer';
 import { EncryptionService } from '../shared/encryption';
+import ContextOptimizer from '../shared/contextOptimizer';
+import type { ChatHistoryData } from '../shared/chatStorageService';
 
 interface Settings {
   apiKey: string;
@@ -38,7 +40,11 @@ interface BacklogMultiSettings {
 
 interface AIService {
   analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string>;
-  processUserMessage(message: string, context: any, settings?: Settings): Promise<string>;
+  processUserMessage(message: string, context: any, settings?: Settings): Promise<{
+    response: string;
+    responseId?: string;
+    tokensUsed?: number;
+  }>;
 }
 
 class GeminiService implements AIService {
@@ -67,13 +73,33 @@ class GeminiService implements AIService {
 
   async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
     const prompt = this.buildAnalysisPrompt(ticketData, settings);
-    return await this.callGeminiAPI(prompt, settings);
+    const result = await this.callGeminiAPI(prompt, settings);
+    return result.response;
   }
 
-  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<string> {
-    // The message is already processed by BackgroundService with full context
-    // Just call the API with the processed prompt
-    return await this.callGeminiAPI(message, settings);
+  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<{
+    response: string;
+    responseId?: string;
+    tokensUsed?: number;
+  }> {
+    // Check if this is optimized context from ContextOptimizer
+    if (contextData.isOptimized) {
+      console.log('🚀 [Gemini] Using optimized context, estimated tokens:', contextData.estimatedTokens);
+      const result = await this.callGeminiAPI(message, settings);
+      return {
+        response: result.response,
+        responseId: result.responseId,
+        tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
+      };
+    }
+
+    // Legacy handling for non-optimized context
+    const result = await this.callGeminiAPI(message, settings);
+    return {
+      response: result.response,
+      responseId: result.responseId,
+      tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
+    };
   }
 
   private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
@@ -128,11 +154,18 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     return prompt;
   }
 
-  private async callGeminiAPI(prompt: string, settings?: Settings): Promise<string> {
+  private async callGeminiAPI(prompt: string, settings?: Settings): Promise<{
+    response: string;
+    responseId?: string;
+    tokensUsed?: number;
+  }> {
     try {
       const apiKey = settings?.geminiApiKey || this.apiKey;
       if (!apiKey) {
-        return 'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
+        return {
+          response: 'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
+          tokensUsed: 0
+        };
       }
 
       // Get model from settings or default to gemini-pro
@@ -140,6 +173,7 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       const apiUrl = this.getApiUrl(model);
 
       console.log('🔄 [Gemini] Calling Gemini API with model:', model);
+      console.log('🔧 [Gemini] Estimated input tokens:', ContextOptimizer.estimateTokenCount(prompt));
 
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: 'POST',
@@ -156,7 +190,7 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
             temperature: 0.3,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: 4096, // Increased from 1024 to handle longer responses
           }
         })
       });
@@ -173,7 +207,8 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       console.log('🔧 [Gemini] API Response structure:', {
         hasCandidates: !!data.candidates,
         candidatesLength: data.candidates?.length,
-        hasError: !!data.error
+        hasError: !!data.error,
+        hasUsageMetadata: !!data.usageMetadata
       });
 
       if (data.error) {
@@ -182,8 +217,21 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
 
       if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
         const content = data.candidates[0].content.parts[0].text;
+        const responseId = data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() || undefined;
+        const tokensUsed = data.usageMetadata?.totalTokenCount || ContextOptimizer.estimateTokenCount(content);
+
         console.log('✅ [Gemini] Response generated successfully');
-        return content;
+        console.log('🔧 [Gemini] Token usage:', {
+          totalTokens: tokensUsed,
+          promptTokens: data.usageMetadata?.promptTokenCount,
+          candidatesTokens: data.usageMetadata?.candidatesTokenCount
+        });
+
+        return {
+          response: content,
+          responseId,
+          tokensUsed
+        };
       } else {
         console.error('❌ [Gemini] Invalid API response structure:', data);
         throw new Error('Invalid Gemini API response - no content in candidates');
@@ -271,9 +319,16 @@ class OpenAIService implements AIService {
     }
   }
 
-  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<string> {
+  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<{
+    response: string;
+    responseId?: string;
+    tokensUsed?: number;
+  }> {
     if (!this.apiKey) {
-      return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
+      return {
+        response: 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
+        tokensUsed: 0
+      };
     }
 
     // The message is already processed by BackgroundService with full context
@@ -299,7 +354,7 @@ class OpenAIService implements AIService {
         body: JSON.stringify({
           model: this.getOpenAIModel(settings),
           messages,
-          max_tokens: 800,
+          max_tokens: 1500, // Increased from 800
           temperature: 0.7
         })
       });
@@ -307,13 +362,24 @@ class OpenAIService implements AIService {
       const data = await response.json();
 
       if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content;
+        const content = data.choices[0].message.content;
+        const tokensUsed = data.usage?.total_tokens || ContextOptimizer.estimateTokenCount(content);
+        const responseId = data.id;
+
+        return {
+          response: content,
+          responseId,
+          tokensUsed
+        };
       } else {
         throw new Error('Invalid API response');
       }
     } catch (error) {
       console.error('Error calling OpenAI API:', error);
-      return `Lỗi khi gọi AI API: ${error}`;
+      return {
+        response: `Lỗi khi gọi AI API: ${error}`,
+        tokensUsed: 0
+      };
     }
   }
 
@@ -562,23 +628,83 @@ class BackgroundService {
       }
 
       let processedMessage = message;
+      let optimizedContext: any = data;
 
       // Build context-aware prompt based on message type
       if (messageType === 'suggestion') {
         processedMessage = this.buildSuggestionPrompt(message, ticketData);
       } else {
-        // For regular chat, include full context
-        processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
+        // For regular chat, use optimized context processing
+        if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
+          console.log('🚀 [Background] Using ContextOptimizer for chat context');
+
+          // Prepare ChatHistoryData for optimization
+          const historyData: ChatHistoryData = {
+            ticketId: ticketData?.id || 'current',
+            ticketUrl: data.ticketUrl || ticketData?.url || 'current-ticket',
+            messages: chatHistory.map((msg: any) => ({
+              id: msg.id || Date.now().toString(),
+              content: msg.content,
+              sender: msg.sender,
+              timestamp: msg.timestamp || new Date().toISOString(),
+              tokenCount: msg.tokenCount,
+              responseId: msg.responseId,
+              compressed: msg.compressed
+            })),
+            lastUpdated: new Date().toISOString(),
+            userInfo: userInfo || {
+              id: 0,
+              name: 'User',
+              avatar: '',
+              mailAddress: '',
+              userId: 'current-user'
+            },
+            ticketInfo: {
+              title: ticketData?.title || 'Current Ticket',
+              status: ticketData?.status || 'Unknown',
+              assignee: ticketData?.assignee
+            },
+            contextSummary: data.contextSummary,
+            lastSummaryIndex: data.lastSummaryIndex,
+            totalTokensUsed: data.totalTokensUsed
+          };
+
+          // Prepare optimized context
+          const optimizedResult = ContextOptimizer.prepareOptimizedContext(
+            historyData,
+            message,
+            ticketData?.description || 'No ticket content available'
+          );
+
+          processedMessage = optimizedResult.context;
+          optimizedContext = {
+            ...data,
+            isOptimized: true,
+            estimatedTokens: optimizedResult.estimatedTokens,
+            recentMessages: optimizedResult.recentMessages
+          };
+
+          console.log('🔧 [Background] Optimized context:', {
+            originalMessages: chatHistory.length,
+            recentMessages: optimizedResult.recentMessages.length,
+            estimatedTokens: optimizedResult.estimatedTokens
+          });
+        } else {
+          // For regular chat without history, include full context
+          processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
+        }
       }
 
-      console.log('🔍 [Background] processedMessage:', processedMessage.substring(0, 200) + '...');
+      console.log('🔍 [Background] processedMessage length:', processedMessage.length);
+      console.log('🔍 [Background] processedMessage preview:', processedMessage.substring(0, 200) + '...');
 
       // Process with AI service
-      const response = await aiService.processUserMessage(processedMessage, data, settings);
+      const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings);
 
-      console.log('✅ [Background] AI response received:', response.substring(0, 200) + '...');
+      console.log('✅ [Background] AI response received:', response.response.substring(0, 200) + '...');
+      console.log('🔧 [Background] Token usage:', response.tokensUsed, 'tokens');
 
-      sendResponse({ success: true, response });
+      sendResponse({ success: true, response: response.response, tokensUsed: response.tokensUsed, responseId: response.responseId });
 
     } catch (error) {
       console.error('❌ [Background] Error processing message:', error);
@@ -661,9 +787,10 @@ class BackgroundService {
       const aiService = await this.getCurrentAIService();
       const summary = await aiService.processUserMessage(summaryPrompt, { ticketData }, settings);
 
-      console.log('✅ [Background] Summary generated, length:', summary.length);
+      console.log('✅ [Background] Summary generated, length:', summary.response.length);
+      console.log('🔧 [Background] Summary token usage:', summary.tokensUsed);
 
-      sendResponse({ success: true, summary });
+      sendResponse({ success: true, summary: summary.response, tokensUsed: summary.tokensUsed });
     } catch (error) {
       console.error('❌ [Background] Error handling ticket summary:', error);
       sendResponse({ success: false, error: String(error) });

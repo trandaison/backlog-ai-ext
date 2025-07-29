@@ -2,6 +2,7 @@
 import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
 import { ChatMessage } from '../shared/chatStorageService';
+import { TicketURLMonitor, TicketChangeEvent } from '../shared/ticketURLMonitor';
 
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
@@ -10,6 +11,8 @@ class BacklogAIInjector {
   private chatbotToggleButton: HTMLButtonElement | null = null;
   private isChatbotOpen: boolean = false;
   private reactRoot: any = null; // React root for cleanup
+  private ticketMonitor: TicketURLMonitor | null = null;
+  private currentTicketId: string | null = null;
 
   constructor() {
     this.ticketAnalyzer = new TicketAnalyzer();
@@ -27,6 +30,9 @@ class BacklogAIInjector {
 
     // Load sidebar CSS
     this.loadSidebarCSS();
+
+    // Initialize ticket URL monitoring
+    this.initializeTicketMonitoring();
 
     // Kiểm tra xem có phải là trang ticket không
     if (this.isTicketPage()) {
@@ -61,6 +67,99 @@ class BacklogAIInjector {
       console.log('🔧 [Content] Received width update from background:', width);
     } catch (error) {
       console.error('❌ [Content] Error handling width update:', error);
+    }
+  }
+
+  private initializeTicketMonitoring(): void {
+    try {
+      this.ticketMonitor = new TicketURLMonitor();
+
+      // Lấy ticket ID hiện tại
+      this.currentTicketId = this.ticketMonitor.getCurrentTicketId();
+      console.log('🎯 [Content] Current ticket ID:', this.currentTicketId);
+
+      // Theo dõi thay đổi ticket
+      this.ticketMonitor.subscribe((event: TicketChangeEvent) => {
+        this.handleTicketChange(event);
+      });
+
+      console.log('✅ [Content] Ticket URL monitoring initialized');
+    } catch (error) {
+      console.error('❌ [Content] Error initializing ticket monitoring:', error);
+    }
+  }
+
+  private handleTicketChange(event: TicketChangeEvent): void {
+    console.log('🔄 [Content] Ticket changed:', event);
+
+    const oldTicketId = this.currentTicketId;
+    this.currentTicketId = event.newTicketId;
+
+    // Chỉ xử lý nếu thực sự có thay đổi ticket ID
+    if (oldTicketId !== event.newTicketId) {
+      console.log(`📋 [Content] Switching from ticket ${oldTicketId} to ${event.newTicketId}`);
+
+      // Gửi message đến ChatbotAsidePanel để reset chat context
+      this.notifyTicketChange(event);
+
+      // Nếu chatbot đang hiển thị, có thể show loading state
+      if (this.isChatbotOpen) {
+        this.showTicketTransitionState();
+      }
+    }
+  }
+
+  private notifyTicketChange(event: TicketChangeEvent): void {
+    // Gửi message đến React component trong main world
+    window.postMessage({
+      type: 'TICKET_CHANGE',
+      oldTicketId: event.oldTicketId,
+      newTicketId: event.newTicketId,
+      url: event.url,
+      timestamp: Date.now()
+    }, '*');
+  }
+
+  private showTicketTransitionState(): void {
+    // Optional: Hiển thị loading state khi đang chuyển đổi ticket
+    if (this.chatbotAsideContainer) {
+      const existingOverlay = this.chatbotAsideContainer.querySelector('.ticket-transition-overlay');
+      if (!existingOverlay) {
+        const overlay = document.createElement('div');
+        overlay.className = 'ticket-transition-overlay';
+        overlay.innerHTML = `
+          <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+          ">
+            <div style="text-align: center;">
+              <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
+                🔄 Đang chuyển đổi ticket...
+              </div>
+              <div style="font-size: 12px; color: #999;">
+                Đang tải ngữ cảnh mới
+              </div>
+            </div>
+          </div>
+        `;
+
+        this.chatbotAsideContainer.appendChild(overlay);
+
+        // Tự động ẩn overlay sau 2 giây
+        setTimeout(() => {
+          if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+          }
+        }, 2000);
+      }
     }
   }
 
@@ -435,6 +534,7 @@ class BacklogAIInjector {
         chatHistory: contextData.chatHistory || [],
         userInfo: contextData.userInfo,
         ticketId: finalTicketData?.id || finalTicketData?.key,
+        ticketUrl: window.location.href, // Add current URL for background script
         timestamp: contextData.timestamp || new Date().toISOString()
       };
 
@@ -532,10 +632,10 @@ class BacklogAIInjector {
     try {
       const result = await chrome.storage.local.get([`chat-history-${ticketKey}`]);
       const historyData = result[`chat-history-${ticketKey}`];
-      
+
       // Extract messages array from the ChatHistoryData structure
       const messages = historyData?.messages || [];
-      
+
       window.postMessage({
         type: 'CHAT_STORAGE_LOAD_RESPONSE',
         id: messageId,
@@ -554,12 +654,16 @@ class BacklogAIInjector {
   }
 
   private async handleChatStorageSave(messageId: string, ticketKey: string, saveData: any): Promise<void> {
+    console.log('🔎 ~ BacklogAIInjector ~ handleChatStorageSave ~ saveData:', saveData);
     try {
       // Construct ChatHistoryData structure
       const historyData = {
         ticketId: saveData.ticketId || ticketKey,
         ticketUrl: window.location.href,
-        messages: (saveData.messages || []).slice(-100), // Keep only recent 100 messages
+        messages: (saveData.messages || []).slice(-100).map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp).toISOString()  // Convert any other type to ISO string
+        })), // Keep only recent 100 messages and normalize timestamps as ISO strings
         lastUpdated: new Date().toISOString(),
         userInfo: saveData.userInfo,
         ticketInfo: {
@@ -568,11 +672,12 @@ class BacklogAIInjector {
           assignee: (saveData.ticketData?.assignee || '').slice(0, 100)
         }
       };
-      
+      console.log('🔎 ~ BacklogAIInjector ~ handleChatStorageSave ~ historyData:', historyData);
+
       await chrome.storage.local.set({
         [`chat-history-${ticketKey}`]: historyData
       });
-      
+
       window.postMessage({
         type: 'CHAT_STORAGE_SAVE_RESPONSE',
         id: messageId,
@@ -600,7 +705,7 @@ class BacklogAIInjector {
           await chrome.storage.local.remove(keysToRemove);
         }
       }
-      
+
       window.postMessage({
         type: 'CHAT_STORAGE_CLEAR_RESPONSE',
         id: messageId,
@@ -720,6 +825,16 @@ class BacklogAIInjector {
 
   // Cleanup method when extension is disabled/removed
   public cleanup() {
+    // Cleanup ticket monitor
+    if (this.ticketMonitor) {
+      try {
+        this.ticketMonitor.destroy();
+        this.ticketMonitor = null;
+      } catch (error) {
+        console.error('Error disposing ticket monitor:', error);
+      }
+    }
+
     if (this.reactRoot) {
       try {
         this.reactRoot.unmount();

@@ -124,7 +124,7 @@ interface StorageMetadata {
 private static isQuotaExceededError(error: any): boolean {
   const errorMessage = error?.message?.toLowerCase() || '';
   const errorName = error?.name?.toLowerCase() || '';
-  
+
   return (
     errorName.includes('quotaexceedederror') ||
     errorMessage.includes('quota') ||

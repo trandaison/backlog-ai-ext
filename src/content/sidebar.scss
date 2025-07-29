@@ -531,13 +531,13 @@ body.ai-ext-sidebar-open {
   justify-content: space-between;
   border: 1px solid;
   animation: slideIn 0.3s ease-out;
-  
+
   &.warning {
     background: #fff3cd;
     border-color: #ffeaa7;
     color: #856404;
   }
-  
+
   &.success {
     background: #d4edda;
     border-color: #c3e6cb;
@@ -549,7 +549,7 @@ body.ai-ext-sidebar-open {
     border-color: #bee5eb;
     color: #0c5460;
   }
-  
+
   .ai-ext-manual-save-btn {
     background: none;
     border: 1px solid currentColor;
@@ -559,7 +559,7 @@ body.ai-ext-sidebar-open {
     font-size: 11px;
     cursor: pointer;
     @include transition(all, 0.2s);
-    
+
     &:hover {
       background: rgba(0, 0, 0, 0.1);
       transform: scale(1.05);

@@ -111,13 +111,23 @@ const PopupApp: React.FC = () => {
         }
       }
 
+      // Migrate old Gemini models to new ones
+      let migratedAiModel = storedSettings.aiModel;
+      if (storedSettings.preferredProvider === 'gemini') {
+        const oldGeminiModels = ['gemini-pro', 'gemini-pro-vision'];
+        if (oldGeminiModels.includes(storedSettings.aiModel)) {
+          migratedAiModel = 'gemini-2.5-flash'; // Default new model
+          console.log(`Migrated old Gemini model ${storedSettings.aiModel} to ${migratedAiModel}`);
+        }
+      }
+
       setSettings({
         apiKey: decryptedApiKey,
         geminiApiKey: decryptedGeminiApiKey,
         preferredProvider: storedSettings.preferredProvider,
         userRole: storedSettings.userRole,
         language: storedSettings.language,
-        aiModel: storedSettings.aiModel,
+        aiModel: migratedAiModel,
         backlogConfigs: storedSettings.backlogConfigs || []
       });
     } catch (error) {
@@ -184,26 +194,50 @@ const PopupApp: React.FC = () => {
   };
 
   const testConnection = async () => {
-    if (!settings.apiKey.trim()) {
-      showMessage('Vui lòng nhập API key trước', 'error');
-      return;
+    // Check API key based on selected provider
+    if (settings.preferredProvider === 'openai') {
+      if (!settings.apiKey.trim()) {
+        showMessage('Vui lòng nhập OpenAI API key trước', 'error');
+        return;
+      }
+    } else if (settings.preferredProvider === 'gemini') {
+      if (!settings.geminiApiKey?.trim()) {
+        showMessage('Vui lòng nhập Gemini API key trước', 'error');
+        return;
+      }
     }
 
     setIsValidatingKey(true);
     showMessage('Đang kiểm tra kết nối...', 'success');
 
     try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${settings.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      if (settings.preferredProvider === 'openai') {
+        // Test OpenAI connection
+        const response = await fetch('https://api.openai.com/v1/models', {
+          headers: {
+            'Authorization': `Bearer ${settings.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.ok) {
-        showMessage('Kết nối thành công!', 'success');
-      } else {
-        showMessage('Kết nối thất bại. Kiểm tra lại API key.', 'error');
+        if (response.ok) {
+          showMessage('Kết nối OpenAI thành công!', 'success');
+        } else {
+          showMessage('Kết nối OpenAI thất bại. Kiểm tra lại API key.', 'error');
+        }
+      } else if (settings.preferredProvider === 'gemini') {
+        // Test Gemini connection
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${settings.geminiApiKey}`, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          showMessage('Kết nối Gemini thành công!', 'success');
+        } else {
+          showMessage('Kết nối Gemini thất bại. Kiểm tra lại API key.', 'error');
+        }
       }
     } catch (error) {
       console.error('Connection test failed:', error);
@@ -351,8 +385,9 @@ const PopupApp: React.FC = () => {
   const getAvailableModels = () => {
     if (settings.preferredProvider === 'gemini') {
       return [
-        { value: 'gemini-pro', label: 'Gemini Pro' },
-        { value: 'gemini-pro-vision', label: 'Gemini Pro Vision' }
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+        { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' }
       ];
     } else {
       return [
@@ -368,7 +403,7 @@ const PopupApp: React.FC = () => {
   const handleProviderChange = (provider: 'openai' | 'gemini') => {
     const defaultModels = {
       openai: 'gpt-3.5-turbo',
-      gemini: 'gemini-pro'
+      gemini: 'gemini-2.5-flash'
     };
 
     setSettings(prev => ({

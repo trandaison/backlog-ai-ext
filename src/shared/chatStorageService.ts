@@ -1,11 +1,15 @@
 import { TicketData } from './ticketAnalyzer';
+import { safeTimestampToDate } from './timeUtils';
 
-export interface ChatMessage {
+export type ChatMessage = {
   id: string;
   content: string;
   sender: 'user' | 'ai';
-  timestamp: Date;
-}
+  timestamp: string | Date; // Allow both string and Date for storage/runtime compatibility
+  responseId?: string; // Store Gemini responseId for reference
+  tokenCount?: number; // Track token usage per message
+  compressed?: boolean; // Flag if this message was summarized
+};
 
 export interface UserInfo {
   id: number;
@@ -21,10 +25,18 @@ export interface UserInfo {
   };
 }
 
-interface ChatHistoryData {
+export interface ChatHistoryData {
   ticketId: string;
   ticketUrl: string;
-  messages: ChatMessage[];
+  messages: Array<{
+    id: string;
+    content: string;
+    sender: 'user' | 'ai';
+    timestamp: string | Date; // Allow both string and Date for storage/runtime compatibility
+    responseId?: string; // Store Gemini responseId for reference
+    tokenCount?: number; // Track token usage per message
+    compressed?: boolean; // Flag if this message was summarized
+  }>;
   lastUpdated: string;
   userInfo: UserInfo;
   ticketInfo: {
@@ -32,6 +44,10 @@ interface ChatHistoryData {
     status: string;
     assignee?: string;
   };
+  // Add optimization fields:
+  contextSummary?: string; // Compressed summary of older messages
+  lastSummaryIndex?: number; // Index of last message included in summary
+  totalTokensUsed?: number; // Track cumulative token usage
 }
 
 interface StorageMetadata {
@@ -59,24 +75,26 @@ export class ChatStorageService {
    * Save chat history for a ticket with quota management
    */
   static async saveChatHistory(
-    ticketId: string, 
-    messages: ChatMessage[], 
-    ticketData: TicketData, 
+    ticketId: string,
+    messages: ChatMessage[],
+    ticketData: TicketData,
     userInfo: UserInfo
   ): Promise<SaveResult> {
     try {
       // Check if we have direct Chrome API access
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        console.log('🔎 ~ ChatStorageService ~ saveChatHistory ~ messages:', messages);
         return await this.saveChatHistoryDirect(ticketId, messages, ticketData, userInfo);
       } else {
         // Use message passing for main world context
+        console.log('🔎 ~ ChatStorageService ~ saveChatHistory ~ messages:', messages);
         return await this.saveChatHistoryViaMessage(ticketId, messages, ticketData, userInfo);
       }
     } catch (error) {
       console.error('❌ [ChatStorage] Save failed:', error);
-      return { 
-        success: false, 
-        error: this.getErrorMessage(error) 
+      return {
+        success: false,
+        error: this.getErrorMessage(error)
       };
     }
   }
@@ -85,22 +103,22 @@ export class ChatStorageService {
    * Direct save method (for content script context)
    */
   private static async saveChatHistoryDirect(
-    ticketId: string, 
-    messages: ChatMessage[], 
-    ticketData: TicketData, 
+    ticketId: string,
+    messages: ChatMessage[],
+    ticketData: TicketData,
     userInfo: UserInfo
   ): Promise<SaveResult> {
     // Check storage quota before saving
     const quotaCheck = await this.checkStorageQuota();
-    
+
     if (quotaCheck.usage > this.EMERGENCY_CLEANUP_THRESHOLD) {
-      console.warn('🚨 [ChatStorage] Emergency cleanup required - storage at', 
+      console.warn('🚨 [ChatStorage] Emergency cleanup required - storage at',
         `${(quotaCheck.usage * 100).toFixed(1)}%`);
-      
+
       const cleanupResult = await this.emergencyCleanup();
       if (!cleanupResult.success) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Storage đã đầy và không thể dọn dẹp. Vui lòng xóa dữ liệu cũ thủ công.',
           usage: quotaCheck.usage
         };
@@ -109,11 +127,14 @@ export class ChatStorageService {
       await this.smartCleanup();
     }
 
-    // Prepare data for storage
+    // Prepare data for storage - ensure timestamps are stored as ISO strings
     const historyData: ChatHistoryData = {
       ticketId,
-      ticketUrl: window.location.href,
-      messages: messages.slice(-this.MAX_MESSAGES_PER_TICKET), // Keep only recent messages
+      ticketUrl: (typeof window !== 'undefined') ? window.location.href : `ticket-${ticketId}`,
+      messages: messages.slice(-this.MAX_MESSAGES_PER_TICKET).map(msg => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp).toISOString()  // Convert any other type to ISO string
+      })), // Keep only recent messages and normalize timestamps as ISO strings
       lastUpdated: new Date().toISOString(),
       userInfo,
       ticketInfo: {
@@ -127,7 +148,7 @@ export class ChatStorageService {
 
     // Attempt to save with error handling
     const saveResult = await this.safeSave(storageKey, historyData);
-    
+
     if (saveResult.success) {
       // Update metadata and access tracking
       await this.updateMetadata(ticketId);
@@ -143,9 +164,9 @@ export class ChatStorageService {
    * Save via message passing (for main world context)
    */
   private static async saveChatHistoryViaMessage(
-    ticketId: string, 
-    messages: ChatMessage[], 
-    ticketData: TicketData, 
+    ticketId: string,
+    messages: ChatMessage[],
+    ticketData: TicketData,
     userInfo: UserInfo
   ): Promise<SaveResult> {
     return new Promise((resolve) => {
@@ -156,7 +177,7 @@ export class ChatStorageService {
 
         if (event.data.type === 'CHAT_STORAGE_SAVE_RESPONSE' && event.data.id === messageId) {
           window.removeEventListener('message', responseHandler);
-          
+
           // The content script sends the result directly, not nested in a 'result' property
           resolve({
             success: event.data.success,
@@ -200,20 +221,20 @@ export class ChatStorageService {
         const storageKey = `${this.STORAGE_KEY_PREFIX}${ticketId}`;
         const result = await chrome.storage.local.get([storageKey]);
         const historyData = result[storageKey] as ChatHistoryData;
-        
+
         if (historyData && historyData.messages) {
-          // Convert timestamp strings back to Date objects
+          // Convert timestamp strings back to Date objects safely
           const messages = historyData.messages.map(msg => ({
             ...msg,
-            timestamp: new Date(msg.timestamp)
+            timestamp: safeTimestampToDate(msg.timestamp)
           }));
-          
+
           // Update access time for smart cleanup
           await this.updateAccessTime(ticketId);
-          
+
           return messages;
         }
-        
+
         return [];
       } else {
         // Use message passing for main world context
@@ -243,7 +264,7 @@ export class ChatStorageService {
             const rawMessages = event.data.data || [];
             const messages = rawMessages.map((msg: any) => ({
               ...msg,
-              timestamp: new Date(msg.timestamp)
+              timestamp: safeTimestampToDate(msg.timestamp)
             }));
             resolve(messages);
           } else {
@@ -267,6 +288,56 @@ export class ChatStorageService {
         resolve([]);
       }, 10000);
     });
+  }
+
+  /**
+   * Get full chat history data including metadata (for optimization purposes)
+   */
+  static async getChatHistory(ticketId: string): Promise<ChatHistoryData | null> {
+    try {
+      // Check if we have direct Chrome API access
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        const storageKey = this.STORAGE_KEY_PREFIX + ticketId;
+        const result = await chrome.storage.local.get([storageKey]);
+
+        if (result[storageKey]) {
+          const historyData = result[storageKey] as ChatHistoryData;
+          // Ensure messages have proper timestamp format
+          historyData.messages = historyData.messages.map(msg => ({
+            ...msg,
+            timestamp: safeTimestampToDate(msg.timestamp)
+          }));
+          return historyData;
+        }
+        return null;
+      } else {
+        // Use message passing for main world context - convert messages to full history
+        const messages = await this.loadChatHistoryViaMessage(ticketId);
+        if (messages.length === 0) return null;
+
+        // Create minimal history data from messages
+        return {
+          ticketId,
+          ticketUrl: (typeof window !== 'undefined') ? window.location.href : `ticket-${ticketId}`,
+          messages,
+          lastUpdated: new Date().toISOString(),
+          userInfo: {
+            id: 0,
+            name: 'User',
+            avatar: '',
+            mailAddress: '',
+            userId: 'current-user'
+          },
+          ticketInfo: {
+            title: 'Current Ticket',
+            status: 'Unknown'
+          }
+        };
+      }
+    } catch (error) {
+      console.error('❌ [ChatStorage] Get history failed:', error);
+      return null;
+    }
   }
 
   /**
@@ -334,7 +405,7 @@ export class ChatStorageService {
     try {
       const quotaInfo = await this.checkStorageQuota();
       const meta = await this.getMetadata();
-      
+
       return {
         usage: quotaInfo.usage,
         bytesUsed: quotaInfo.bytesUsed,
@@ -358,15 +429,15 @@ export class ChatStorageService {
   static async clearAllChatHistories(): Promise<boolean> {
     try {
       const meta = await this.getMetadata();
-      
+
       for (const ticketId of meta.ticketIds) {
         const storageKey = `${this.STORAGE_KEY_PREFIX}${ticketId}`;
         await chrome.storage.local.remove([storageKey]);
       }
-      
+
       // Clear metadata
       await chrome.storage.local.remove([this.META_KEY]);
-      
+
       return true;
     } catch (error) {
       console.error('❌ [ChatStorage] Failed to clear all chat histories:', error);
@@ -380,7 +451,7 @@ export class ChatStorageService {
    * Safe save with quota error handling and retry mechanism
    */
   private static async safeSave(
-    key: string, 
+    key: string,
     data: ChatHistoryData
   ): Promise<{success: boolean, error?: string, cleaned?: boolean}> {
     try {
@@ -391,7 +462,7 @@ export class ChatStorageService {
       // Handle quota exceeded errors
       if (this.isQuotaExceededError(error)) {
         console.warn('🚨 [ChatStorage] Quota exceeded, attempting emergency cleanup...');
-        
+
         const cleanupResult = await this.emergencyCleanup();
         if (cleanupResult.success) {
           try {
@@ -399,18 +470,18 @@ export class ChatStorageService {
             await chrome.storage.local.set({ [key]: data });
             return { success: true, cleaned: true };
           } catch (retryError) {
-            return { 
-              success: false, 
+            return {
+              success: false,
               error: 'Không thể lưu dữ liệu ngay cả sau khi dọn dẹp. Dữ liệu có thể quá lớn.',
-              cleaned: true 
+              cleaned: true
             };
           }
         }
-        
-        return { 
-          success: false, 
+
+        return {
+          success: false,
           error: 'Storage đã đầy và không thể dọn dẹp tự động.',
-          cleaned: false 
+          cleaned: false
         };
       }
 
@@ -423,8 +494,8 @@ export class ChatStorageService {
    * Check current storage usage
    */
   private static async checkStorageQuota(): Promise<{
-    usage: number; 
-    bytesUsed: number; 
+    usage: number;
+    bytesUsed: number;
     maxBytes: number;
   }> {
     try {
@@ -481,10 +552,10 @@ export class ChatStorageService {
   private static async smartCleanup(): Promise<void> {
     const meta = await this.getMetadata();
     const now = Date.now();
-    
+
     // Remove tickets older than 30 days with no recent access
     const oldThreshold = now - (30 * 24 * 60 * 60 * 1000); // 30 days
-    
+
     const ticketsToRemove = meta.ticketIds.filter(id => {
       const lastAccess = meta.lastAccess?.[id] || 0;
       return lastAccess < oldThreshold;
@@ -495,7 +566,7 @@ export class ChatStorageService {
       const sortedTickets = meta.ticketIds
         .map(id => ({ id, lastAccess: meta.lastAccess?.[id] || 0 }))
         .sort((a, b) => a.lastAccess - b.lastAccess);
-      
+
       const excessCount = meta.ticketIds.length - this.MAX_TICKETS;
       const excessTickets = sortedTickets.slice(0, excessCount);
       ticketsToRemove.push(...excessTickets.map(t => t.id));
@@ -514,15 +585,15 @@ export class ChatStorageService {
    */
   private static async updateMetadata(ticketId: string): Promise<void> {
     const meta = await this.getMetadata();
-    
+
     if (!meta.ticketIds.includes(ticketId)) {
       meta.ticketIds.push(ticketId);
     }
-    
+
     // Track last access time for smart cleanup
     meta.lastAccess = meta.lastAccess || {};
     meta.lastAccess[ticketId] = Date.now();
-    
+
     await chrome.storage.local.set({ [this.META_KEY]: meta });
   }
 
@@ -533,7 +604,7 @@ export class ChatStorageService {
     const meta = await this.getMetadata();
     meta.lastAccess = meta.lastAccess || {};
     meta.lastAccess[ticketId] = Date.now();
-    
+
     await chrome.storage.local.set({ [this.META_KEY]: meta });
   }
 
@@ -543,11 +614,11 @@ export class ChatStorageService {
   private static async removeFromMetadata(ticketId: string): Promise<void> {
     const meta = await this.getMetadata();
     meta.ticketIds = meta.ticketIds.filter(id => id !== ticketId);
-    
+
     if (meta.lastAccess) {
       delete meta.lastAccess[ticketId];
     }
-    
+
     await chrome.storage.local.set({ [this.META_KEY]: meta });
   }
 
@@ -578,7 +649,7 @@ export class ChatStorageService {
   private static isQuotaExceededError(error: any): boolean {
     const errorMessage = error?.message?.toLowerCase() || '';
     const errorName = error?.name?.toLowerCase() || '';
-    
+
     // Check basic error patterns first
     const isQuotaError = (
       errorName.includes('quotaexceedederror') ||
@@ -602,7 +673,7 @@ export class ChatStorageService {
     if (this.isQuotaExceededError(error)) {
       return 'Storage đã đầy. Hệ thống đã cố gắng dọn dẹp tự động.';
     }
-    
+
     if (error?.message?.includes('network')) {
       return 'Lỗi mạng khi lưu dữ liệu.';
     }
@@ -610,7 +681,163 @@ export class ChatStorageService {
     if (error?.message?.includes('permission')) {
       return 'Không có quyền truy cập storage.';
     }
-    
+
     return 'Lỗi không xác định khi lưu chat history.';
+  }
+
+  /**
+   * Add a new message with token tracking to existing chat history
+   */
+  static async addMessage(
+    ticketId: string,
+    message: ChatMessage,
+    options?: {
+      autoOptimize?: boolean;
+      maxMessages?: number;
+    }
+  ): Promise<SaveResult> {
+    try {
+      const existingHistory = await this.getChatHistory(ticketId);
+      if (!existingHistory) {
+        return {
+          success: false,
+          error: 'No existing chat history found for ticket'
+        };
+      }
+
+      // Add the new message
+      const updatedMessages = [...existingHistory.messages, message];
+
+      // Update token tracking
+      const newTokenCount = message.tokenCount || 0;
+      const updatedHistory: ChatHistoryData = {
+        ...existingHistory,
+        messages: updatedMessages,
+        lastUpdated: new Date().toISOString(),
+        totalTokensUsed: (existingHistory.totalTokensUsed || 0) + newTokenCount
+      };
+
+      // Auto-optimize if enabled and message count exceeds limit
+      if (options?.autoOptimize && (options.maxMessages || 20) < updatedMessages.length) {
+        const ContextOptimizer = (await import('./contextOptimizer')).default;
+        const optimized = ContextOptimizer.optimizeContext(updatedHistory, {
+          maxMessages: options.maxMessages || 15,
+          maxTokens: 6000
+        });
+
+        console.log('🚀 [ChatStorage] Auto-optimized chat history:', {
+          originalMessages: updatedMessages.length,
+          optimizedMessages: optimized.messages.length,
+          hasSummary: !!optimized.contextSummary
+        });
+
+        return await this.saveChatHistory(
+          ticketId,
+          optimized.messages,
+          {
+            id: existingHistory.ticketId,
+            title: existingHistory.ticketInfo.title,
+            description: '',
+            status: existingHistory.ticketInfo.status,
+            priority: '',
+            assignee: existingHistory.ticketInfo.assignee || '',
+            reporter: '',
+            dueDate: '',
+            labels: [],
+            comments: []
+          },
+          existingHistory.userInfo
+        );
+      }
+
+      // Regular save without optimization
+      return await this.saveChatHistory(
+        ticketId,
+        updatedMessages,
+        {
+          id: existingHistory.ticketId,
+          title: existingHistory.ticketInfo.title,
+          description: '',
+          status: existingHistory.ticketInfo.status,
+          priority: '',
+          assignee: existingHistory.ticketInfo.assignee || '',
+          reporter: '',
+          dueDate: '',
+          labels: [],
+          comments: []
+        },
+        existingHistory.userInfo
+      );
+    } catch (error) {
+      console.error('❌ [ChatStorage] Add message failed:', error);
+      return {
+        success: false,
+        error: this.getErrorMessage(error)
+      };
+    }
+  }
+
+  /**
+   * Update message with token information after AI response
+   */
+  static async updateMessageTokens(
+    ticketId: string,
+    messageId: string,
+    tokenInfo: {
+      tokenCount?: number;
+      responseId?: string;
+      compressed?: boolean;
+    }
+  ): Promise<SaveResult> {
+    try {
+      const existingHistory = await this.getChatHistory(ticketId);
+      if (!existingHistory) {
+        return {
+          success: false,
+          error: 'No existing chat history found for ticket'
+        };
+      }
+
+      // Find and update the message
+      const updatedMessages = existingHistory.messages.map(msg => {
+        if (msg.id === messageId) {
+          return {
+            ...msg,
+            ...tokenInfo
+          };
+        }
+        return msg;
+      });
+
+      const updatedHistory: ChatHistoryData = {
+        ...existingHistory,
+        messages: updatedMessages,
+        lastUpdated: new Date().toISOString()
+      };
+
+      return await this.saveChatHistory(
+        ticketId,
+        updatedMessages,
+        {
+          id: existingHistory.ticketId,
+          title: existingHistory.ticketInfo.title,
+          description: '',
+          status: existingHistory.ticketInfo.status,
+          priority: '',
+          assignee: existingHistory.ticketInfo.assignee || '',
+          reporter: '',
+          dueDate: '',
+          labels: [],
+          comments: []
+        },
+        existingHistory.userInfo
+      );
+    } catch (error) {
+      console.error('❌ [ChatStorage] Update message tokens failed:', error);
+      return {
+        success: false,
+        error: this.getErrorMessage(error)
+      };
+    }
   }
 }
