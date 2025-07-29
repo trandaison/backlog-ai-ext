@@ -7,38 +7,15 @@
 
 ### Intelligent Chrome Extension for Backlog Project Management
 
-## 📞 **Support & Contact**
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Extension-blue?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore)
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18+-blue?logo=react&logoColor=white)](https://reactjs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/your-repo/releases)
 
-### 🆘 **Get Help**
+**Transform your Backlog workflow with AI-powered ticket analysis, smart suggestions, and intelligent chat assistance.**
 
-- **GitHub Issues**: [Report bugs & request features](https://github.com/your-username/backlog-ai-ext/issues)
-- **Documentation**: [Full documentation wiki](https://github.com/your-username/backlog-ai-ext/wiki)
-- **Email**: [sontd.it@gmail.com](mailto:sontd.it@gmail.com)
-
-### 💬 **Quick Support**
-
-- **Bug Reports**: Use GitHub Issues for detailed bug reports
-- **Feature Requests**: Submit enhancement ideas via GitHub Issues
-- **General Questions**: Feel free to reach out via email for any questions
-- **Contributions**: Check our [Contributing Guidelines](#contributing) to get started
-
-### ☕ **Support the Project**
-
-If you find this extension helpful, consider supporting its development:
-
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/trandaison)
-
-Your support helps maintain and improve this project! 🙏
-
-  [![Chrome Web Store](https://img.shields.io/badge/Chrome-Extension-blue?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-  [![React](https://img.shields.io/badge/React-18+-blue?logo=react&logoColor=white)](https://reactjs.org/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-  [![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/your-repo/releases)
-
-  **Transform your Backlog workflow with AI-powered ticket analysis, smart suggestions, and intelligent chat assistance.**
-
-  [🚀 Installation](#installation) • [📖 Features](#features) • [⚙️ Configuration](#configuration) • [🛠️ Development](#development) • [🤝 Contributing](#contributing)
+[🚀 Installation](#installation) • [📖 Features](#features) • [⚙️ Configuration](#configuration) • [🛠️ Development](#development) • [🤝 Contributing](#contributing)
 
 </div>
 
@@ -392,7 +369,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy...
 - **Documentation**: [Full documentation wiki](https://github.com/your-username/backlog-ai-ext/wiki)
 - **Email**: [sontd.it@gmail.com](mailto:sontd.it@gmail.com)
 
-### � **Quick Support**
+### 💬 **Quick Support**
 
 - **Bug Reports**: Use GitHub Issues for detailed bug reports
 - **Feature Requests**: Submit enhancement ideas via GitHub Issues

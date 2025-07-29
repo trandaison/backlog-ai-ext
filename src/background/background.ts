@@ -70,9 +70,10 @@ class GeminiService implements AIService {
     return await this.callGeminiAPI(prompt, settings);
   }
 
-  async processUserMessage(message: string, context: any, settings?: Settings): Promise<string> {
-    const prompt = this.buildChatPrompt(message, context, settings);
-    return await this.callGeminiAPI(prompt, settings);
+  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<string> {
+    // The message is already processed by BackgroundService with full context
+    // Just call the API with the processed prompt
+    return await this.callGeminiAPI(message, settings);
   }
 
   private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
@@ -270,23 +271,18 @@ class OpenAIService implements AIService {
     }
   }
 
-  async processUserMessage(message: string, context: any, settings?: Settings): Promise<string> {
+  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<string> {
     if (!this.apiKey) {
       return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
     }
 
-    const conversationHistory = context.conversationHistory || [];
-    const ticketData = context.ticketData;
-
+    // The message is already processed by BackgroundService with full context
+    // Build messages array for OpenAI
     const messages = [
       {
         role: 'system',
         content: this.buildSystemPrompt(settings)
       },
-      ...conversationHistory.slice(-10).map((msg: any) => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      })),
       {
         role: 'user',
         content: message
@@ -548,51 +544,43 @@ class BackgroundService {
 
   private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
     try {
-      console.log('🔍 [Background] handleUserMessage data:', data);
+      console.log('🔍 [Background] handleUserMessage received data:', data);
 
-      const ticketData = this.ticketDataCache.get(data.ticketId);
-      console.log('🔍 [Background] ticketId:', data.ticketId);
-      console.log('🔍 [Background] ticketData from cache:', ticketData);
-      console.log('🔍 [Background] cache keys:', Array.from(this.ticketDataCache.keys()));
+      const { message, messageType, ticketData, chatHistory, userInfo } = data;
 
-      // Check if this is a suggestion button message and convert to detailed prompt
-      let processedMessage = data.message;
-      console.log('🔍 [Background] original message:', data.message);
-
-      if (data.message === 'Tóm tắt nội dung') {
-        processedMessage = this.buildSummaryPrompt(ticketData);
-        console.log('🔍 [Background] buildSummaryPrompt result:', processedMessage);
-      } else if (data.message === 'Giải thích yêu cầu ticket') {
-        processedMessage = this.buildExplainPrompt(ticketData);
-      } else if (data.message === 'Dịch nội dung ticket') {
-        processedMessage = this.buildTranslatePrompt(ticketData);
-      }
-
-      console.log('🔍 [Background] processedMessage:', processedMessage);
-
-      const context = {
-        conversationHistory: data.conversationHistory,
-        ticketData: ticketData
-      };
-
-      // Get user settings for personalized responses
+      // Get current AI service
       const settings = await this.getSettings();
       const aiService = await this.getCurrentAIService();
-      const response = await aiService.processUserMessage(processedMessage, context, settings);
 
-      // Gửi response về content script
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          action: 'aiResponse',
-          data: { response, type: 'chat' }
-        });
+      if (!aiService) {
+        throw new Error('AI service not configured');
       }
 
+      let processedMessage = message;
+
+      // Build context-aware prompt based on message type
+      if (messageType === 'suggestion') {
+        processedMessage = this.buildSuggestionPrompt(message, ticketData);
+      } else {
+        // For regular chat, include full context
+        processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
+      }
+
+      console.log('🔍 [Background] processedMessage:', processedMessage.substring(0, 200) + '...');
+
+      // Process with AI service
+      const response = await aiService.processUserMessage(processedMessage, data, settings);
+
+      console.log('✅ [Background] AI response received:', response.substring(0, 200) + '...');
+
       sendResponse({ success: true, response });
+
     } catch (error) {
-      console.error('Error in user message processing:', error);
-      sendResponse({ success: false, error: String(error) });
+      console.error('❌ [Background] Error processing message:', error);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 
@@ -957,6 +945,111 @@ Phân tích các tác vụ cần thực hiện, dependencies, và impact của t
 **Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
 
 Bao gồm title, description, và các thông tin quan trọng khác. Giữ nguyên format và structure của nội dung.`;
+  }
+
+  // New method: Build suggestion prompt with ticket context
+  private buildSuggestionPrompt(suggestionMessage: string, ticketData: any): string {
+    if (!ticketData) {
+      return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
+Hãy trả lời câu hỏi sau bằng tiếng Việt:
+
+**Yêu cầu:** ${suggestionMessage}`;
+    }
+
+    // Build ticket context
+    const ticketContext = this.buildTicketContext(ticketData);
+
+    // Map suggestion messages to detailed prompts
+    let detailedPrompt = '';
+    if (suggestionMessage === 'Tóm tắt nội dung') {
+      detailedPrompt = `Hãy tóm tắt nội dung ticket này một cách ngắn gọn và rõ ràng. Bao gồm:
+- Mục tiêu chính của ticket
+- Các yêu cầu quan trọng
+- Trạng thái hiện tại
+- Các điểm cần lưu ý`;
+    } else if (suggestionMessage === 'Giải thích yêu cầu ticket') {
+      detailedPrompt = `Hãy giải thích chi tiết yêu cầu của ticket này. Bao gồm:
+- Phân tích requirements
+- Technical scope và complexity
+- Các bước implementation được đề xuất
+- Potential risks và challenges`;
+    } else if (suggestionMessage === 'Dịch nội dung ticket') {
+      detailedPrompt = `Hãy dịch toàn bộ nội dung ticket sang tiếng Anh một cách chuyên nghiệp, giữ nguyên technical terms và format.`;
+    } else {
+      detailedPrompt = suggestionMessage;
+    }
+
+    return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
+Hãy trả lời yêu cầu sau bằng tiếng Việt, dựa trên thông tin ticket:
+
+${ticketContext}
+
+**Yêu cầu:** ${detailedPrompt}
+
+Hãy respond bằng tiếng Việt. Giữ technical terms bằng tiếng Anh khi cần thiết.
+
+Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
+- Technical implementation details
+- Code architecture và design patterns
+- Performance và optimization
+- Security considerations
+- Development best practices`;
+  }
+
+  // New method: Build chat prompt with full context
+  private buildChatPrompt(userMessage: string, ticketData: any, chatHistory: any[]): string {
+    if (!ticketData) {
+      return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
+Hãy trả lời câu hỏi sau bằng tiếng Việt:
+
+**Câu hỏi:** ${userMessage}`;
+    }
+
+    // Build ticket context
+    const ticketContext = this.buildTicketContext(ticketData);
+
+    // Build chat history context (last 10 messages to avoid token limit)
+    const recentHistory = chatHistory.slice(-10);
+    const historyContext = recentHistory.length > 0
+      ? `\n\n**Lịch sử cuộc trò chuyện:**\n${recentHistory
+          .map((msg: any, index: number) => `${index + 1}. ${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.content}`)
+          .join('\n')}`
+      : '';
+
+    return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
+Hãy trả lời câu hỏi sau bằng tiếng Việt, dựa trên thông tin ticket và lịch sử cuộc trò chuyện:
+
+${ticketContext}${historyContext}
+
+**Câu hỏi hiện tại:** ${userMessage}
+
+Hãy respond bằng tiếng Việt. Giữ technical terms bằng tiếng Anh khi cần thiết.
+
+Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
+- Technical implementation details
+- Code architecture và design patterns
+- Performance và optimization
+- Security considerations
+- Development best practices`;
+  }
+
+  // Helper method: Build ticket context
+  private buildTicketContext(ticketData: any): string {
+    const sortedComments = this.sortCommentsByTime(ticketData.comments || []);
+
+    const commentsSection = sortedComments.length > 0
+      ? `\n\n**Comments (theo thời gian):**\n${sortedComments
+          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
+          .join('\n')}`
+      : '';
+
+    return `**Thông tin ticket hiện tại:**
+- ID: ${ticketData.id || ticketData.key || 'Không rõ'}
+- Tiêu đề: ${ticketData.title || 'Không có tiêu đề'}
+- Trạng thái: ${ticketData.status || 'Không rõ'}
+- Độ ưu tiên: ${ticketData.priority || 'Không rõ'}
+- Người được gán: ${ticketData.assignee || 'Chưa gán'}
+- Mô tả: ${ticketData.description || 'Không có mô tả'}${commentsSection}`;
   }
 
   private async callOpenAISummary(prompt: string, settings?: Settings): Promise<string> {

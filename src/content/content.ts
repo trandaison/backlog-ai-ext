@@ -303,7 +303,8 @@ class BacklogAIInjector {
           break;
 
         case 'CHAT_MESSAGE':
-          this.handleChatMessage(event.data.message, event.data.id, event.data.ticketData, event.data.chatHistory);
+          // Handle new context data structure
+          this.handleChatMessage(event.data.data, event.data.id);
           break;
 
         case 'REQUEST_SUMMARY':
@@ -336,20 +337,44 @@ class BacklogAIInjector {
     }
   }
 
-  private async handleChatMessage(message: string, messageId: string, ticketData?: any, chatHistory?: any[]): Promise<void> {
+  private async handleChatMessage(contextData: any, messageId: string): Promise<void> {
     try {
-      // Get ticket data if not provided
-      const finalTicketData = ticketData || await this.ticketAnalyzer.extractTicketData();
+      console.log('🔄 [Content] Processing chat message with full context:', {
+        messageLength: contextData.message?.length || 0,
+        messageType: contextData.messageType,
+        hasTicketData: !!contextData.ticketData,
+        chatHistoryLength: contextData.chatHistory?.length || 0,
+        hasUserInfo: !!contextData.userInfo
+      });
 
-      // Handle chat messages via background script
+      // Extract current ticket data if not provided in context
+      const finalTicketData = contextData.ticketData || await this.ticketAnalyzer.extractTicketData();
+
+      // Prepare full context for background script
+      const fullContextData = {
+        message: contextData.message,
+        messageType: contextData.messageType || 'user',
+        ticketData: finalTicketData,
+        chatHistory: contextData.chatHistory || [],
+        userInfo: contextData.userInfo,
+        ticketId: finalTicketData?.id || finalTicketData?.key,
+        timestamp: contextData.timestamp || new Date().toISOString()
+      };
+
+      console.log('📤 [Content] Sending to background:', {
+        action: 'processUserMessage',
+        messageType: fullContextData.messageType,
+        hasTicketData: !!fullContextData.ticketData,
+        chatHistoryLength: fullContextData.chatHistory.length
+      });
+
+      // Send to background script with full context
       const response = await chrome.runtime.sendMessage({
         action: 'processUserMessage',
-        data: {
-          message,
-          ticketId: finalTicketData?.id,
-          conversationHistory: chatHistory || []
-        }
+        data: fullContextData
       });
+
+      console.log('📨 [Content] Background response:', response);
 
       window.postMessage({
         type: 'CHAT_RESPONSE',
@@ -359,6 +384,7 @@ class BacklogAIInjector {
         error: response.success ? null : response.error
       }, '*');
     } catch (error) {
+      console.error('❌ [Content] Error handling chat message:', error);
       window.postMessage({
         type: 'CHAT_RESPONSE',
         id: messageId,

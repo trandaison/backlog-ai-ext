@@ -183,11 +183,11 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       translate: 'Dịch nội dung ticket'
     };
 
-    // Send the suggestion as a message
-    handleSendMessage(suggestionMessages[type]);
+    // Send the suggestion as a message with 'suggestion' type
+    handleSendMessage(suggestionMessages[type], 'suggestion');
   };
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
     if (!message.trim() || isTyping) return;
 
     const userMessage: ChatMessage = {
@@ -197,12 +197,32 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Update messages with the new user message
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setCurrentMessage('');
     setIsTyping(true);
 
     try {
-      // Send message via postMessage to content script
+      // Build comprehensive context for AI
+      const contextData = {
+        message: message.trim(),
+        messageType: messageType,
+        ticketData: ticketData,
+        chatHistory: newMessages, // Include current chat history with the new message
+        userInfo: userInfo,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('🔍 [ChatbotAsidePanel] Sending context data:', {
+        messageLength: message.length,
+        messageType,
+        hasTicketData: !!ticketData,
+        chatHistoryLength: newMessages.length,
+        hasUserInfo: !!userInfo
+      });
+
+      // Send message with full context via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
         const messageId = Date.now() + Math.random();
 
@@ -225,9 +245,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         window.postMessage({
           type: 'CHAT_MESSAGE',
           id: messageId,
-          message: message,
-          ticketData: ticketData,
-          chatHistory: messages
+          data: contextData
         }, '*');
 
         // Timeout
