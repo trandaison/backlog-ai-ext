@@ -98,10 +98,13 @@ window.addEventListener('message', (event) => {
         }, '*');
       };
 
+      console.log('🔧 [MainWorld] Creating component with props:', event.data.props);
+
       const root = ReactDOM.createRoot(container);
       root.render(React.createElement(ChatbotAsidePanel, {
         ticketAnalyzer,
-        onClose
+        onClose,
+        initialWidth: event.data.props?.initialWidth // Pass initialWidth from props
       }));
 
       // Store root for later cleanup

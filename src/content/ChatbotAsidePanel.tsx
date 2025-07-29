@@ -28,9 +28,10 @@ interface UserInfo {
 interface ChatbotAsidePanelProps {
   ticketAnalyzer: TicketAnalyzer;
   onClose: () => void;
+  initialWidth?: number;
 }
 
-const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, onClose }) => {
+const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, onClose, initialWidth }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -39,18 +40,176 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string>('');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+  // Resize functionality state
+  const [isResizing, setIsResizing] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(initialWidth || 400); // Use initialWidth if provided
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Resize constants
+  const MIN_WIDTH = 200;
+  const MAX_WIDTH = 1000;
+  const STORAGE_KEY = 'ai-ext-sidebar-width';
+
+  useEffect(() => {
+    // Load saved width immediately when component mounts, but only if no initialWidth provided
+    if (!initialWidth) {
+      loadSavedWidth();
+    } else {
+      console.log('✅ [ChatbotAsidePanel] Using initialWidth from props:', initialWidth);
+    }
+  }, []);
 
   useEffect(() => {
     // Load ticket data and user info when component mounts
     loadTicketData();
     loadUserInfo();
+
+    // Setup width sync listener
+    const handleWidthUpdate = (event: MessageEvent) => {
+      if (event.source !== window) return;
+
+      if (event.data.type === 'SIDEBAR_WIDTH_UPDATE') {
+        const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), event.data.width));
+        setSidebarWidth(newWidth);
+        console.log('📨 [ChatbotAsidePanel] Received width update:', newWidth);
+      }
+    };
+
+    window.addEventListener('message', handleWidthUpdate);
+
+    return () => {
+      window.removeEventListener('message', handleWidthUpdate);
+    };
   }, []);
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Apply width to sidebar
+    if (sidebarRef.current) {
+      sidebarRef.current.style.width = `${sidebarWidth}px`;
+
+      // Update CSS custom property for layout adjustment
+      document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${sidebarWidth}px`);
+
+      // Update position: when closed, it should be hidden to the right
+      // When open, it should be at right: 0
+      if (sidebarRef.current.classList.contains('ai-ext-open')) {
+        sidebarRef.current.style.right = '0px';
+      } else {
+        sidebarRef.current.style.right = `${-sidebarWidth}px`;
+      }
+    }
+  }, [sidebarWidth]);
+
+  // Load saved width from storage
+  const loadSavedWidth = async () => {
+    try {
+      // Don't attempt chrome.storage.local if we're in main world without access
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        console.log('⚠️ [ChatbotAsidePanel] Chrome storage not available in main world');
+        return;
+      }
+
+      const result = await chrome.storage.local.get([STORAGE_KEY]);
+      console.log('🔄 [ChatbotAsidePanel] Loading saved width from storage:', result);
+
+      if (result[STORAGE_KEY]) {
+        const savedWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), result[STORAGE_KEY]));
+        console.log('✅ [ChatbotAsidePanel] Loaded saved width:', result[STORAGE_KEY], '→ Applied width:', savedWidth);
+        setSidebarWidth(savedWidth);
+      } else {
+        console.log('ℹ️ [ChatbotAsidePanel] No saved width found, using default:', 400);
+      }
+    } catch (error) {
+      console.log('❌ [ChatbotAsidePanel] Could not load saved width:', error);
+    }
+  };
+
+  // Save width to storage
+  const saveWidth = async (width: number) => {
+    try {
+      console.log('💾 [ChatbotAsidePanel] Saving width to storage:', width);
+
+      // If chrome.storage not available (main world), send message to content script
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        console.log('📤 [ChatbotAsidePanel] Sending width save request to content script');
+        window.postMessage({
+          type: 'SAVE_SIDEBAR_WIDTH',
+          width: width
+        }, '*');
+        return;
+      }
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: width });
+      console.log('✅ [ChatbotAsidePanel] Width saved successfully');
+
+      // Broadcast width change to other tabs
+      chrome.runtime.sendMessage({
+        action: 'sidebarWidthChanged',
+        width: width
+      }).catch(() => {
+        // Ignore errors if background script is not available
+      });
+    } catch (error) {
+      console.log('❌ [ChatbotAsidePanel] Could not save width:', error);
+      // Fallback: send message to content script
+      window.postMessage({
+        type: 'SAVE_SIDEBAR_WIDTH',
+        width: width
+      }, '*');
+    }
+  };
+
+  // Calculate max width based on screen size
+  const getMaxAllowedWidth = () => {
+    return Math.min(MAX_WIDTH, window.innerWidth * 0.8);
+  };
+
+  // Resize handlers
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+
+    if (sidebarRef.current) {
+      sidebarRef.current.classList.add('ai-ext-resizing');
+    }
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    let currentWidth = startWidth; // Track current width
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate new width: when moving left (negative deltaX), width should increase
+      // when moving right (positive deltaX), width should decrease
+      const deltaX = startX - e.clientX; // This gives us the distance moved from start point
+      const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), startWidth + deltaX));
+      currentWidth = newWidth; // Update current width
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      if (sidebarRef.current) {
+        sidebarRef.current.classList.remove('ai-ext-resizing');
+      }
+
+      // Save the current width (use currentWidth instead of sidebarWidth)
+      saveWidth(currentWidth);
+
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -293,7 +452,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   };
 
   return (
-    <div className="ai-ext-aside-content">
+    <div className="ai-ext-aside-content" ref={sidebarRef}>
+      {/* Resize Handle */}
+      <div
+        className={`ai-ext-resize-handle ${isResizing ? 'ai-ext-resize-active' : ''}`}
+        onMouseDown={handleResizeStart}
+      />
+
       {/* Header */}
       <div className="ai-ext-header">
         <h3 className="ai-ext-title">

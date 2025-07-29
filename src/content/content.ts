@@ -21,12 +21,45 @@ class BacklogAIInjector {
     console.warn('🚀 [DEBUG] Backlog AI Extension loaded - with DEBUG enabled');
     console.error('🔍 [DEBUG] Init method called - this is intentional error for debugging');
 
+    // Setup message listeners
+    this.setupChromeMessageListeners();
+
     // Load sidebar CSS
     this.loadSidebarCSS();
 
     // Kiểm tra xem có phải là trang ticket không
     if (this.isTicketPage()) {
       this.setupChatbot();
+    }
+  }
+
+  private setupChromeMessageListeners(): void {
+    // Listen for messages from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      switch (message.type) {
+        case 'SIDEBAR_WIDTH_UPDATE':
+          this.handleSidebarWidthUpdate(message.width);
+          sendResponse({ success: true });
+          break;
+      }
+      return true;
+    });
+  }
+
+  private handleSidebarWidthUpdate(width: number): void {
+    try {
+      // Forward width update to React component via postMessage
+      window.postMessage({
+        type: 'SIDEBAR_WIDTH_UPDATE',
+        width: width
+      }, '*');
+
+      // Also update our content script width management
+      this.handleSidebarWidthChange(width);
+
+      console.log('🔧 [Content] Received width update from background:', width);
+    } catch (error) {
+      console.error('❌ [Content] Error handling width update:', error);
     }
   }
 
@@ -243,8 +276,18 @@ class BacklogAIInjector {
   }
 
   private async createComponentInMainWorld(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const messageId = Date.now() + Math.random();
+
+      // Load saved width before creating component
+      let savedWidth = null;
+      try {
+        const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+        savedWidth = result['ai-ext-sidebar-width'];
+        console.log('🔄 [ContentScript] Loaded saved width for component:', savedWidth);
+      } catch (error) {
+        console.log('❌ [ContentScript] Could not load saved width:', error);
+      }
 
       const responseHandler = (event: MessageEvent) => {
         if (event.source !== window) return;
@@ -254,6 +297,18 @@ class BacklogAIInjector {
 
           if (event.data.success) {
             console.log('✅ [ContentScript] Component created successfully in main world');
+
+            // Send saved width to component immediately after creation
+            if (savedWidth) {
+              setTimeout(() => {
+                window.postMessage({
+                  type: 'SIDEBAR_WIDTH_UPDATE',
+                  width: savedWidth
+                }, '*');
+                console.log('📤 [ContentScript] Sent saved width to component:', savedWidth);
+              }, 100);
+            }
+
             // Set up ongoing message handlers for component interactions
             this.setupComponentMessageHandlers();
             resolve();
@@ -277,6 +332,7 @@ class BacklogAIInjector {
         props: {
           // Don't pass functions - handle via separate messages
           // We'll set up message handlers for component interactions
+          initialWidth: savedWidth // Pass saved width as initial prop
         }
       }, '*');
 
@@ -296,6 +352,14 @@ class BacklogAIInjector {
       switch (event.data.type) {
         case 'CHATBOT_CLOSE':
           this.closeChatbotPanel();
+          break;
+
+        case 'SIDEBAR_WIDTH_CHANGED':
+          this.handleSidebarWidthChange(event.data.width);
+          break;
+
+        case 'SAVE_SIDEBAR_WIDTH':
+          this.handleSaveWidth(event.data.width);
           break;
 
         case 'REQUEST_TICKET_DATA':
@@ -574,6 +638,44 @@ class BacklogAIInjector {
     }
 
     document.body.classList.remove('ai-ext-sidebar-open');
+  }
+
+  private handleSidebarWidthChange(width: number): void {
+    try {
+      // Update CSS custom property for dynamic width
+      document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${width}px`);
+
+      // Update chatbot container width if it exists
+      if (this.chatbotAsideContainer) {
+        this.chatbotAsideContainer.style.width = `${width}px`;
+        this.chatbotAsideContainer.style.right = this.isChatbotOpen ? '0' : `${-width}px`;
+      }
+
+      console.log('🔧 [Content] Sidebar width updated to:', width);
+    } catch (error) {
+      console.error('❌ [Content] Error updating sidebar width:', error);
+    }
+  }
+
+  private async handleSaveWidth(width: number): Promise<void> {
+    try {
+      console.log('💾 [Content] Saving width to storage:', width);
+      await chrome.storage.local.set({ 'ai-ext-sidebar-width': width });
+      console.log('✅ [Content] Width saved successfully');
+
+      // Also update width immediately
+      this.handleSidebarWidthChange(width);
+
+      // Broadcast width change to other tabs
+      chrome.runtime.sendMessage({
+        action: 'sidebarWidthChanged',
+        width: width
+      }).catch(() => {
+        // Ignore errors if background script is not available
+      });
+    } catch (error) {
+      console.error('❌ [Content] Could not save width:', error);
+    }
   }
 }
 

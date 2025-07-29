@@ -480,6 +480,11 @@ class BackgroundService {
           await this.handleUserMessage(message.data, sendResponse);
           break;
 
+        case 'sidebarWidthChanged':
+          await this.handleSidebarWidthSync(message.width, sender);
+          sendResponse({ success: true });
+          break;
+
         case 'requestTicketSummary':
           await this.handleTicketSummary(message.data, sendResponse);
           break;
@@ -1405,6 +1410,36 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
     };
 
     return languagePrompts[language as keyof typeof languagePrompts] || languagePrompts.vi;
+  }
+
+  private async handleSidebarWidthSync(width: number, sender: chrome.runtime.MessageSender): Promise<void> {
+    try {
+      console.log('🔧 [Background] Syncing sidebar width across tabs:', width);
+
+      // Get all tabs to sync width
+      const tabs = await chrome.tabs.query({});
+
+      // Send width update to all other tabs
+      const promises = tabs.map(async (tab) => {
+        if (tab.id && tab.id !== sender.tab?.id) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, {
+              type: 'SIDEBAR_WIDTH_UPDATE',
+              width: width
+            });
+          } catch (error) {
+            // Ignore errors for tabs without content script
+            console.log(`Tab ${tab.id} does not have content script loaded`);
+          }
+        }
+      });
+
+      await Promise.allSettled(promises);
+      console.log('✅ [Background] Width sync completed');
+
+    } catch (error) {
+      console.error('❌ [Background] Error syncing sidebar width:', error);
+    }
   }
 }
 

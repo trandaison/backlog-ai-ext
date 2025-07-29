@@ -1,4 +1,5 @@
 /* Sidebar AI Extension Styles */
+@use "sass:color";
 
 // Variables
 $sidebar-width: 400px;
@@ -11,6 +12,11 @@ $text-color: #333;
 $header-bg: #f8f9fa;
 $border-light: #e0e0e0;
 $border-light-2: rgba(0, 0, 0, 0.18);
+
+// CSS Custom Properties for dynamic sidebar width
+:root {
+  --ai-ext-sidebar-width: #{$sidebar-width};
+}
 
 // Mixins
 @mixin transition($property, $duration: $animation-duration, $easing: $animation-easing) {
@@ -46,19 +52,19 @@ $border-light-2: rgba(0, 0, 0, 0.18);
 body.ai-ext-sidebar-open {
   // Adjust content-outer margin when sidebar is open
   .content-outer {
-    margin-right: $sidebar-width;
+    margin-right: var(--ai-ext-sidebar-width);
     @include transition(margin-right);
   }
 
   .core-wrapper.-project {
     .comment-editor.-fixed-footer {
-      width: calc(100% - 200px - $sidebar-width);
-      right: $sidebar-width;
+      width: calc(100% - 200px - var(--ai-ext-sidebar-width));
+      right: var(--ai-ext-sidebar-width);
       transition: width $animation-duration $animation-easing, right $animation-duration $animation-easing;
     }
 
     &.is_project-nav-collapsed .comment-editor.-fixed-footer {
-      width: calc(100% - 50px - $sidebar-width);
+      width: calc(100% - 50px - var(--ai-ext-sidebar-width));
     }
   }
 }
@@ -68,9 +74,9 @@ body.ai-ext-sidebar-open {
   position: fixed;
   top: var(--globalNavHeight, 0);
   height: calc(100% - var(--globalNavHeight, 0));
-  width: $sidebar-width;
+  width: var(--ai-ext-sidebar-width);
   z-index: 601;
-  right: -$sidebar-width;
+  right: calc(-1 * var(--ai-ext-sidebar-width));
   background: $bg-color;
   border-left: 1px solid $border-color;
   @include transition(right);
@@ -79,6 +85,19 @@ body.ai-ext-sidebar-open {
 
   &.ai-ext-open {
     right: 0;
+  }
+
+  &.ai-ext-resizing {
+    transition: none !important;
+
+    * {
+      user-select: none !important;
+      pointer-events: none !important;
+    }
+
+    .ai-ext-resize-handle {
+      pointer-events: auto !important;
+    }
   }
 
   * {
@@ -109,6 +128,88 @@ body.ai-ext-sidebar-open {
   .ai-ext-heading-reset {
     margin: 0;
     font-weight: 600;
+  }
+}
+
+// Resize handle
+.ai-ext-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  // Handle visual indicator (vertical line with dots)
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 1px;
+    height: 40px;
+    background: transparent;
+    border-left: 1px solid transparent;
+    transition: border-color 0.2s ease;
+  }
+
+  // Handle dots
+  &::after {
+    content: '⋮⋮';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8px;
+    line-height: 0.5;
+    letter-spacing: -2px;
+    color: transparent;
+    transition: color 0.2s ease;
+  }
+
+  // Hover state - darker gray
+  &:hover {
+    &::before {
+      border-color: #4b5563; // Much darker gray (gray-600)
+    }
+
+    &::after {
+      color: #4b5563; // Much darker gray dots
+    }
+
+    background: rgba(75, 85, 99, 0.12); // More visible background
+  }
+
+  // Active state (dragging) - darker green
+  &.ai-ext-resize-active {
+    &::before {
+      border-color: #059669; // Darker emerald green (emerald-600)
+      box-shadow: 0 0 4px rgba(5, 150, 105, 0.6);
+    }
+
+    &::after {
+      color: #059669; // Darker green dots
+    }
+
+    background: rgba(5, 150, 105, 0.2); // More prominent background
+  }
+
+  // Expanded hit area for easier interaction
+  &:before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 0;
+    width: 14px;
+    height: 100%;
+    background: transparent;
   }
 }
 
