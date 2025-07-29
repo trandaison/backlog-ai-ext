@@ -19,10 +19,15 @@ function show_menu() {
     echo ""
     echo -e "${YELLOW}Available commands:${NC}"
     echo "1. start    - Start development mode with watch"
-    echo "2. build    - Build once for development"
-    echo "3. clean    - Clean dev-build directory"
-    echo "4. help     - Show Chrome extension loading instructions"
-    echo "5. status   - Check if watch mode is running"
+    echo "2. build    - Build once for development (outputs to dev-build/)"
+    echo "3. prod     - Build for production (outputs to dist/)"
+    echo "4. clean    - Clean dev-build directory"
+    echo "5. help     - Show Chrome extension loading instructions"
+    echo "6. status   - Check if watch mode is running"
+    echo ""
+    echo -e "${BLUE}Note:${NC}"
+    echo "• Development builds preserve dev-build/ when running production builds"
+    echo "• Production builds only affect dist/ directory"
     echo ""
 }
 
@@ -37,6 +42,13 @@ function start_dev() {
 function build_once() {
     echo -e "${GREEN}Building for development...${NC}"
     npm run clean:dev && npm run build:dev
+}
+
+function build_prod() {
+    echo -e "${GREEN}Building for production...${NC}"
+    echo -e "${YELLOW}Output will be in dist/ directory${NC}"
+    echo -e "${YELLOW}dev-build/ directory will not be affected${NC}"
+    npm run build
 }
 
 function clean_dev() {
@@ -91,6 +103,9 @@ case "$1" in
         ;;
     "build")
         build_once
+        ;;
+    "prod")
+        build_prod
         ;;
     "clean")
         clean_dev

@@ -7,7 +7,7 @@
     "build:dev": "npm run clean:dev && webpack --config webpack.build-dev.js",
     "dev": "webpack --config webpack.dev.js",
     "dev:watch": "webpack --config webpack.dev.js --watch",
-    "clean": "rm -rf dist dev-build",
+    "clean": "rm -rf dist",
     "clean:dev": "rm -rf dev-build",
     "lint": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
