@@ -74,3 +74,33 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
 - **Get help**: Use `./dev.sh help` for Chrome extension loading instructions
 
 The `dev.sh` script provides a standardized development workflow and should be used for all build operations.
+
+## Release Management:
+
+### Versioning:
+- Use semantic versioning (MAJOR.MINOR.PATCH) starting from v1.0.0
+- Follow semver principles:
+  - PATCH: Bug fixes and minor improvements
+  - MINOR: New features that are backward compatible
+  - MAJOR: Breaking changes or significant feature overhauls
+
+### Changelog Management:
+- Use `changelogen` library for automated changelog generation and release management
+- Changelogen automatically parses commit messages and generates appropriate changelog entries
+- Release commands:
+  - `npx changelogen --release` - Generate changelog and create release
+  - `npx changelogen --bump` - Only bump version without release
+  - `npx changelogen` - Generate changelog preview
+
+### Commit Message Format:
+- Follow conventional commit format for automated changelog generation
+- Format: `type: short description`
+- Keep messages concise and descriptive, avoid multi-line commits
+- Common types:
+  - `feat: add new chat feature`
+  - `fix: resolve token optimization bug`
+  - `docs: update installation guide`
+  - `style: improve chatbot UI spacing`
+  - `refactor: optimize context processing`
+  - `test: add unit tests for storage service`
+  - `chore: update dependencies`

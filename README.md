@@ -7,15 +7,15 @@
 
 ### Intelligent Chrome Extension for Backlog Project Management
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Extension-blue?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Extension-blue?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore/#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-blue?logo=react&logoColor=white)](https://reactjs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/your-repo/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/trandaison/backlog-ai-ext/releases)
 
 **Transform your Backlog workflow with AI-powered ticket analysis, smart suggestions, and intelligent chat assistance.**
 
-[🚀 Installation](#installation) • [📖 Features](#features) • [⚙️ Configuration](#configuration) • [🛠️ Development](#development) • [🤝 Contributing](#contributing)
+[🚀 Installation](#-installation) • [📖 Features](#-features) • [⚙️ Configuration](#%EF%B8%8F-configuration) • [🛠️ Development](#%EF%B8%8F-development) • [🤝 Contributing](#-contributing)
 
 </div>
 
