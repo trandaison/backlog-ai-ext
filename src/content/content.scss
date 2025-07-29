@@ -1,5 +1,8 @@
 /* Content script styles for Backlog AI Extension */
 
+// Import markdown styles
+@use '../styles/markdown.scss';
+
 // Variables
 $toggle-size: 50px;
 $primary-color: #007acc;
@@ -167,5 +170,121 @@ $z-index-chatbot: 999998;
   .ai-fade-out {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* Markdown styling customizations for chatbot messages */
+#backlog-ai-chatbot-container .ai-ext-message-ai .markdown-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: inherit;
+  
+  // Reset margins for better integration
+  > *:first-child {
+    margin-top: 0 !important;
+  }
+  
+  > *:last-child {
+    margin-bottom: 0 !important;
+  }
+  
+  // Code blocks adjustments
+  pre {
+    background-color: #f8f9fa !important;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    font-size: 13px;
+    margin: 8px 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  
+  // Inline code adjustments
+  code {
+    background-color: rgba(175, 184, 193, 0.15) !important;
+    color: #c7254e;
+    font-size: 13px;
+    padding: 0.2em 0.4em;
+  }
+  
+  // Tables responsive
+  table {
+    font-size: 13px;
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+    white-space: nowrap;
+  }
+  
+  // Lists spacing
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  
+  li {
+    margin-bottom: 4px;
+  }
+  
+  // Blockquotes
+  blockquote {
+    border-left: 3px solid #007acc;
+    margin: 8px 0;
+    padding-left: 12px;
+    color: #666;
+    font-style: italic;
+  }
+  
+  // Links
+  a {
+    color: #007acc;
+    text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  
+  // Headers
+  h1, h2, h3, h4, h5, h6 {
+    color: #333;
+    margin: 12px 0 8px 0;
+    
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+  
+  h1 { font-size: 1.2em; }
+  h2 { font-size: 1.1em; }
+  h3 { font-size: 1.05em; }
+  h4, h5, h6 { font-size: 1em; }
+  
+  // Horizontal rules
+  hr {
+    border: none;
+    border-top: 1px solid #e1e4e8;
+    margin: 16px 0;
+  }
+  
+  // Images
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+  
+  // Paragraphs
+  p {
+    margin: 8px 0;
+    
+    &:first-child {
+      margin-top: 0;
+    }
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
   }
 }

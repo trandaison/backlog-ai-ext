@@ -26,6 +26,7 @@
   "description": "AI-powered assistant for Backlog ticket analysis and chat",
   "devDependencies": {
     "@types/chrome": "^0.1.1",
+    "@types/marked": "^5.0.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "changelogen": "^0.6.2",
@@ -42,6 +43,8 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "github-markdown-css": "^5.8.1",
+    "marked": "^16.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   }
