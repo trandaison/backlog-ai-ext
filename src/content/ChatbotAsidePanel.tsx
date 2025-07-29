@@ -29,6 +29,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   // Chat storage state
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  
+  // Title truncation state
+  const [isTitleExpanded, setIsTitleExpanded] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -655,6 +658,17 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       .replace(/^(.*)$/, '<p>$1</p>');
   };
 
+  // Helper function to check if title needs truncation
+  const shouldTruncateTitle = (title: string): boolean => {
+    return title.length > 50; // Truncate if longer than 50 characters (suitable for 1 line)
+  };
+
+  // Helper function to get truncated title
+  const getTruncatedTitle = (title: string): string => {
+    if (!shouldTruncateTitle(title)) return title;
+    return title.substring(0, 50) + '...';
+  };
+
   return (
     <div className="ai-ext-aside-content" ref={sidebarRef}>
       {/* Resize Handle */}
@@ -701,7 +715,36 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       {ticketData && (
         <div className="ai-ext-ticket-info">
           <div className="ai-ext-ticket-title">
-            <strong>{ticketData.id}</strong>: {ticketData.title}
+            <div className="ai-ext-title-wrapper">
+              <div 
+                className={`ai-ext-title-content ${isTitleExpanded ? 'ai-ext-title-expanded' : 'ai-ext-title-truncated'}`}
+                title={ticketData.title} // Tooltip showing full title
+              >
+                <strong>{ticketData.id}</strong>: {
+                  isTitleExpanded || !shouldTruncateTitle(ticketData.title) 
+                    ? ticketData.title 
+                    : getTruncatedTitle(ticketData.title)
+                }
+              </div>
+              {shouldTruncateTitle(ticketData.title) && (
+                <button 
+                  className="ai-ext-toggle-title-caret"
+                  onClick={() => setIsTitleExpanded(!isTitleExpanded)}
+                  title={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
+                  aria-label={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
+                >
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="currentColor"
+                    className={`ai-ext-caret-icon ${isTitleExpanded ? 'ai-ext-caret-up' : 'ai-ext-caret-down'}`}
+                  >
+                    <path d="M6 8L2 4h8z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <div className="ai-ext-ticket-meta">
             <span className="ai-ext-status">{ticketData.status}</span>

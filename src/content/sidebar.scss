@@ -272,6 +272,76 @@ body.ai-ext-sidebar-open {
     color: $text-color;
     margin-bottom: 8px;
     font-size: 14px;
+
+    .ai-ext-title-wrapper {
+      display: flex;
+      align-items: flex-start;
+      gap: 2px;
+
+      .ai-ext-title-content {
+        flex: 1;
+        line-height: 1.4;
+        min-width: 0; // Allow text to shrink
+
+        &.ai-ext-title-truncated {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-height: 1.4em; /* 1 line * 1.4 line-height */
+        }
+
+        &.ai-ext-title-expanded {
+          display: block;
+          white-space: normal;
+          word-wrap: break-word;
+        }
+      }
+
+      .ai-ext-toggle-title-caret {
+        background: none;
+        border: none;
+        color: $primary-color;
+        cursor: pointer;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+        opacity: 0.7;
+        flex-shrink: 0;
+        margin-top: 2px; // Align with first line of text
+
+        &:hover {
+          opacity: 1;
+          background-color: rgba($primary-color, 0.1);
+        }
+
+        &:focus {
+          outline: 1px solid $primary-color;
+          outline-offset: 1px;
+          opacity: 1;
+        }
+
+        .ai-ext-caret-icon {
+          transition: transform 0.2s ease;
+
+          &.ai-ext-caret-down {
+            transform: rotate(0deg);
+          }
+
+          &.ai-ext-caret-up {
+            transform: rotate(180deg);
+          }
+        }
+      }
+    }
   }
 
   .ai-ext-ticket-meta {
