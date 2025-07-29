@@ -47,11 +47,30 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Resize constants
   const MIN_WIDTH = 200;
   const MAX_WIDTH = 1000;
   const STORAGE_KEY = 'ai-ext-sidebar-width';
+
+  // Auto-resize textarea function
+  const autoResizeTextarea = (textarea: HTMLTextAreaElement) => {
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+
+    // Calculate the new height based on content
+    const lineHeight = 20; // Approximate line height in pixels
+    const maxLines = 12;
+    const minHeight = lineHeight + 12; // 1 line + padding
+    const maxHeight = lineHeight * maxLines + 12; // 12 lines + padding
+
+    let newHeight = Math.max(minHeight, textarea.scrollHeight);
+    newHeight = Math.min(newHeight, maxHeight);
+
+    textarea.style.height = `${newHeight}px`;
+    textarea.style.overflowY = newHeight >= maxHeight ? 'auto' : 'hidden';
+  };
 
   useEffect(() => {
     // Load saved width immediately when component mounts, but only if no initialWidth provided
@@ -89,6 +108,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     // Scroll to bottom when new messages are added
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Auto-resize textarea when currentMessage changes
+    if (textareaRef.current) {
+      autoResizeTextarea(textareaRef.current);
+    }
+  }, [currentMessage]);
 
   useEffect(() => {
     // Apply width to sidebar
@@ -362,6 +388,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     setCurrentMessage('');
     setIsTyping(true);
 
+    // Reset textarea height after clearing message
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        autoResizeTextarea(textareaRef.current);
+      }
+    }, 0);
+
     try {
       // Build comprehensive context for AI
       const contextData = {
@@ -615,24 +649,34 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         {/* Input */}
         <div className="ai-ext-chat-input-container">
           <div className="ai-ext-chat-input-wrapper">
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               className="ai-ext-chat-input"
-              placeholder="Nhập câu hỏi về ticket..."
+              placeholder={`Nhập câu hỏi về ticket... (Enter để xuống dòng • ${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter để gửi)`}
               value={currentMessage}
-              onChange={(e) => setCurrentMessage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+              onChange={(e) => {
+                setCurrentMessage(e.target.value);
+                autoResizeTextarea(e.target as HTMLTextAreaElement);
+              }}
+              onKeyDown={(e) => {
+                // Handle Ctrl+Enter or Cmd+Enter to submit
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
                   handleSendMessage(currentMessage);
                 }
               }}
               disabled={isTyping}
+              rows={1}
+              style={{
+                resize: 'none',
+                overflow: 'hidden'
+              }}
             />
             <button
               className="ai-ext-send-button"
               onClick={() => handleSendMessage(currentMessage)}
               disabled={!currentMessage.trim() || isTyping}
+              title={isTyping ? 'Đang xử lý...' : 'Gửi tin nhắn (Ctrl/Cmd + Enter)'}
             >
               {isTyping ? '⏳' : '📤'}
             </button>
