@@ -72,7 +72,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -136,15 +136,15 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.version_number }}
           echo "Extracting changelog for version $VERSION"
-          
+
           # Get changelog content between the current version and the next version header
           awk "/^## \\[$VERSION\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md > release_notes.txt
-          
+
           # If no specific version section found, get content from top until first version
           if [ ! -s release_notes.txt ]; then
             awk '/^## \[/{if(!found){found=1; next} else exit} found' CHANGELOG.md > release_notes.txt
           fi
-          
+
           echo "Release notes content:"
           cat release_notes.txt
 

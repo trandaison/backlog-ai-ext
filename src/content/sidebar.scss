@@ -760,6 +760,7 @@ body.ai-ext-sidebar-open {
   .ai-ext-message-text {
     font-size: 14px;
     line-height: 1.4;
+    word-wrap: break-word;
 
     p {
       margin: 0 0 8px 0;

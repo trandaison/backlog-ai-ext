@@ -21,10 +21,6 @@ class BacklogAIInjector {
   }
 
   private init() {
-    // Use console.warn and console.error for debugging (less likely to be optimized away)
-    console.warn('🚀 [DEBUG] Backlog AI Extension loaded - with DEBUG enabled');
-    console.error('🔍 [DEBUG] Init method called - this is intentional error for debugging');
-
     // Setup message listeners
     this.setupChromeMessageListeners();
 
@@ -76,14 +72,11 @@ class BacklogAIInjector {
 
       // Lấy ticket ID hiện tại
       this.currentTicketId = this.ticketMonitor.getCurrentTicketId();
-      console.log('🎯 [Content] Current ticket ID:', this.currentTicketId);
 
       // Theo dõi thay đổi ticket
       this.ticketMonitor.subscribe((event: TicketChangeEvent) => {
         this.handleTicketChange(event);
       });
-
-      console.log('✅ [Content] Ticket URL monitoring initialized');
     } catch (error) {
       console.error('❌ [Content] Error initializing ticket monitoring:', error);
     }
@@ -262,9 +255,6 @@ class BacklogAIInjector {
 
       // Use postMessage to create component in main world
       await this.createComponentInMainWorld();
-
-      console.log('✅ [ContentScript] React ChatbotAsidePanel loaded successfully');
-
     } catch (error) {
       console.error('Failed to load React chatbot component:', error);
       // Fallback UI
@@ -290,7 +280,6 @@ class BacklogAIInjector {
           if (event.source !== window) return;
 
           if (event.data.type === 'REACT_COMPONENTS_LOADED') {
-            console.log('🎯 [ContentScript] Received components loaded message');
             window.removeEventListener('message', messageHandler);
 
             // Small delay then check components
@@ -303,9 +292,7 @@ class BacklogAIInjector {
         window.addEventListener('message', messageHandler);
 
         // Inject scripts into main world using chrome.scripting API
-        this.injectMainWorldScripts().then(() => {
-          console.log('🔧 [ContentScript] Scripts injected to main world');
-        }).catch((error) => {
+        this.injectMainWorldScripts().catch((error) => {
           console.error('❌ [ContentScript] Failed to inject scripts:', error);
           window.removeEventListener('message', messageHandler);
           reject(error);
@@ -351,7 +338,6 @@ class BacklogAIInjector {
           window.removeEventListener('message', responseHandler);
 
           if (event.data.available) {
-            console.log('✅ [ContentScript] Components are ready in main world');
             resolve();
           } else {
             reject(new Error('Components not available in main world'));
@@ -384,7 +370,6 @@ class BacklogAIInjector {
       try {
         const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
         savedWidth = result['ai-ext-sidebar-width'];
-        console.log('🔄 [ContentScript] Loaded saved width for component:', savedWidth);
       } catch (error) {
         console.log('❌ [ContentScript] Could not load saved width:', error);
       }
@@ -396,8 +381,6 @@ class BacklogAIInjector {
           window.removeEventListener('message', responseHandler);
 
           if (event.data.success) {
-            console.log('✅ [ContentScript] Component created successfully in main world');
-
             // Send saved width to component immediately after creation
             if (savedWidth) {
               setTimeout(() => {
@@ -405,7 +388,6 @@ class BacklogAIInjector {
                   type: 'SIDEBAR_WIDTH_UPDATE',
                   width: savedWidth
                 }, '*');
-                console.log('📤 [ContentScript] Sent saved width to component:', savedWidth);
               }, 100);
             }
 
@@ -422,8 +404,6 @@ class BacklogAIInjector {
 
       // Send create component message to main world
       const containerId = this.chatbotAsideContainer?.id || 'ai-ext-chatbot-aside';
-
-      console.log('🔧 [ContentScript] Creating component with container ID:', containerId);
 
       window.postMessage({
         type: 'CREATE_COMPONENT',
@@ -515,14 +495,6 @@ class BacklogAIInjector {
 
   private async handleChatMessage(contextData: any, messageId: string): Promise<void> {
     try {
-      console.log('🔄 [Content] Processing chat message with full context:', {
-        messageLength: contextData.message?.length || 0,
-        messageType: contextData.messageType,
-        hasTicketData: !!contextData.ticketData,
-        chatHistoryLength: contextData.chatHistory?.length || 0,
-        hasUserInfo: !!contextData.userInfo
-      });
-
       // Extract current ticket data if not provided in context
       const finalTicketData = contextData.ticketData || await this.ticketAnalyzer.extractTicketData();
 
@@ -601,14 +573,10 @@ class BacklogAIInjector {
 
   private async handleGetUserInfo(messageId: string): Promise<void> {
     try {
-      console.log('🔍 [Content] Handling get user info request');
-
       // Request user info via background script
       const response = await chrome.runtime.sendMessage({
         action: 'getCurrentUser'
       });
-
-      console.log('🔍 [Content] User info response:', response);
 
       window.postMessage({
         type: 'USER_INFO_RESPONSE',
@@ -654,7 +622,6 @@ class BacklogAIInjector {
   }
 
   private async handleChatStorageSave(messageId: string, ticketKey: string, saveData: any): Promise<void> {
-    console.log('🔎 ~ BacklogAIInjector ~ handleChatStorageSave ~ saveData:', saveData);
     try {
       // Construct ChatHistoryData structure
       const historyData = {
@@ -672,7 +639,6 @@ class BacklogAIInjector {
           assignee: (saveData.ticketData?.assignee || '').slice(0, 100)
         }
       };
-      console.log('🔎 ~ BacklogAIInjector ~ handleChatStorageSave ~ historyData:', historyData);
 
       await chrome.storage.local.set({
         [`chat-history-${ticketKey}`]: historyData
@@ -760,15 +726,7 @@ class BacklogAIInjector {
           } catch (e) {}
         }
 
-        console.log('🔍 [ContentScript] Globals check:', {
-          React: !!React,
-          ReactDOM: !!ReactDOM,
-          ChatbotAsidePanel: !!ChatbotAsidePanel,
-          windowKeys: Object.keys(window).filter(k => k.includes('React')).slice(0, 5)
-        });
-
         if (React && ReactDOM && ChatbotAsidePanel) {
-          console.log('✅ [ContentScript] All globals found!');
           // Store them for later use
           this.reactGlobals = { React, ReactDOM, ChatbotAsidePanel };
           resolve();

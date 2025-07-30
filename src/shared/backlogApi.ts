@@ -222,40 +222,27 @@ export class BacklogApiService {
 
   private getCurrentConfig(): BacklogApiConfig | null {
     const currentUrl = window.location.href;
-    console.log('🔍 ~ BacklogApiService ~ getCurrentConfig ~ currentUrl:', currentUrl);
-    console.log('🔍 ~ BacklogApiService ~ getCurrentConfig ~ available configs:', this.configs);
 
     // Try to find matching config based on current URL
     for (const config of this.configs) {
-      console.log(`🔍 ~ Checking config: domain=${config.domain}, spaceName=${config.spaceName}`);
-      console.log(`🔍 ~ URL includes .${config.domain}:`, currentUrl.includes(`.${config.domain}`));
-      console.log(`🔍 ~ URL includes ${config.spaceName}:`, currentUrl.includes(config.spaceName));
-
       if (currentUrl.includes(`.${config.domain}`) &&
           currentUrl.includes(config.spaceName)) {
-        console.log('✅ ~ Found matching config:', config);
         return config;
       }
     }
 
     // Fallback: return first config if any
     const fallbackConfig = this.configs.length > 0 ? this.configs[0] : null;
-    console.log('🔄 ~ Using fallback config:', fallbackConfig);
     return fallbackConfig;
   }
 
   private getBaseUrl(config: BacklogApiConfig): string {
     const baseUrl = `https://${config.spaceName}.${config.domain}/api/v2`;
-    console.log('🌐 ~ BacklogApiService ~ getBaseUrl ~ baseUrl:', baseUrl);
-    console.log('🌐 ~ BacklogApiService ~ getBaseUrl ~ spaceName:', config.spaceName);
-    console.log('🌐 ~ BacklogApiService ~ getBaseUrl ~ domain:', config.domain);
     return baseUrl;
   }
 
   public updateSettings(settings: BacklogMultiSettings) {
-    console.log('🔧 ~ BacklogApiService ~ updateSettings ~ input:', settings);
     this.configs = settings.configs;
-    console.log('🔧 ~ BacklogApiService ~ updateSettings ~ updated configs:', this.configs);
   }
 
   // Legacy method for backward compatibility
@@ -283,7 +270,6 @@ export class BacklogApiService {
 
   public async getIssue(issueKey: string): Promise<BacklogTicketData> {
     const config = this.getCurrentConfig();
-    console.warn('🔎 ~ BacklogApiService ~ getIssue ~ config:', config);
     if (!config) {
       throw new Error('Backlog API config chưa được cấu hình');
     }
@@ -347,7 +333,7 @@ export class BacklogApiService {
       comments: comments.map(comment => ({
         author: comment.createdUser.name,
         content: comment.content,
-        timestamp: new Date(comment.created).toLocaleString('vi-VN')
+        timestamp: new Date(comment.created).toISOString()
       })),
       // Additional metadata from Backlog API
       issueType: backlogData.issueType.name,

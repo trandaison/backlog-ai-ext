@@ -8,8 +8,6 @@ import ChatbotAsidePanel from './ChatbotAsidePanel';
 (window as any).ReactDOM = ReactDOM;
 (window as any).ChatbotAsidePanel = ChatbotAsidePanel;
 
-console.log('🎯 [ChatbotAsidePanelEntry] React components loaded to global scope in main world');
-
 // Set up message listener for component checks from content script
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
@@ -18,13 +16,6 @@ window.addEventListener('message', (event) => {
     const available = !!(window as any).React &&
                      !!(window as any).ReactDOM &&
                      !!(window as any).ChatbotAsidePanel;
-
-    console.log('🎯 [MainWorld] Components check:', {
-      React: !!(window as any).React,
-      ReactDOM: !!(window as any).ReactDOM,
-      ChatbotAsidePanel: !!(window as any).ChatbotAsidePanel,
-      available
-    });
 
     window.postMessage({
       type: 'COMPONENTS_CHECK_RESPONSE',
@@ -35,7 +26,6 @@ window.addEventListener('message', (event) => {
 
   if (event.data.type === 'CREATE_COMPONENT') {
     try {
-      console.log('🎯 [MainWorld] Looking for container:', event.data.containerId);
       const container = document.getElementById(event.data.containerId);
 
       if (!container) {
@@ -44,8 +34,6 @@ window.addEventListener('message', (event) => {
         );
         throw new Error(`Container ${event.data.containerId} not found`);
       }
-
-      console.log('🎯 [MainWorld] Found container:', container);
 
       const React = (window as any).React;
       const ReactDOM = (window as any).ReactDOM;
@@ -98,8 +86,6 @@ window.addEventListener('message', (event) => {
         }, '*');
       };
 
-      console.log('🔧 [MainWorld] Creating component with props:', event.data.props);
-
       const root = ReactDOM.createRoot(container);
       root.render(React.createElement(ChatbotAsidePanel, {
         ticketAnalyzer,
@@ -115,8 +101,6 @@ window.addEventListener('message', (event) => {
         id: event.data.id,
         success: true
       }, '*');
-
-      console.log('✅ [MainWorld] Component created successfully');
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

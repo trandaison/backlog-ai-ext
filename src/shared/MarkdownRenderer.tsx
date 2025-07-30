@@ -6,13 +6,13 @@ interface MarkdownRendererProps {
   className?: string;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
-  content, 
-  className = '' 
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+  className = ''
 }) => {
   // Configure marked options for better rendering
   const renderer = new marked.Renderer();
-  
+
   // Custom link renderer to open in new tab and add security
   renderer.link = ({ href, title, tokens }) => {
     // Convert tokens back to text
@@ -40,7 +40,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   const htmlContent = marked.parse(content);
 
   return (
-    <div 
+    <div
       className={`markdown-body ${className}`}
       dangerouslySetInnerHTML={{ __html: htmlContent }}
     />

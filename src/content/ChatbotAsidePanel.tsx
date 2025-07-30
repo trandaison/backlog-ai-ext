@@ -29,7 +29,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   // Chat storage state
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
-  
+
   // Title truncation state
   const [isTitleExpanded, setIsTitleExpanded] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -66,8 +66,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     // Load saved width immediately when component mounts, but only if no initialWidth provided
     if (!initialWidth) {
       loadSavedWidth();
-    } else {
-      console.log('✅ [ChatbotAsidePanel] Using initialWidth from props:', initialWidth);
     }
   }, []);
 
@@ -83,7 +81,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       if (event.data.type === 'SIDEBAR_WIDTH_UPDATE') {
         const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), event.data.width));
         setSidebarWidth(newWidth);
-        console.log('📨 [ChatbotAsidePanel] Received width update:', newWidth);
       } else if (event.data.type === 'TICKET_CHANGE') {
         handleTicketChange(event.data);
       }
@@ -106,8 +103,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           const savedMessages = await ChatStorageService.loadChatHistory(ticketData.id);
           if (savedMessages.length > 0) {
             setMessages(savedMessages);
-            // Quietly load history without showing success message
-            console.log(`✅ [ChatbotAsidePanel] Loaded ${savedMessages.length} messages from history`);
           }
         } catch (error) {
           console.error('❌ [ChatbotAsidePanel] Failed to load chat history:', error);
@@ -130,8 +125,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       }
 
       try {
-        console.log('💾 [ChatbotAsidePanel] Auto-saving chat history...');
-
         const result = await ChatStorageService.saveChatHistory(
           ticketData.id,
           messages,
@@ -216,7 +209,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       if (result[STORAGE_KEY]) {
         const savedWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), result[STORAGE_KEY]));
-        console.log('✅ [ChatbotAsidePanel] Loaded saved width:', result[STORAGE_KEY], '→ Applied width:', savedWidth);
         setSidebarWidth(savedWidth);
       } else {
         console.log('ℹ️ [ChatbotAsidePanel] No saved width found, using default:', 400);
@@ -320,8 +312,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   const loadUserInfo = async () => {
     try {
-      console.log('🔍 [ChatbotAsidePanel] Loading user info...');
-
       // Use postMessage to communicate with content script
       const response = await new Promise<any>((resolve, reject) => {
         const messageId = Date.now() + Math.random();
@@ -356,9 +346,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       if (response.success && response.data) {
         setUserInfo(response.data);
-        console.log('✅ [ChatbotAsidePanel] User info loaded:', response.data);
-        console.log('🔍 [ChatbotAsidePanel] Avatar URL:', response.data.avatar);
-        console.log('🔍 [ChatbotAsidePanel] NulabAccount:', response.data.nulabAccount);
       } else {
         console.log('❌ [ChatbotAsidePanel] Failed to load user info:', response.error);
       }
@@ -373,8 +360,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     url: string;
     timestamp: number;
   }) => {
-    console.log('🔄 [ChatbotAsidePanel] Handling ticket change:', changeData);
-
     // Chỉ xử lý nếu thực sự có thay đổi ticket ID
     if (changeData.oldTicketId !== changeData.newTicketId) {
       try {
@@ -387,14 +372,11 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         setStorageWarning(null);
 
         // Load new ticket data
-        console.log('📋 [ChatbotAsidePanel] Loading new ticket data...');
         await loadTicketData();
 
         // Show transition notification
         setStorageWarning(`Đã chuyển sang ticket ${changeData.newTicketId || 'mới'}`);
         setTimeout(() => setStorageWarning(null), 3000);
-
-        console.log('✅ [ChatbotAsidePanel] Ticket transition completed');
       } catch (error) {
         console.error('❌ [ChatbotAsidePanel] Error during ticket transition:', error);
         setStorageWarning('Lỗi khi chuyển đổi ticket');
@@ -450,8 +432,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       });
 
       setSummaryContent(response.summary || response.response);
-      console.log('✅ [ChatbotAsidePanel] Summary received:', response);
-
     } catch (error) {
       console.error('Error getting ticket summary:', error);
       setSummaryError(String(error));
@@ -461,8 +441,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   };
 
   const handleSuggestionClick = (type: 'summary' | 'explain' | 'translate') => {
-    console.log('🎯 [ChatbotAsidePanel] Suggestion clicked:', type);
-
     // Messages for each suggestion type - these will appear as user messages in chat
     const suggestionMessages = {
       summary: 'Tóm tắt nội dung',
@@ -509,14 +487,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         timestamp: new Date().toISOString()
       };
 
-      console.log('🔍 [ChatbotAsidePanel] Sending context data:', {
-        messageLength: message.length,
-        messageType,
-        hasTicketData: !!ticketData,
-        chatHistoryLength: newMessages.length,
-        hasUserInfo: !!userInfo
-      });
-
       // Send message with full context via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
         const messageId = Date.now() + Math.random();
@@ -525,11 +495,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           if (event.source !== window) return;
 
           if (event.data.type === 'CHAT_RESPONSE' && event.data.id === messageId) {
-            console.log('🎯 [ChatbotAsidePanel] Received CHAT_RESPONSE:', event.data);
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
-              console.log('✅ [ChatbotAsidePanel] Response data:', event.data.data);
               resolve({ response: event.data.data, success: true });
             } else {
               console.error('❌ [ChatbotAsidePanel] Response error:', event.data.error);
@@ -560,10 +528,8 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         timestamp: new Date()
       };
 
-      console.log('🤖 [ChatbotAsidePanel] Adding AI message to state:', aiMessage);
       setMessages(prev => {
         const newMessages = [...prev, aiMessage];
-        console.log('📝 [ChatbotAsidePanel] New messages state:', newMessages);
         return newMessages;
       });
 
@@ -595,8 +561,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     }
 
     try {
-      console.log('💾 [ChatbotAsidePanel] Manual save triggered');
-
       const result = await ChatStorageService.saveChatHistory(
         ticketData.id,
         messages,
@@ -605,7 +569,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       );
 
       if (result.success) {
-        setStorageWarning('✅ Chat history đã được lưu thành công!');
         setAutoSaveEnabled(true); // Re-enable auto-save on successful manual save
         setTimeout(() => setStorageWarning(null), 3000);
       } else {
@@ -716,27 +679,27 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         <div className="ai-ext-ticket-info">
           <div className="ai-ext-ticket-title">
             <div className="ai-ext-title-wrapper">
-              <div 
+              <div
                 className={`ai-ext-title-content ${isTitleExpanded ? 'ai-ext-title-expanded' : 'ai-ext-title-truncated'}`}
                 title={ticketData.title} // Tooltip showing full title
               >
                 <strong>{ticketData.id}</strong>: {
-                  isTitleExpanded || !shouldTruncateTitle(ticketData.title) 
-                    ? ticketData.title 
+                  isTitleExpanded || !shouldTruncateTitle(ticketData.title)
+                    ? ticketData.title
                     : getTruncatedTitle(ticketData.title)
                 }
               </div>
               {shouldTruncateTitle(ticketData.title) && (
-                <button 
+                <button
                   className="ai-ext-toggle-title-caret"
                   onClick={() => setIsTitleExpanded(!isTitleExpanded)}
                   title={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
                   aria-label={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
                 >
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 12 12" 
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
                     fill="currentColor"
                     className={`ai-ext-caret-icon ${isTitleExpanded ? 'ai-ext-caret-up' : 'ai-ext-caret-down'}`}
                   >
