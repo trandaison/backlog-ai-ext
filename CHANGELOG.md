@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.0.4
+
+[compare changes](https://github.com/trandaison/backlog-ai-ext/compare/v0.0.3...v0.0.4)
+
+### 🩹 Fixes
+
+- Correct comment sorting and timestamp format ([1d4d82e](https://github.com/trandaison/backlog-ai-ext/commit/1d4d82e))
+
+### 🏡 Chore
+
+- **release:** V0.0.3 ([2264079](https://github.com/trandaison/backlog-ai-ext/commit/2264079))
+
+### ❤️ Contributors
+
+- Trandaison ([@trandaison](https://github.com/trandaison))
+- GitHub Action <action@github.com>
+
 ## v0.0.3
 
 
