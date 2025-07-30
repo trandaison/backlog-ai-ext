@@ -823,7 +823,7 @@ class BacklogAIInjector {
       // Update chatbot container width if it exists
       if (this.chatbotAsideContainer) {
         this.chatbotAsideContainer.style.width = `${width}px`;
-        this.chatbotAsideContainer.style.right = this.isChatbotOpen ? '0' : `${-width}px`;
+        // Don't manually set right position - let CSS handle it via .ai-ext-open class
       }
 
       console.log('🔧 [Content] Sidebar width updated to:', width);

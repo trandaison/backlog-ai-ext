@@ -178,21 +178,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   }, [currentMessage]);
 
   useEffect(() => {
-    // Apply width to sidebar
-    if (sidebarRef.current) {
-      sidebarRef.current.style.width = `${sidebarWidth}px`;
+    // Update CSS custom property for layout adjustment
+    document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${sidebarWidth}px`);
 
-      // Update CSS custom property for layout adjustment
-      document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${sidebarWidth}px`);
-
-      // Update position: when closed, it should be hidden to the right
-      // When open, it should be at right: 0
-      if (sidebarRef.current.classList.contains('ai-ext-open')) {
-        sidebarRef.current.style.right = '0px';
-      } else {
-        sidebarRef.current.style.right = `${-sidebarWidth}px`;
-      }
-    }
+    // Send message to content script to update outer container width
+    // This is needed because the CSS positioning is based on .ai-ext-chatbot-aside, not .ai-ext-aside-content
+    window.postMessage({
+      type: 'SIDEBAR_WIDTH_CHANGED',
+      width: sidebarWidth
+    }, '*');
   }, [sidebarWidth]);
 
   // Load saved width from storage
@@ -268,14 +262,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     }
 
     const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    let currentWidth = startWidth; // Track current width
+    // Use current sidebarWidth state value to ensure we have the most up-to-date width
+    const initialWidth = sidebarWidth;
+    let currentWidth = initialWidth; // Track current width
 
     const handleMouseMove = (e: MouseEvent) => {
       // Calculate new width: when moving left (negative deltaX), width should increase
       // when moving right (positive deltaX), width should decrease
       const deltaX = startX - e.clientX; // This gives us the distance moved from start point
-      const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), startWidth + deltaX));
+      const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), initialWidth + deltaX));
       currentWidth = newWidth; // Update current width
       setSidebarWidth(newWidth);
     };
@@ -286,7 +281,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         sidebarRef.current.classList.remove('ai-ext-resizing');
       }
 
-      // Save the current width (use currentWidth instead of sidebarWidth)
+      // Save the final width
       saveWidth(currentWidth);
 
       document.removeEventListener('mousemove', handleMouseMove);
