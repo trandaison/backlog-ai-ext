@@ -83,11 +83,9 @@ export class ChatStorageService {
     try {
       // Check if we have direct Chrome API access
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        console.log('🔎 ~ ChatStorageService ~ saveChatHistory ~ messages:', messages);
         return await this.saveChatHistoryDirect(ticketId, messages, ticketData, userInfo);
       } else {
         // Use message passing for main world context
-        console.log('🔎 ~ ChatStorageService ~ saveChatHistory ~ messages:', messages);
         return await this.saveChatHistoryViaMessage(ticketId, messages, ticketData, userInfo);
       }
     } catch (error) {

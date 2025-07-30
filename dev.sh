@@ -108,7 +108,7 @@ function preview_release() {
     echo ""
     echo -e "${BLUE}Release types:${NC}"
     echo "• patch: Bug fixes (1.0.0 → 1.0.1)"
-    echo "• minor: New features (1.0.0 → 1.1.0)"  
+    echo "• minor: New features (1.0.0 → 1.1.0)"
     echo "• major: Breaking changes (1.0.0 → 2.0.0)"
 }
 

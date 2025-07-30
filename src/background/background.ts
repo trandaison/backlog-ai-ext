@@ -404,10 +404,19 @@ Hãy phân tích ticket Backlog sau:
 **Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
 
 **Comments**:
-${ticketData.comments.map(comment => {
-  const content = comment.content || '';
-  return `- ${comment.author} (${comment.timestamp}): ${content}`;
-}).join('\n')}
+${ticketData.comments
+  .filter((comment: any) => comment.content && comment.content.trim())
+  .sort((a: any, b: any) => {
+    // Sort by timestamp field ascending (oldest first, newest last)
+    // timestamp contains ISO 8601 format from Backlog API's 'created' field
+    const timeA = new Date(a.timestamp || a.created || 0).getTime();
+    const timeB = new Date(b.timestamp || b.created || 0).getTime();
+    return timeA - timeB;
+  })
+  .map((comment: any) => {
+    const content = comment.content || '';
+    return `- ${comment.author} (${comment.timestamp}): ${content}`;
+  }).join('\n')}
 
 Hãy đưa ra:
 1. Tóm tắt nội dung ticket
@@ -695,9 +704,6 @@ class BackgroundService {
         }
       }
 
-      console.log('🔍 [Background] processedMessage length:', processedMessage.length);
-      console.log('🔍 [Background] processedMessage preview:', processedMessage.substring(0, 200) + '...');
-
       // Process with AI service
       const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings);
 
@@ -941,7 +947,7 @@ class BackgroundService {
   }
 
   private convertBacklogDataToTicketData(issueData: any, comments: any[]): TicketData {
-    return {
+    const convertedTicketData = {
       id: issueData.issueKey || issueData.id,
       title: issueData.summary || 'No title',
       description: issueData.description || 'No description',
@@ -954,7 +960,8 @@ class BackgroundService {
       comments: comments.map(comment => ({
         author: comment.createdUser?.name || 'Unknown',
         content: comment.content || '',
-        timestamp: comment.created || ''
+        timestamp: comment.created || '', // Map 'created' field to 'timestamp', keep ISO 8601 format
+        created: comment.created || '' // Keep 'created' field as backup
       })),
       // Extended fields
       issueType: issueData.issueType?.name,
@@ -966,6 +973,8 @@ class BackgroundService {
       customFields: issueData.customFields || [],
       attachments: issueData.attachments || []
     };
+
+    return convertedTicketData;
   }
 
   private buildTicketSummaryPrompt(ticketData: TicketData, settings?: Settings): string {
@@ -988,12 +997,16 @@ Hãy tạo một summary ngắn gọn và súc tích cho ticket Backlog sau:
 **Hạn**: ${ticketData.dueDate || 'No due date'}
 **Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
 
-${ticketData.comments && ticketData.comments.length > 0 ? `**Comments gần đây**:
-${ticketData.comments.slice(-3).map(comment => {
+${ticketData.comments && ticketData.comments.length > 0 ? (() => {
+  const sortedComments = this.sortCommentsByTime(ticketData.comments);
+
+  return `**Comments gần đây**:
+${sortedComments.slice(-3).map(comment => {
   const content = comment.content || '';
   const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
   return `- ${comment.author}: ${truncatedContent}`;
-}).join('\n')}` : ''}
+}).join('\n')}`;
+})() : ''}
 
 Hãy tóm tắt trong 3-5 câu ngắn gọn:
 1. Vấn đề chính của ticket
@@ -1006,9 +1019,10 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
     return comments
       .filter((comment: any) => comment.content && comment.content.trim())
       .sort((a: any, b: any) => {
-        // Sort by timestamp ascending (oldest first) for proper conversation flow
-        const timeA = new Date(a.timestamp || 0).getTime();
-        const timeB = new Date(b.timestamp || 0).getTime();
+        // Sort by timestamp field ascending (oldest first, newest last)
+        // timestamp contains ISO 8601 format from Backlog API's 'created' field
+        const timeA = new Date(a.timestamp || a.created || 0).getTime();
+        const timeB = new Date(b.timestamp || b.created || 0).getTime();
         return timeA - timeB;
       });
   }
