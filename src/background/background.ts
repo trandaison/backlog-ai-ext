@@ -273,13 +273,16 @@ class OpenAIService implements AIService {
   }
 
   async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
-    if (!this.apiKey) {
+    const apiKey = settings?.apiKey || this.apiKey;
+    if (!apiKey) {
       await this.loadApiKey(); // Try to reload in case it was updated
-      if (!this.apiKey) {
+      const fallbackApiKey = settings?.apiKey || this.apiKey;
+      if (!fallbackApiKey) {
         return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
       }
     }
 
+    const finalApiKey = settings?.apiKey || this.apiKey;
     const prompt = this.buildTicketAnalysisPrompt(ticketData, settings);
 
     try {
@@ -287,7 +290,7 @@ class OpenAIService implements AIService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${finalApiKey}`
         },
         body: JSON.stringify({
           model: this.getOpenAIModel(settings),
@@ -324,7 +327,8 @@ class OpenAIService implements AIService {
     responseId?: string;
     tokensUsed?: number;
   }> {
-    if (!this.apiKey) {
+    const apiKey = settings?.apiKey || this.apiKey;
+    if (!apiKey) {
       return {
         response: 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
         tokensUsed: 0
@@ -349,7 +353,7 @@ class OpenAIService implements AIService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
           model: this.getOpenAIModel(settings),
