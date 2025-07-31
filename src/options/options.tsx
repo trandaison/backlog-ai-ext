@@ -262,6 +262,9 @@ const OptionsPage: React.FC = () => {
   const [isLoadingBacklogKeys, setIsLoadingBacklogKeys] = useState(true);
   const [testingStates, setTestingStates] = useState<Record<string, { testing: boolean; result?: { success: boolean; namespace?: string; error?: string } }>>({});
   const [showPasswordStates, setShowPasswordStates] = useState<Record<string, boolean>>({});
+  const [language, setLanguage] = useState<string>('vi');
+  const [userRole, setUserRole] = useState<string>('developer');
+  const [isLoadingGeneral, setIsLoadingGeneral] = useState(true);
 
   // Initialize active section from URL hash
   React.useEffect(() => {
@@ -335,15 +338,34 @@ const OptionsPage: React.FC = () => {
     loadSelectedModels();
   }, []);
 
+  // Load general settings (language and userRole) từ storage
+  React.useEffect(() => {
+    const loadGeneralSettings = async () => {
+      try {
+        const result = await chrome.storage.sync.get(['language', 'userRole']);
+        const lang = result.language || 'vi';
+        const role = result.userRole || 'developer';
+        setLanguage(lang);
+        setUserRole(role);
+      } catch (error) {
+        console.error('Failed to load general settings:', error);
+      } finally {
+        setIsLoadingGeneral(false);
+      }
+    };
+
+    loadGeneralSettings();
+  }, []);
+
   // Load Backlog API keys từ storage
   React.useEffect(() => {
     const loadBacklogAPIKeys = async () => {
       try {
         const result = await chrome.storage.sync.get(['backlogAPIKeys', 'backlogDomain', 'backlogAPIKey']);
-        
+
         // Migration từ popup settings cũ
         let keys: BacklogAPIKey[] = [];
-        
+
         if (result.backlogAPIKeys) {
           // Nếu đã có format mới
           keys = result.backlogAPIKeys;
@@ -355,12 +377,12 @@ const OptionsPage: React.FC = () => {
             apiKey: result.backlogAPIKey,
             note: 'Migrated from popup settings'
           }];
-          
+
           // Save format mới và xóa keys cũ
           await chrome.storage.sync.set({ backlogAPIKeys: keys });
           await chrome.storage.sync.remove(['backlogDomain', 'backlogAPIKey']);
         }
-        
+
         // Nếu không có keys nào, tạo một entry trống
         if (keys.length === 0) {
           keys = [{
@@ -370,9 +392,9 @@ const OptionsPage: React.FC = () => {
             note: ''
           }];
         }
-        
+
         setBacklogAPIKeys(keys);
-        
+
         // Initialize password visibility states for all keys
         const initialShowStates: Record<string, boolean> = {};
         keys.forEach(key => {
@@ -401,7 +423,7 @@ const OptionsPage: React.FC = () => {
       void contentElement.offsetWidth; // Force reflow
       contentElement.classList.add('content-transition');
     }
-    
+
     setActiveSection(section);
     // Update URL hash without page reload
     window.history.pushState(null, '', `#${section}`);
@@ -413,6 +435,24 @@ const OptionsPage: React.FC = () => {
       await chrome.storage.sync.set({ preferredModel: modelId });
     } catch (error) {
       console.error('Failed to save preferred model:', error);
+    }
+  };
+
+  const handleLanguageChange = async (newLanguage: string) => {
+    setLanguage(newLanguage);
+    try {
+      await chrome.storage.sync.set({ language: newLanguage });
+    } catch (error) {
+      console.error('Failed to save language:', error);
+    }
+  };
+
+  const handleUserRoleChange = async (newRole: string) => {
+    setUserRole(newRole);
+    try {
+      await chrome.storage.sync.set({ userRole: newRole });
+    } catch (error) {
+      console.error('Failed to save user role:', error);
     }
   };
 
@@ -437,7 +477,7 @@ const OptionsPage: React.FC = () => {
       apiKey: '',
       note: ''
     };
-    
+
     setBacklogAPIKeys([...backlogAPIKeys, newKey]);
     // Initialize password visibility state for new entry
     setShowPasswordStates(prev => ({
@@ -449,14 +489,14 @@ const OptionsPage: React.FC = () => {
   const removeBacklogAPIKey = async (id: string) => {
     const updatedKeys = backlogAPIKeys.filter(key => key.id !== id);
     setBacklogAPIKeys(updatedKeys);
-    
+
     // Remove password visibility state for deleted entry
     setShowPasswordStates(prev => {
       const newStates = { ...prev };
       delete newStates[id];
       return newStates;
     });
-    
+
     try {
       await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
     } catch (error) {
@@ -465,12 +505,12 @@ const OptionsPage: React.FC = () => {
   };
 
   const updateBacklogAPIKey = async (id: string, field: keyof BacklogAPIKey, value: string) => {
-    const updatedKeys = backlogAPIKeys.map(key => 
+    const updatedKeys = backlogAPIKeys.map(key =>
       key.id === id ? { ...key, [field]: value } : key
     );
-    
+
     setBacklogAPIKeys(updatedKeys);
-    
+
     try {
       await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
     } catch (error) {
@@ -480,24 +520,24 @@ const OptionsPage: React.FC = () => {
 
   const normalizeDomain = (domain: string): string => {
     if (!domain.trim()) return '';
-    
+
     let normalized = domain.trim();
-    
+
     // Remove protocol (http:// or https://)
     normalized = normalized.replace(/^https?:\/\//, '');
-    
+
     // Remove trailing slash
     normalized = normalized.replace(/\/$/, '');
-    
+
     // Remove any path (everything after the domain)
     const domainOnly = normalized.split('/')[0];
-    
+
     return domainOnly;
   };
 
   const handleDomainBlur = async (id: string, currentValue: string) => {
     const normalizedDomain = normalizeDomain(currentValue);
-    
+
     if (normalizedDomain !== currentValue) {
       await updateBacklogAPIKey(id, 'domain', normalizedDomain);
     }
@@ -528,14 +568,14 @@ const OptionsPage: React.FC = () => {
 
       if (response.success) {
         const namespace = response.data?.name || response.data?.spaceKey || 'Connected';
-        
+
         // Update the namespace in the key entry
-        const updatedKeys = backlogAPIKeys.map(key => 
+        const updatedKeys = backlogAPIKeys.map(key =>
           key.id === id ? { ...key, namespace } : key
         );
-        
+
         setBacklogAPIKeys(updatedKeys);
-        
+
         // Save to Chrome storage when connection is successful
         try {
           await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
@@ -543,7 +583,7 @@ const OptionsPage: React.FC = () => {
         } catch (storageError) {
           console.error('Failed to save Backlog API keys:', storageError);
         }
-        
+
         setTestingStates(prev => ({
           ...prev,
           [id]: { testing: false, result: { success: true, namespace } }
@@ -567,21 +607,44 @@ const OptionsPage: React.FC = () => {
       case 'general':
         return (
           <div className="settings-section">
-            <h2>General Settings</h2>
-            <p>Configure general extension preferences and behavior.</p>
+            <h2>⚙️ General Settings</h2>
+            <p>Configure language preferences and user profile for personalized AI assistance.</p>
 
-            <div className="setting-group">
-              <div className="group-header">
-                <h3>🌐 Language & Region</h3>
-                <p className="group-description">Set your preferred language and regional settings</p>
+            <div className="setting-item">
+              <label className="setting-label">AI Response Language</label>
+              <select
+                className="setting-select setting-select-compact"
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                disabled={isLoadingGeneral}
+              >
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+              </select>
+              <div className="setting-hint">
+                Language used for AI responses and interface interactions
               </div>
-              <div className="setting-item">
-                <label className="setting-label">Interface Language</label>
-                <select className="setting-select">
-                  <option value="en">English</option>
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="ja">日本語</option>
-                </select>
+            </div>
+
+            <div className="setting-item">
+              <label className="setting-label">Your Role</label>
+              <select
+                className="setting-select setting-select-compact"
+                value={userRole}
+                onChange={(e) => handleUserRoleChange(e.target.value)}
+                disabled={isLoadingGeneral}
+              >
+                <option value="developer">Developer/Engineer</option>
+                <option value="pm">Project Manager</option>
+                <option value="qa">QA/Tester</option>
+                <option value="comtor">Comtor</option>
+                <option value="designer">Designer</option>
+                <option value="devops">DevOps</option>
+                <option value="other">Other</option>
+              </select>
+              <div className="setting-hint">
+                AI will provide role-specific assistance and recommendations
               </div>
             </div>
           </div>
@@ -781,7 +844,7 @@ const OptionsPage: React.FC = () => {
           <div className="settings-section">
             <h2>🔑 Backlog API Configs</h2>
             <p>Configure API keys for different Backlog domains.</p>
-            
+
             {isLoadingBacklogKeys ? (
               <div className="loading">Loading Backlog API keys...</div>
             ) : (
@@ -791,7 +854,7 @@ const OptionsPage: React.FC = () => {
                     <div className="entry-header">
                       <h3>Backlog Configuration</h3>
                       {backlogAPIKeys.length > 1 && (
-                        <button 
+                        <button
                           className="remove-btn"
                           onClick={() => removeBacklogAPIKey(keyEntry.id)}
                           title="Remove this configuration"
@@ -800,7 +863,7 @@ const OptionsPage: React.FC = () => {
                         </button>
                       )}
                     </div>
-                    
+
                     <div className="input-row">
                       <div className="input-group full-width">
                         <label htmlFor={`domain-${keyEntry.id}`}>Domain:</label>
@@ -814,7 +877,7 @@ const OptionsPage: React.FC = () => {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="input-row">
                       <div className="input-group full-width">
                         <label htmlFor={`apikey-${keyEntry.id}`}>API Key:</label>
@@ -840,7 +903,7 @@ const OptionsPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="input-row">
                       <div className="input-group full-width">
                         <label htmlFor={`note-${keyEntry.id}`}>Note (optional):</label>
@@ -853,16 +916,16 @@ const OptionsPage: React.FC = () => {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="test-section">
-                      <button 
+                      <button
                         className={`test-btn ${testingStates[keyEntry.id]?.testing ? 'testing' : ''}`}
                         onClick={() => testBacklogConnection(keyEntry.id)}
                         disabled={!keyEntry.domain || !keyEntry.apiKey || testingStates[keyEntry.id]?.testing}
                       >
                         {testingStates[keyEntry.id]?.testing ? 'Testing...' : 'Test Connection'}
                       </button>
-                      
+
                       {testingStates[keyEntry.id]?.result && (
                         <div className={`test-result ${testingStates[keyEntry.id]?.result?.success ? 'success' : 'error'}`}>
                           {testingStates[keyEntry.id]?.result?.success ? (
@@ -875,7 +938,7 @@ const OptionsPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
-                
+
                 <button className="add-key-btn" onClick={addBacklogAPIKey}>
                   + Add Another Backlog
                 </button>
