@@ -19,32 +19,122 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   h1 {
     margin: 0;
     color: #333;
     font-size: 24px;
     font-weight: 600;
   }
+
+  .version-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace;
+    font-size: 12px;
+    color: #666;
+
+    .version-line, .commit-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .version-label, .commit-label {
+      font-weight: 500;
+      color: #888;
+    }
+
+    .version-value {
+      font-weight: 600;
+      color: #007ACC;
+      background: #f0f7ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #d0e7ff;
+    }
+
+    .commit-value {
+      font-weight: 600;
+      color: #6f42c1;
+      background: #f8f4ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e1d7ff;
+      font-family: monospace;
+    }
+  }
 }
 
 .options-layout {
   display: flex;
+  align-items: flex-start;
   gap: 20px;
   min-height: 600px;
 }
 
 /* Sidebar Styles */
+
 .options-sidebar {
   width: 250px;
+}
+
+// Sidebar version info
+.sidebar-version-info {
+  padding: 16px 0;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace;
+  font-size: 11px;
+  color: #666;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+
+  .version-line, .commit-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .version-label, .commit-label {
+    font-weight: 500;
+    color: #888;
+  }
+
+  .version-value {
+    font-weight: 600;
+    color: #007ACC;
+    background: #f0f7ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #d0e7ff;
+  }
+
+  .commit-value {
+    font-weight: 600;
+    color: #6f42c1;
+    background: #f8f4ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #e1d7ff;
+    font-family: monospace;
+  }
+}
+
+.sidebar-nav {
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-}
-
-.sidebar-nav {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
 }
 
 .sidebar-item {
@@ -465,6 +555,44 @@ body {
   }
 
   &:active {
+    transform: scale(0.95);
+  }
+}
+
+.clear-button {
+  width: 80px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #dc3545;
+  border-radius: 6px;
+  background: #dc3545;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  &:hover:not(:disabled) {
+    background: #c82333;
+    border-color: #c82333;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    pointer-events: none;
+    background: #6c757d;
+    border-color: #6c757d;
+    color: white;
+    opacity: 0.6;
+  }
+
+  &:active:not(:disabled) {
     transform: scale(0.95);
   }
 }

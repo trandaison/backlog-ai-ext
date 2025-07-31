@@ -4,7 +4,12 @@ import './options.scss';
 import { EncryptionService } from '../shared/encryption';
 
 // Inline component để tránh module import issues
-type SettingsSection = 'general' | 'features' | 'ai-keys' | 'backlog-keys' | 'export';
+type SettingsSection =
+  | 'general'
+  | 'features'
+  | 'ai-keys'
+  | 'backlog-keys'
+  | 'export';
 
 interface SidebarItem {
   id: SettingsSection;
@@ -29,21 +34,86 @@ interface BacklogAPIKey {
 
 const availableModels: ModelInfo[] = [
   // OpenAI Models (Latest 2025)
-  { id: 'o3', name: 'o3', description: 'Our most powerful reasoning model', provider: 'openai' },
-  { id: 'o3-pro', name: 'o3 Pro', description: 'Version of o3 with more compute for better responses', provider: 'openai' },
-  { id: 'o3-mini', name: 'o3 Mini', description: 'A small model alternative to o3', provider: 'openai' },
-  { id: 'gpt-4.1', name: 'GPT-4.1', description: 'Flagship GPT model for complex tasks', provider: 'openai' },
-  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', description: 'Balanced for intelligence, speed, and cost', provider: 'openai' },
-  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', description: 'Fastest, most cost-effective GPT-4.1 model', provider: 'openai' },
-  { id: 'gpt-4o', name: 'GPT-4o', description: 'Fast, intelligent, flexible GPT model', provider: 'openai' },
-  { id: 'chatgpt-4o', name: 'ChatGPT-4o', description: 'GPT-4o model used in ChatGPT', provider: 'openai' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast, affordable small model for focused tasks', provider: 'openai' },
-  { id: 'o4-mini', name: 'o4 Mini', description: 'Faster, more affordable reasoning model', provider: 'openai' },
+  {
+    id: 'o3',
+    name: 'o3',
+    description: 'Our most powerful reasoning model',
+    provider: 'openai',
+  },
+  {
+    id: 'o3-pro',
+    name: 'o3 Pro',
+    description: 'Version of o3 with more compute for better responses',
+    provider: 'openai',
+  },
+  {
+    id: 'o3-mini',
+    name: 'o3 Mini',
+    description: 'A small model alternative to o3',
+    provider: 'openai',
+  },
+  {
+    id: 'gpt-4.1',
+    name: 'GPT-4.1',
+    description: 'Flagship GPT model for complex tasks',
+    provider: 'openai',
+  },
+  {
+    id: 'gpt-4.1-mini',
+    name: 'GPT-4.1 Mini',
+    description: 'Balanced for intelligence, speed, and cost',
+    provider: 'openai',
+  },
+  {
+    id: 'gpt-4.1-nano',
+    name: 'GPT-4.1 Nano',
+    description: 'Fastest, most cost-effective GPT-4.1 model',
+    provider: 'openai',
+  },
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    description: 'Fast, intelligent, flexible GPT model',
+    provider: 'openai',
+  },
+  {
+    id: 'chatgpt-4o',
+    name: 'ChatGPT-4o',
+    description: 'GPT-4o model used in ChatGPT',
+    provider: 'openai',
+  },
+  {
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o Mini',
+    description: 'Fast, affordable small model for focused tasks',
+    provider: 'openai',
+  },
+  {
+    id: 'o4-mini',
+    name: 'o4 Mini',
+    description: 'Faster, more affordable reasoning model',
+    provider: 'openai',
+  },
 
   // Google Gemini Models (Latest 2025)
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Most advanced Gemini model with enhanced reasoning', provider: 'gemini' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fast and efficient multimodal model', provider: 'gemini' },
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', description: 'Lightweight version optimized for speed and cost', provider: 'gemini' }
+  {
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    description: 'Most advanced Gemini model with enhanced reasoning',
+    provider: 'gemini',
+  },
+  {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    description: 'Fast and efficient multimodal model',
+    provider: 'gemini',
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash-Lite',
+    description: 'Lightweight version optimized for speed and cost',
+    provider: 'gemini',
+  },
 ];
 
 interface APIKeyInputProps {
@@ -54,12 +124,20 @@ interface APIKeyInputProps {
   onVerify: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
 }
 
-const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, providerKey, onVerify }) => {
+const APIKeyInput: React.FC<APIKeyInputProps> = ({
+  label,
+  placeholder,
+  hint,
+  providerKey,
+  onVerify,
+}) => {
   const [apiKey, setApiKey] = useState('');
   const [storedKey, setStoredKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationState, setVerificationState] = useState<'idle' | 'success' | 'error'>('idle');
+  const [verificationState, setVerificationState] = useState<
+    'idle' | 'success' | 'error'
+  >('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoadingKey, setIsLoadingKey] = useState(true);
 
@@ -83,7 +161,10 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
 
         let stored = '';
 
-        if (encryptedKey && (providerKey === 'openai' || providerKey === 'gemini')) {
+        if (
+          encryptedKey &&
+          (providerKey === 'openai' || providerKey === 'gemini')
+        ) {
           try {
             // Decrypt key từ popup format
             stored = await EncryptionService.decryptApiKey(encryptedKey);
@@ -142,7 +223,7 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
           }
 
           await chrome.storage.sync.set({
-            [storageKey]: valueToStore
+            [storageKey]: valueToStore,
           });
           setStoredKey(apiKey);
         } catch (error) {
@@ -170,29 +251,52 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
     setErrorMessage('');
   };
 
-  const getVerifyButtonContent = () => {
-    if (isVerifying) return 'Verifying...';
-    if (verificationState === 'success') return 'Verified';
-    return 'Verify';
+  const handleClear = async () => {
+    setApiKey('');
+    setVerificationState('idle');
+    setErrorMessage('');
+
+    // Clear from storage
+    try {
+      let storageKey;
+      if (providerKey === 'openai') {
+        storageKey = 'encryptedApiKey';
+      } else if (providerKey === 'gemini') {
+        storageKey = 'encryptedGeminiApiKey';
+      } else {
+        storageKey = `apiKey_${providerKey}`;
+      }
+
+      await chrome.storage.sync.remove([storageKey]);
+      setStoredKey('');
+    } catch (error) {
+      console.error('Failed to clear API key:', error);
+    }
+  };
+
+  const getSaveButtonContent = () => {
+    if (isVerifying) return 'Saving...';
+    if (verificationState === 'success') return 'Saved';
+    return 'Save';
   };
 
   return (
-    <div className="api-key-input-group">
-      <label className="setting-label">{label}</label>
-      <div className="api-key-input-container">
-        <div className="input-with-controls">
-          <div className="input-wrapper">
+    <div className='api-key-input-group'>
+      <label className='setting-label'>{label}</label>
+      <div className='api-key-input-container'>
+        <div className='input-with-controls'>
+          <div className='input-wrapper'>
             <input
               type={showPassword ? 'text' : 'password'}
-              className="setting-input api-key-input"
+              className='setting-input api-key-input'
               placeholder={isLoadingKey ? 'Loading...' : placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               disabled={isLoadingKey}
             />
             <button
-              type="button"
-              className="input-toggle-button-inside"
+              type='button'
+              className='input-toggle-button-inside'
               onClick={() => setShowPassword(!showPassword)}
               title={showPassword ? 'Hide API key' : 'Show API key'}
               disabled={isLoadingKey}
@@ -201,37 +305,43 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
             </button>
           </div>
           <button
-            type="button"
+            type='button'
             className={`verify-button ${verificationState}`}
             onClick={handleVerify}
             disabled={isVerifying || isLoadingKey}
           >
-            {getVerifyButtonContent()}
+            {getSaveButtonContent()}
+          </button>
+          <button
+            type='button'
+            className='clear-button'
+            onClick={handleClear}
+            disabled={isVerifying || isLoadingKey}
+            title='Clear API key'
+          >
+            Clear
           </button>
           {apiKey !== storedKey && !isLoadingKey && (
             <button
-              type="button"
-              className="reset-button"
+              type='button'
+              className='reset-button'
               onClick={resetToStoredKey}
-              title="Reset to saved key"
+              title='Reset to saved key'
             >
               ↶
             </button>
           )}
         </div>
       </div>
-      {errorMessage && (
-        <div className="error-message">
-          {errorMessage}
-        </div>
-      )}
-      <div className="hint-text">{hint.includes('http') ? (
+      {errorMessage && <div className='error-message'>{errorMessage}</div>}
+      <div className='hint-text'>
+        {hint.includes('http') ? (
           <span>
             {hint.split('https://')[0]}
             <a
               href={`https://${hint.split('https://')[1]}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              target='_blank'
+              rel='noopener noreferrer'
             >
               https://{hint.split('https://')[1]}
             </a>
@@ -245,23 +355,34 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
 };
 
 const sidebarItems: SidebarItem[] = [
-    { id: 'general', label: 'General Settings', icon: '⚙️' },
+  { id: 'general', label: 'General Settings', icon: '⚙️' },
   { id: 'features', label: 'Features', icon: '✨' },
   { id: 'ai-keys', label: 'AI & Models', icon: '🤖' },
   { id: 'backlog-keys', label: 'Backlog API Keys', icon: '🔑' },
-  { id: 'export', label: 'Export Data', icon: '📤' }
+  { id: 'export', label: 'Export Data', icon: '📤' },
 ];
 
 const OptionsPage: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('general');
+  const [activeSection, setActiveSection] =
+    useState<SettingsSection>('general');
   const [isLoadingProvider, setIsLoadingProvider] = useState(true);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [preferredModel, setPreferredModel] = useState<string>('gpt-4.1-mini');
   const [backlogAPIKeys, setBacklogAPIKeys] = useState<BacklogAPIKey[]>([]);
   const [isLoadingBacklogKeys, setIsLoadingBacklogKeys] = useState(true);
-  const [testingStates, setTestingStates] = useState<Record<string, { testing: boolean; result?: { success: boolean; namespace?: string; error?: string } }>>({});
-  const [showPasswordStates, setShowPasswordStates] = useState<Record<string, boolean>>({});
+  const [testingStates, setTestingStates] = useState<
+    Record<
+      string,
+      {
+        testing: boolean;
+        result?: { success: boolean; namespace?: string; error?: string };
+      }
+    >
+  >({});
+  const [showPasswordStates, setShowPasswordStates] = useState<
+    Record<string, boolean>
+  >({});
   const [language, setLanguage] = useState<string>('vi');
   const [userRole, setUserRole] = useState<string>('developer');
   const [isLoadingGeneral, setIsLoadingGeneral] = useState(true);
@@ -284,7 +405,13 @@ const OptionsPage: React.FC = () => {
   React.useEffect(() => {
     const getInitialSection = (): SettingsSection => {
       const hash = window.location.hash.slice(1); // Remove #
-      const validSections: SettingsSection[] = ['general', 'features', 'ai-keys', 'backlog-keys', 'export'];
+      const validSections: SettingsSection[] = [
+        'general',
+        'features',
+        'ai-keys',
+        'backlog-keys',
+        'export',
+      ];
 
       if (hash && validSections.includes(hash as SettingsSection)) {
         return hash as SettingsSection;
@@ -298,7 +425,13 @@ const OptionsPage: React.FC = () => {
     // Listen for hash changes (back/forward navigation)
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1);
-      const validSections: SettingsSection[] = ['general', 'features', 'ai-keys', 'backlog-keys', 'export'];
+      const validSections: SettingsSection[] = [
+        'general',
+        'features',
+        'ai-keys',
+        'backlog-keys',
+        'export',
+      ];
 
       if (hash && validSections.includes(hash as SettingsSection)) {
         setActiveSection(hash as SettingsSection);
@@ -333,12 +466,12 @@ const OptionsPage: React.FC = () => {
         const result = await chrome.storage.sync.get(['selectedModels']);
         // Default models: Mới, tối ưu chi phí, thông minh, nhanh
         const defaultModels = [
-          'gpt-4.1-mini',        // Balanced for intelligence, speed, and cost
-          'gpt-4o-mini',         // Fast, affordable small model for focused tasks
-          'o3-mini',             // Small alternative to o3 reasoning model
-          'gemini-2.5-pro',      // Most advanced Gemini model with enhanced reasoning
-          'gemini-2.5-flash',    // Fast and efficient multimodal model
-          'gemini-2.5-flash-lite' // Lightweight version optimized for speed and cost
+          'gpt-4.1-mini', // Balanced for intelligence, speed, and cost
+          'gpt-4o-mini', // Fast, affordable small model for focused tasks
+          'o3-mini', // Small alternative to o3 reasoning model
+          'gemini-2.5-pro', // Most advanced Gemini model with enhanced reasoning
+          'gemini-2.5-flash', // Fast and efficient multimodal model
+          'gemini-2.5-flash-lite', // Lightweight version optimized for speed and cost
         ];
         const models = result.selectedModels || defaultModels;
         setSelectedModels(models);
@@ -376,11 +509,23 @@ const OptionsPage: React.FC = () => {
     const loadFeatureSettings = async () => {
       setIsLoadingFeatures(true);
       try {
-        const result = await chrome.storage.sync.get(['rememberChatboxSize', 'autoOpenChatbox', 'enterToSend']);
+        const result = await chrome.storage.sync.get([
+          'rememberChatboxSize',
+          'autoOpenChatbox',
+          'enterToSend',
+        ]);
 
-        setRememberChatboxSize(result.rememberChatboxSize !== undefined ? result.rememberChatboxSize : true);
-        setAutoOpenChatbox(result.autoOpenChatbox !== undefined ? result.autoOpenChatbox : false);
-        setEnterToSend(result.enterToSend !== undefined ? result.enterToSend : true);
+        setRememberChatboxSize(
+          result.rememberChatboxSize !== undefined
+            ? result.rememberChatboxSize
+            : true
+        );
+        setAutoOpenChatbox(
+          result.autoOpenChatbox !== undefined ? result.autoOpenChatbox : false
+        );
+        setEnterToSend(
+          result.enterToSend !== undefined ? result.enterToSend : true
+        );
       } catch (error) {
         console.error('Failed to load feature settings:', error);
       } finally {
@@ -395,7 +540,11 @@ const OptionsPage: React.FC = () => {
   React.useEffect(() => {
     const loadBacklogAPIKeys = async () => {
       try {
-        const result = await chrome.storage.sync.get(['backlogAPIKeys', 'backlogDomain', 'backlogAPIKey']);
+        const result = await chrome.storage.sync.get([
+          'backlogAPIKeys',
+          'backlogDomain',
+          'backlogAPIKey',
+        ]);
 
         // Migration từ popup settings cũ
         let keys: BacklogAPIKey[] = [];
@@ -405,12 +554,14 @@ const OptionsPage: React.FC = () => {
           keys = result.backlogAPIKeys;
         } else if (result.backlogDomain && result.backlogAPIKey) {
           // Migration từ format cũ
-          keys = [{
-            id: 'migrated-' + Date.now(),
-            domain: result.backlogDomain,
-            apiKey: result.backlogAPIKey,
-            note: 'Migrated from popup settings'
-          }];
+          keys = [
+            {
+              id: 'migrated-' + Date.now(),
+              domain: result.backlogDomain,
+              apiKey: result.backlogAPIKey,
+              note: 'Migrated from popup settings',
+            },
+          ];
 
           // Save format mới và xóa keys cũ
           await chrome.storage.sync.set({ backlogAPIKeys: keys });
@@ -419,19 +570,21 @@ const OptionsPage: React.FC = () => {
 
         // Nếu không có keys nào, tạo một entry trống
         if (keys.length === 0) {
-          keys = [{
-            id: 'default-' + Date.now(),
-            domain: '',
-            apiKey: '',
-            note: ''
-          }];
+          keys = [
+            {
+              id: 'default-' + Date.now(),
+              domain: '',
+              apiKey: '',
+              note: '',
+            },
+          ];
         }
 
         setBacklogAPIKeys(keys);
 
         // Initialize password visibility states for all keys
         const initialShowStates: Record<string, boolean> = {};
-        keys.forEach(key => {
+        keys.forEach((key) => {
           initialShowStates[key.id] = false;
         });
         setShowPasswordStates(initialShowStates);
@@ -451,7 +604,9 @@ const OptionsPage: React.FC = () => {
 
   const handleSectionChange = (section: SettingsSection) => {
     // Add animation class to trigger re-animation
-    const contentElement = document.querySelector('.options-content') as HTMLElement;
+    const contentElement = document.querySelector(
+      '.options-content'
+    ) as HTMLElement;
     if (contentElement) {
       contentElement.classList.remove('content-transition');
       void contentElement.offsetWidth; // Force reflow
@@ -520,7 +675,7 @@ const OptionsPage: React.FC = () => {
 
   const handleModelToggle = async (modelId: string) => {
     const newSelectedModels = selectedModels.includes(modelId)
-      ? selectedModels.filter(id => id !== modelId)
+      ? selectedModels.filter((id) => id !== modelId)
       : [...selectedModels, modelId];
 
     setSelectedModels(newSelectedModels);
@@ -540,26 +695,41 @@ const OptionsPage: React.FC = () => {
     try {
       const exportData: any = {
         exportedAt: new Date().toISOString(),
-        extensionVersion: "1.0.0" // Get from manifest
+        extensionVersion: '1.0.0', // Get from manifest
       };
 
       if (exportConfigs) {
         // Export specific configuration data instead of all sync storage
         const configKeys = [
-          'language', 'userRole', 'rememberChatboxSize', 'autoOpenChatbox',
-          'enterToSend', 'selectedModels', 'preferredModel', 'encryptedApiKey',
-          'encryptedGeminiApiKey', 'backlogAPIKeys'
+          'language',
+          'userRole',
+          'rememberChatboxSize',
+          'autoOpenChatbox',
+          'enterToSend',
+          'selectedModels',
+          'preferredModel',
+          'encryptedApiKey',
+          'encryptedGeminiApiKey',
+          'backlogAPIKeys',
         ];
         const configData = await chrome.storage.sync.get(configKeys);
 
         // Get sidebar width from local storage
-        const localData = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+        const localData = await chrome.storage.local.get([
+          'ai-ext-sidebar-width',
+        ]);
 
         // Process selected models - use current UI state for most accurate data
         const selectedModelIds = selectedModels; // Use current UI state instead of storage
         console.log('🔍 [Export] Selected models to export:', selectedModelIds);
-        console.log('🔍 [Export] Total selected models count:', selectedModelIds.length);
-        console.log('🔍 [Export] Storage selectedModels:', configData.selectedModels);
+        console.log(
+          '🔍 [Export] Total selected models count:',
+          selectedModelIds.length
+        );
+        console.log(
+          '🔍 [Export] Storage selectedModels:',
+          configData.selectedModels
+        );
 
         // Encrypt API keys in backlog data
         const backlogData = configData.backlogAPIKeys
@@ -569,7 +739,7 @@ const OptionsPage: React.FC = () => {
                 domain: key.domain,
                 apiKey: await EncryptionService.encryptApiKey(key.apiKey),
                 note: key.note,
-                namespace: key.namespace
+                namespace: key.namespace,
               }))
             )
           : [];
@@ -577,21 +747,21 @@ const OptionsPage: React.FC = () => {
         exportData.configs = {
           general: {
             language: configData.language,
-            userRole: configData.userRole
+            userRole: configData.userRole,
           },
           features: {
             rememberChatboxSize: configData.rememberChatboxSize,
             autoOpenChatbox: configData.autoOpenChatbox,
-            enterToSend: configData.enterToSend
+            enterToSend: configData.enterToSend,
           },
           aiModels: {
             selectedModels: selectedModelIds, // Export as ID array only
             preferredModel: configData.preferredModel,
             encryptedApiKey: configData.encryptedApiKey,
-            encryptedGeminiApiKey: configData.encryptedGeminiApiKey
+            encryptedGeminiApiKey: configData.encryptedGeminiApiKey,
           },
           backlog: backlogData,
-          sidebarWidth: localData['ai-ext-sidebar-width']
+          sidebarWidth: localData['ai-ext-sidebar-width'],
         };
       }
 
@@ -603,22 +773,28 @@ const OptionsPage: React.FC = () => {
       }
 
       // Clean undefined values
-      const cleanedData = JSON.parse(JSON.stringify(exportData, (key, value) =>
-        value === undefined ? null : value
-      ));
+      const cleanedData = JSON.parse(
+        JSON.stringify(exportData, (key, value) =>
+          value === undefined ? null : value
+        )
+      );
 
       // Generate filename with timestamp
       const now = new Date();
-      const timestamp = now.getFullYear().toString() +
+      const timestamp =
+        now.getFullYear().toString() +
         (now.getMonth() + 1).toString().padStart(2, '0') +
-        now.getDate().toString().padStart(2, '0') + '_' +
+        now.getDate().toString().padStart(2, '0') +
+        '_' +
         now.getHours().toString().padStart(2, '0') +
         now.getMinutes().toString().padStart(2, '0');
 
       const filename = `backlog-ai-ext_data_v1.0.0_${timestamp}.json`;
 
       // Create and download file
-      const blob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(cleanedData, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -636,7 +812,9 @@ const OptionsPage: React.FC = () => {
     }
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file || file.type !== 'application/json') {
       alert('Please select a valid JSON file');
@@ -673,7 +851,7 @@ const OptionsPage: React.FC = () => {
       // Create backup of current data
       backup = {
         sync: await chrome.storage.sync.get(),
-        local: await chrome.storage.local.get()
+        local: await chrome.storage.local.get(),
       };
 
       // Use cached file content instead of reading again
@@ -692,8 +870,10 @@ const OptionsPage: React.FC = () => {
 
         // Merge general settings
         if (configs.general) {
-          if (configs.general.language) syncData.language = configs.general.language;
-          if (configs.general.userRole) syncData.userRole = configs.general.userRole;
+          if (configs.general.language)
+            syncData.language = configs.general.language;
+          if (configs.general.userRole)
+            syncData.userRole = configs.general.userRole;
         }
 
         // Merge feature settings
@@ -717,7 +897,8 @@ const OptionsPage: React.FC = () => {
           if (configs.aiModels.encryptedApiKey)
             syncData.encryptedApiKey = configs.aiModels.encryptedApiKey;
           if (configs.aiModels.encryptedGeminiApiKey)
-            syncData.encryptedGeminiApiKey = configs.aiModels.encryptedGeminiApiKey;
+            syncData.encryptedGeminiApiKey =
+              configs.aiModels.encryptedGeminiApiKey;
         }
 
         // Merge Backlog settings - decrypt API keys
@@ -725,7 +906,7 @@ const OptionsPage: React.FC = () => {
           const decryptedBacklogKeys = await Promise.all(
             configs.backlog.map(async (key: any) => ({
               ...key,
-              apiKey: await EncryptionService.decryptApiKey(key.apiKey)
+              apiKey: await EncryptionService.decryptApiKey(key.apiKey),
             }))
           );
           syncData.backlogAPIKeys = decryptedBacklogKeys;
@@ -750,16 +931,19 @@ const OptionsPage: React.FC = () => {
         await chrome.storage.local.set(importData.chatData);
       }
 
-      alert('Import completed successfully! Please refresh the page to see changes.');
+      alert(
+        'Import completed successfully! Please refresh the page to see changes.'
+      );
 
       // Reset import state
       setImportFile(null);
       setFileContent(null);
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
       if (fileInput) {
         fileInput.value = '';
       }
-
     } catch (error) {
       console.error('Import failed:', error);
 
@@ -773,7 +957,9 @@ const OptionsPage: React.FC = () => {
           alert('Import failed and data has been restored to previous state.');
         } catch (restoreError) {
           console.error('Failed to restore backup:', restoreError);
-          alert('Import failed and backup restoration also failed. Please reload the extension.');
+          alert(
+            'Import failed and backup restoration also failed. Please reload the extension.'
+          );
         }
       } else {
         alert('Import failed: ' + (error as Error).message);
@@ -782,7 +968,9 @@ const OptionsPage: React.FC = () => {
       // Reset state on error
       setImportFile(null);
       setFileContent(null);
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
       if (fileInput) {
         fileInput.value = '';
       }
@@ -796,23 +984,23 @@ const OptionsPage: React.FC = () => {
       id: 'key-' + Date.now(),
       domain: '',
       apiKey: '',
-      note: ''
+      note: '',
     };
 
     setBacklogAPIKeys([...backlogAPIKeys, newKey]);
     // Initialize password visibility state for new entry
-    setShowPasswordStates(prev => ({
+    setShowPasswordStates((prev) => ({
       ...prev,
-      [newKey.id]: false
+      [newKey.id]: false,
     }));
   };
 
   const removeBacklogAPIKey = async (id: string) => {
-    const updatedKeys = backlogAPIKeys.filter(key => key.id !== id);
+    const updatedKeys = backlogAPIKeys.filter((key) => key.id !== id);
     setBacklogAPIKeys(updatedKeys);
 
     // Remove password visibility state for deleted entry
-    setShowPasswordStates(prev => {
+    setShowPasswordStates((prev) => {
       const newStates = { ...prev };
       delete newStates[id];
       return newStates;
@@ -825,8 +1013,12 @@ const OptionsPage: React.FC = () => {
     }
   };
 
-  const updateBacklogAPIKey = async (id: string, field: keyof BacklogAPIKey, value: string) => {
-    const updatedKeys = backlogAPIKeys.map(key =>
+  const updateBacklogAPIKey = async (
+    id: string,
+    field: keyof BacklogAPIKey,
+    value: string
+  ) => {
+    const updatedKeys = backlogAPIKeys.map((key) =>
       key.id === id ? { ...key, [field]: value } : key
     );
 
@@ -865,14 +1057,14 @@ const OptionsPage: React.FC = () => {
   };
 
   const testBacklogConnection = async (id: string) => {
-    const keyEntry = backlogAPIKeys.find(key => key.id === id);
+    const keyEntry = backlogAPIKeys.find((key) => key.id === id);
     if (!keyEntry || !keyEntry.domain || !keyEntry.apiKey) {
       return;
     }
 
-    setTestingStates(prev => ({
+    setTestingStates((prev) => ({
       ...prev,
-      [id]: { testing: true }
+      [id]: { testing: true },
     }));
 
     try {
@@ -883,15 +1075,16 @@ const OptionsPage: React.FC = () => {
           id: keyEntry.id,
           domain: keyEntry.domain,
           spaceName: keyEntry.domain.split('.')[0], // Extract space name from domain
-          apiKey: keyEntry.apiKey
-        }
+          apiKey: keyEntry.apiKey,
+        },
       });
 
       if (response.success) {
-        const namespace = response.data?.name || response.data?.spaceKey || 'Connected';
+        const namespace =
+          response.data?.name || response.data?.spaceKey || 'Connected';
 
         // Update the namespace in the key entry
-        const updatedKeys = backlogAPIKeys.map(key =>
+        const updatedKeys = backlogAPIKeys.map((key) =>
           key.id === id ? { ...key, namespace } : key
         );
 
@@ -905,20 +1098,29 @@ const OptionsPage: React.FC = () => {
           console.error('Failed to save Backlog API keys:', storageError);
         }
 
-        setTestingStates(prev => ({
+        setTestingStates((prev) => ({
           ...prev,
-          [id]: { testing: false, result: { success: true, namespace } }
+          [id]: { testing: false, result: { success: true, namespace } },
         }));
       } else {
-        setTestingStates(prev => ({
+        setTestingStates((prev) => ({
           ...prev,
-          [id]: { testing: false, result: { success: false, error: response.message || 'Connection failed' } }
+          [id]: {
+            testing: false,
+            result: {
+              success: false,
+              error: response.message || 'Connection failed',
+            },
+          },
         }));
       }
     } catch (error) {
-      setTestingStates(prev => ({
+      setTestingStates((prev) => ({
         ...prev,
-        [id]: { testing: false, result: { success: false, error: (error as Error).message } }
+        [id]: {
+          testing: false,
+          result: { success: false, error: (error as Error).message },
+        },
       }));
     }
   };
@@ -927,44 +1129,47 @@ const OptionsPage: React.FC = () => {
     switch (activeSection) {
       case 'general':
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>⚙️ General Settings</h2>
-            <p>Configure language preferences and user profile for personalized AI assistance.</p>
+            <p>
+              Configure language preferences and user profile for personalized
+              AI assistance.
+            </p>
 
-            <div className="setting-item">
-              <label className="setting-label">AI Response Language</label>
+            <div className='setting-item'>
+              <label className='setting-label'>AI Response Language</label>
               <select
-                className="setting-select setting-select-compact"
+                className='setting-select setting-select-compact'
                 value={language}
                 onChange={(e) => handleLanguageChange(e.target.value)}
                 disabled={isLoadingGeneral}
               >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
-                <option value="ja">日本語</option>
+                <option value='vi'>Tiếng Việt</option>
+                <option value='en'>English</option>
+                <option value='ja'>日本語</option>
               </select>
-              <div className="setting-hint">
+              <div className='setting-hint'>
                 Language used for AI responses and interface interactions
               </div>
             </div>
 
-            <div className="setting-item">
-              <label className="setting-label">Your Role</label>
+            <div className='setting-item'>
+              <label className='setting-label'>Your Role</label>
               <select
-                className="setting-select setting-select-compact"
+                className='setting-select setting-select-compact'
                 value={userRole}
                 onChange={(e) => handleUserRoleChange(e.target.value)}
                 disabled={isLoadingGeneral}
               >
-                <option value="developer">Developer/Engineer</option>
-                <option value="pm">Project Manager</option>
-                <option value="qa">QA/Tester</option>
-                <option value="comtor">Comtor</option>
-                <option value="designer">Designer</option>
-                <option value="devops">DevOps</option>
-                <option value="other">Other</option>
+                <option value='developer'>Developer/Engineer</option>
+                <option value='pm'>Project Manager</option>
+                <option value='qa'>QA/Tester</option>
+                <option value='comtor'>Comtor</option>
+                <option value='designer'>Designer</option>
+                <option value='devops'>DevOps</option>
+                <option value='other'>Other</option>
               </select>
-              <div className="setting-hint">
+              <div className='setting-hint'>
                 AI will provide role-specific assistance and recommendations
               </div>
             </div>
@@ -973,54 +1178,63 @@ const OptionsPage: React.FC = () => {
 
       case 'features':
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>✨ Features</h2>
-            <p>Enable or disable specific extension features to customize your experience.</p>
+            <p>
+              Enable or disable specific extension features to customize your
+              experience.
+            </p>
 
-            <div className="setting-item">
-              <label className="setting-checkbox-label">
+            <div className='setting-item'>
+              <label className='setting-checkbox-label'>
                 <input
-                  type="checkbox"
-                  className="setting-checkbox"
+                  type='checkbox'
+                  className='setting-checkbox'
                   checked={rememberChatboxSize}
-                  onChange={(e) => handleRememberChatboxSizeChange(e.target.checked)}
+                  onChange={(e) =>
+                    handleRememberChatboxSizeChange(e.target.checked)
+                  }
                   disabled={isLoadingFeatures}
                 />
                 <span>Remember chatbox size</span>
               </label>
-              <div className="setting-hint">
-                Automatically save and restore the chatbox dimensions when you resize it
+              <div className='setting-hint'>
+                Automatically save and restore the chatbox dimensions when you
+                resize it
               </div>
             </div>
 
-            <div className="setting-item">
-              <label className="setting-checkbox-label">
+            <div className='setting-item'>
+              <label className='setting-checkbox-label'>
                 <input
-                  type="checkbox"
-                  className="setting-checkbox"
+                  type='checkbox'
+                  className='setting-checkbox'
                   checked={autoOpenChatbox}
-                  onChange={(e) => handleAutoOpenChatboxChange(e.target.checked)}
+                  onChange={(e) =>
+                    handleAutoOpenChatboxChange(e.target.checked)
+                  }
                   disabled={isLoadingFeatures}
                 />
                 <span>Auto-open chatbox on Backlog tickets</span>
               </label>
-              <div className="setting-hint">
-                Automatically show the AI chatbox when opening a Backlog ticket page
+              <div className='setting-hint'>
+                Automatically show the AI chatbox when opening a Backlog ticket
+                page
               </div>
             </div>
 
-            <div className="setting-item">
-              <label className="setting-checkbox-label">
+            <div className='setting-item'>
+              <label className='setting-checkbox-label'>
                 <input
-                  type="checkbox"
-                  className="setting-checkbox"
+                  type='checkbox'
+                  className='setting-checkbox'
                   checked={enterToSend}
                   onChange={(e) => handleEnterToSendChange(e.target.checked)}
                   disabled={isLoadingFeatures}
                 />
                 <span>Press Enter to send messages</span>
               </label>
-              <div className="setting-hint">
+              <div className='setting-hint'>
                 Send messages by pressing Enter key (Shift+Enter for new line)
               </div>
             </div>
@@ -1029,99 +1243,111 @@ const OptionsPage: React.FC = () => {
 
       case 'ai-keys':
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>AI & Models</h2>
             <p>Configure your AI service providers and authentication keys.</p>
 
-            <div className="setting-group api-keys-section">
-              <div className="group-header">
+            <div className='setting-group api-keys-section'>
+              <div className='group-header'>
                 <h3>🔐 API Keys</h3>
-                <p className="group-description">Configure authentication for your AI services</p>
+                <p className='group-description'>
+                  Configure authentication for your AI services
+                </p>
               </div>
 
-              <div className="api-providers">
-                <div className="api-provider-card">
-                  <div className="provider-header">
+              <div className='api-providers'>
+                <div className='api-provider-card'>
+                  <div className='provider-header'>
                     <img
-                      src="https://platform.openai.com/favicon-platform.png"
-                      alt="OpenAI"
-                      className="provider-icon-img"
+                      src='https://platform.openai.com/favicon-platform.png'
+                      alt='OpenAI'
+                      className='provider-icon-img'
                     />
-                    <span className="provider-name">OpenAI</span>
+                    <span className='provider-name'>OpenAI</span>
                   </div>
                   <APIKeyInput
-                    label=""
-                    placeholder="sk-..."
-                    hint="Get your API key from https://platform.openai.com/api-keys"
-                    providerKey="openai"
+                    label=''
+                    placeholder='sk-...'
+                    hint='Get your API key from https://platform.openai.com/api-keys'
+                    providerKey='openai'
                     onVerify={async (apiKey) => {
-                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      await new Promise((resolve) => setTimeout(resolve, 1500));
                       if (apiKey.startsWith('sk-') && apiKey.length > 10) {
                         return { success: true };
                       }
-                      return { success: false, error: 'Invalid OpenAI API key format' };
+                      return {
+                        success: false,
+                        error: 'Invalid OpenAI API key format',
+                      };
                     }}
                   />
                 </div>
 
-                <div className="api-provider-card">
-                  <div className="provider-header">
+                <div className='api-provider-card'>
+                  <div className='provider-header'>
                     <img
-                      src="https://www.gstatic.com/lamda/images/gemini_sparkle_aurora_33f86dc0c0257da337c63.svg"
-                      alt="Google Gemini"
-                      className="provider-icon-img"
+                      src='https://www.gstatic.com/lamda/images/gemini_sparkle_aurora_33f86dc0c0257da337c63.svg'
+                      alt='Google Gemini'
+                      className='provider-icon-img'
                     />
-                    <span className="provider-name">Google Gemini</span>
+                    <span className='provider-name'>Google Gemini</span>
                   </div>
                   <APIKeyInput
-                    label=""
-                    placeholder="AIza..."
-                    hint="Get your API key from https://aistudio.google.com/app/apikey"
-                    providerKey="gemini"
+                    label=''
+                    placeholder='AIza...'
+                    hint='Get your API key from https://aistudio.google.com/app/apikey'
+                    providerKey='gemini'
                     onVerify={async (apiKey) => {
-                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      await new Promise((resolve) => setTimeout(resolve, 1500));
                       if (apiKey.startsWith('AIza') && apiKey.length > 10) {
                         return { success: true };
                       }
-                      return { success: false, error: 'Invalid Gemini API key format' };
+                      return {
+                        success: false,
+                        error: 'Invalid Gemini API key format',
+                      };
                     }}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="setting-group models-section">
-              <div className="group-header">
+            <div className='setting-group models-section'>
+              <div className='group-header'>
                 <h3>🎛️ Available Models</h3>
-                <p className="group-description">Select which models should be available for use</p>
+                <p className='group-description'>
+                  Select which models should be available for use
+                </p>
               </div>
 
-              <div className="models-container">
-                <div className="provider-models">
-                  <div className="provider-models-header">
+              <div className='models-container'>
+                <div className='provider-models'>
+                  <div className='provider-models-header'>
                     <img
-                      src="https://platform.openai.com/favicon-platform.png"
-                      alt="OpenAI"
-                      className="provider-icon-img"
+                      src='https://platform.openai.com/favicon-platform.png'
+                      alt='OpenAI'
+                      className='provider-icon-img'
                     />
-                    <span className="provider-name">OpenAI Models</span>
+                    <span className='provider-name'>OpenAI Models</span>
                   </div>
-                  <div className="models-list">
+                  <div className='models-list'>
                     {availableModels
-                      .filter(model => model.provider === 'openai')
-                      .map(model => (
-                        <div key={model.id} className="model-item">
-                          <label className="model-checkbox-label">
+                      .filter((model) => model.provider === 'openai')
+                      .map((model) => (
+                        <div key={model.id} className='model-item'>
+                          <label className='model-checkbox-label'>
                             <input
-                              type="checkbox"
-                              className="model-checkbox"
+                              type='checkbox'
+                              className='model-checkbox'
                               checked={selectedModels.includes(model.id)}
                               onChange={() => handleModelToggle(model.id)}
                               disabled={isLoadingModels}
                             />
-                            <div className="model-info">
-                              <div className="model-name">{model.name}</div>
-                              <div className="model-description">{model.description}</div>
+                            <div className='model-info'>
+                              <div className='model-name'>{model.name}</div>
+                              <div className='model-description'>
+                                {model.description}
+                              </div>
                             </div>
                           </label>
                         </div>
@@ -1129,31 +1355,33 @@ const OptionsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="provider-models">
-                  <div className="provider-models-header">
+                <div className='provider-models'>
+                  <div className='provider-models-header'>
                     <img
-                      src="https://www.gstatic.com/lamda/images/gemini_sparkle_aurora_33f86dc0c0257da337c63.svg"
-                      alt="Google Gemini"
-                      className="provider-icon-img"
+                      src='https://www.gstatic.com/lamda/images/gemini_sparkle_aurora_33f86dc0c0257da337c63.svg'
+                      alt='Google Gemini'
+                      className='provider-icon-img'
                     />
-                    <span className="provider-name">Google Gemini Models</span>
+                    <span className='provider-name'>Google Gemini Models</span>
                   </div>
-                  <div className="models-list">
+                  <div className='models-list'>
                     {availableModels
-                      .filter(model => model.provider === 'gemini')
-                      .map(model => (
-                        <div key={model.id} className="model-item">
-                          <label className="model-checkbox-label">
+                      .filter((model) => model.provider === 'gemini')
+                      .map((model) => (
+                        <div key={model.id} className='model-item'>
+                          <label className='model-checkbox-label'>
                             <input
-                              type="checkbox"
-                              className="model-checkbox"
+                              type='checkbox'
+                              className='model-checkbox'
                               checked={selectedModels.includes(model.id)}
                               onChange={() => handleModelToggle(model.id)}
                               disabled={isLoadingModels}
                             />
-                            <div className="model-info">
-                              <div className="model-name">{model.name}</div>
-                              <div className="model-description">{model.description}</div>
+                            <div className='model-info'>
+                              <div className='model-name'>{model.name}</div>
+                              <div className='model-description'>
+                                {model.description}
+                              </div>
                             </div>
                           </label>
                         </div>
@@ -1162,23 +1390,28 @@ const OptionsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="preferred-model-section">
-                <div className="group-header">
+              <div className='preferred-model-section'>
+                <div className='group-header'>
                   <h3>⭐ Preferred Model</h3>
-                  <p className="group-description">Select your default model for AI conversations</p>
+                  <p className='group-description'>
+                    Select your default model for AI conversations
+                  </p>
                 </div>
-                <div className="setting-item">
+                <div className='setting-item'>
                   <select
-                    className="setting-select"
+                    className='setting-select'
                     value={preferredModel}
                     onChange={(e) => handlePreferredModelChange(e.target.value)}
                     disabled={isLoadingModels}
                   >
-                    {selectedModels.map(modelId => {
-                      const model = availableModels.find(m => m.id === modelId);
+                    {selectedModels.map((modelId) => {
+                      const model = availableModels.find(
+                        (m) => m.id === modelId
+                      );
                       return model ? (
                         <option key={model.id} value={model.id}>
-                          {model.name} ({model.provider === 'openai' ? 'OpenAI' : 'Gemini'})
+                          {model.name} (
+                          {model.provider === 'openai' ? 'OpenAI' : 'Gemini'})
                         </option>
                       ) : null;
                     })}
@@ -1191,62 +1424,88 @@ const OptionsPage: React.FC = () => {
 
       case 'backlog-keys':
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>🔑 Backlog API Configs</h2>
             <p>Configure API keys for different Backlog domains.</p>
 
             {isLoadingBacklogKeys ? (
-              <div className="loading">Loading Backlog API keys...</div>
+              <div className='loading'>Loading Backlog API keys...</div>
             ) : (
-              <div className="backlog-keys-container">
+              <div className='backlog-keys-container'>
                 {backlogAPIKeys.map((keyEntry) => (
-                  <div key={keyEntry.id} className="backlog-key-entry">
-                    <div className="entry-header">
+                  <div key={keyEntry.id} className='backlog-key-entry'>
+                    <div className='entry-header'>
                       <h3>Backlog Configuration</h3>
                       {backlogAPIKeys.length > 1 && (
                         <button
-                          className="remove-btn"
+                          className='remove-btn'
                           onClick={() => removeBacklogAPIKey(keyEntry.id)}
-                          title="Remove this configuration"
+                          title='Remove this configuration'
                         >
                           ×
                         </button>
                       )}
                     </div>
 
-                    <div className="input-row">
-                      <div className="input-group full-width">
+                    <div className='input-row'>
+                      <div className='input-group full-width'>
                         <label htmlFor={`domain-${keyEntry.id}`}>Domain:</label>
                         <input
                           id={`domain-${keyEntry.id}`}
-                          type="text"
-                          placeholder="your-space.backlog.com"
+                          type='text'
+                          placeholder='your-space.backlog.com'
                           value={keyEntry.domain}
-                          onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'domain', e.target.value)}
-                          onBlur={(e) => handleDomainBlur(keyEntry.id, e.target.value)}
+                          onChange={(e) =>
+                            updateBacklogAPIKey(
+                              keyEntry.id,
+                              'domain',
+                              e.target.value
+                            )
+                          }
+                          onBlur={(e) =>
+                            handleDomainBlur(keyEntry.id, e.target.value)
+                          }
                         />
                       </div>
                     </div>
 
-                    <div className="input-row">
-                      <div className="input-group full-width">
-                        <label htmlFor={`apikey-${keyEntry.id}`}>API Key:</label>
-                        <div className="input-wrapper">
+                    <div className='input-row'>
+                      <div className='input-group full-width'>
+                        <label htmlFor={`apikey-${keyEntry.id}`}>
+                          API Key:
+                        </label>
+                        <div className='input-wrapper'>
                           <input
                             id={`apikey-${keyEntry.id}`}
-                            type={showPasswordStates[keyEntry.id] ? 'text' : 'password'}
-                            placeholder="Your Backlog API key"
+                            type={
+                              showPasswordStates[keyEntry.id]
+                                ? 'text'
+                                : 'password'
+                            }
+                            placeholder='Your Backlog API key'
                             value={keyEntry.apiKey}
-                            onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'apiKey', e.target.value)}
+                            onChange={(e) =>
+                              updateBacklogAPIKey(
+                                keyEntry.id,
+                                'apiKey',
+                                e.target.value
+                              )
+                            }
                           />
                           <button
-                            type="button"
-                            className="input-toggle-button-inside"
-                            onClick={() => setShowPasswordStates(prev => ({
-                              ...prev,
-                              [keyEntry.id]: !prev[keyEntry.id]
-                            }))}
-                            title={showPasswordStates[keyEntry.id] ? 'Hide API key' : 'Show API key'}
+                            type='button'
+                            className='input-toggle-button-inside'
+                            onClick={() =>
+                              setShowPasswordStates((prev) => ({
+                                ...prev,
+                                [keyEntry.id]: !prev[keyEntry.id],
+                              }))
+                            }
+                            title={
+                              showPasswordStates[keyEntry.id]
+                                ? 'Hide API key'
+                                : 'Show API key'
+                            }
                           >
                             {showPasswordStates[keyEntry.id] ? '🙈' : '👁️'}
                           </button>
@@ -1254,34 +1513,64 @@ const OptionsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="input-row">
-                      <div className="input-group full-width">
-                        <label htmlFor={`note-${keyEntry.id}`}>Note (optional):</label>
+                    <div className='input-row'>
+                      <div className='input-group full-width'>
+                        <label htmlFor={`note-${keyEntry.id}`}>
+                          Note (optional):
+                        </label>
                         <input
                           id={`note-${keyEntry.id}`}
-                          type="text"
-                          placeholder="Description for this configuration"
+                          type='text'
+                          placeholder='Description for this configuration'
                           value={keyEntry.note}
-                          onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'note', e.target.value)}
+                          onChange={(e) =>
+                            updateBacklogAPIKey(
+                              keyEntry.id,
+                              'note',
+                              e.target.value
+                            )
+                          }
                         />
                       </div>
                     </div>
 
-                    <div className="test-section">
+                    <div className='test-section'>
                       <button
-                        className={`test-btn ${testingStates[keyEntry.id]?.testing ? 'testing' : ''}`}
+                        className={`test-btn ${
+                          testingStates[keyEntry.id]?.testing ? 'testing' : ''
+                        }`}
                         onClick={() => testBacklogConnection(keyEntry.id)}
-                        disabled={!keyEntry.domain || !keyEntry.apiKey || testingStates[keyEntry.id]?.testing}
+                        disabled={
+                          !keyEntry.domain ||
+                          !keyEntry.apiKey ||
+                          testingStates[keyEntry.id]?.testing
+                        }
                       >
-                        {testingStates[keyEntry.id]?.testing ? 'Testing...' : 'Test Connection'}
+                        {testingStates[keyEntry.id]?.testing
+                          ? 'Testing...'
+                          : 'Test Connection'}
                       </button>
 
                       {testingStates[keyEntry.id]?.result && (
-                        <div className={`test-result ${testingStates[keyEntry.id]?.result?.success ? 'success' : 'error'}`}>
+                        <div
+                          className={`test-result ${
+                            testingStates[keyEntry.id]?.result?.success
+                              ? 'success'
+                              : 'error'
+                          }`}
+                        >
                           {testingStates[keyEntry.id]?.result?.success ? (
-                            <span>✅ Connected to namespace: <strong>{keyEntry.namespace || testingStates[keyEntry.id]?.result?.namespace}</strong></span>
+                            <span>
+                              ✅ Connected to namespace:{' '}
+                              <strong>
+                                {keyEntry.namespace ||
+                                  testingStates[keyEntry.id]?.result?.namespace}
+                              </strong>
+                            </span>
                           ) : (
-                            <span>❌ {testingStates[keyEntry.id]?.result?.error}</span>
+                            <span>
+                              ❌ {testingStates[keyEntry.id]?.result?.error}
+                            </span>
                           )}
                         </div>
                       )}
@@ -1289,7 +1578,7 @@ const OptionsPage: React.FC = () => {
                   </div>
                 ))}
 
-                <button className="add-key-btn" onClick={addBacklogAPIKey}>
+                <button className='add-key-btn' onClick={addBacklogAPIKey}>
                   + Add Another Backlog
                 </button>
               </div>
@@ -1299,54 +1588,59 @@ const OptionsPage: React.FC = () => {
 
       case 'export':
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>📤 Import/Export Data</h2>
             <p>Backup and restore your extension settings and chat history.</p>
 
             {/* Export Section */}
-            <div className="setting-group export-section">
-              <div className="group-header">
+            <div className='setting-group export-section'>
+              <div className='group-header'>
                 <h3>📤 Export Data</h3>
-                <p className="group-description">Create a backup of your extension data</p>
+                <p className='group-description'>
+                  Create a backup of your extension data
+                </p>
               </div>
 
-              <div className="setting-item">
-                <label className="setting-checkbox-label">
+              <div className='setting-item'>
+                <label className='setting-checkbox-label'>
                   <input
-                    type="checkbox"
-                    className="setting-checkbox"
+                    type='checkbox'
+                    className='setting-checkbox'
                     checked={exportConfigs}
                     onChange={(e) => setExportConfigs(e.target.checked)}
                     disabled={isExporting}
                   />
                   <span>Export configurations</span>
                 </label>
-                <div className="setting-hint">
-                  Include general settings, features, your selected AI models ({selectedModels.length} models), and Backlog API keys
+                <div className='setting-hint'>
+                  Include general settings, features, your selected AI models (
+                  {selectedModels.length} models), and Backlog API keys
                 </div>
               </div>
 
-              <div className="setting-item">
-                <label className="setting-checkbox-label">
+              <div className='setting-item'>
+                <label className='setting-checkbox-label'>
                   <input
-                    type="checkbox"
-                    className="setting-checkbox"
+                    type='checkbox'
+                    className='setting-checkbox'
                     checked={exportChatHistory}
                     onChange={(e) => setExportChatHistory(e.target.checked)}
                     disabled={isExporting}
                   />
                   <span>Export chat history</span>
                 </label>
-                <div className="setting-hint">
+                <div className='setting-hint'>
                   Include all saved chat conversations and ticket analysis
                 </div>
               </div>
 
-              <div className="setting-item">
+              <div className='setting-item'>
                 <button
-                  className="setting-button"
+                  className='setting-button'
                   onClick={handleExportData}
-                  disabled={isExporting || (!exportConfigs && !exportChatHistory)}
+                  disabled={
+                    isExporting || (!exportConfigs && !exportChatHistory)
+                  }
                 >
                   {isExporting ? 'Exporting...' : 'Export Data'}
                 </button>
@@ -1354,48 +1648,53 @@ const OptionsPage: React.FC = () => {
             </div>
 
             {/* Import Section */}
-            <div className="setting-group import-section">
-              <div className="group-header">
+            <div className='setting-group import-section'>
+              <div className='group-header'>
                 <h3>📥 Import Data</h3>
-                <p className="group-description">Import previously exported extension data</p>
+                <p className='group-description'>
+                  Import previously exported extension data
+                </p>
               </div>
 
-              <div className="setting-item">
-                <label className="setting-label">Select Import File</label>
+              <div className='setting-item'>
+                <label className='setting-label'>Select Import File</label>
                 <input
-                  type="file"
-                  accept=".json"
+                  type='file'
+                  accept='.json'
                   onChange={handleFileSelect}
                   disabled={isImporting}
-                  className="setting-input"
+                  className='setting-input'
                 />
-                <div className="setting-hint">
+                <div className='setting-hint'>
                   Select a JSON file exported from this extension
                 </div>
               </div>
 
               {importFile && (
                 <>
-                  <div className="setting-item">
-                    <div className="import-file-info">
+                  <div className='setting-item'>
+                    <div className='import-file-info'>
                       <span>Selected: {importFile.name}</span>
-                      <span className="file-size">({(importFile.size / 1024).toFixed(1)} KB)</span>
+                      <span className='file-size'>
+                        ({(importFile.size / 1024).toFixed(1)} KB)
+                      </span>
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="setting-item">
+              <div className='setting-item'>
                 <button
-                  className="setting-button setting-button-warning"
+                  className='setting-button setting-button-warning'
                   onClick={handleImportData}
                   disabled={isImporting || !importFile}
                 >
                   {isImporting ? 'Importing...' : 'Import Data'}
                 </button>
                 {importFile && (
-                  <div className="setting-hint import-warning">
-                    ⚠️ This will merge with existing data. Create a backup first!
+                  <div className='setting-hint import-warning'>
+                    ⚠️ This will merge with existing data. Create a backup
+                    first!
                   </div>
                 )}
               </div>
@@ -1405,7 +1704,7 @@ const OptionsPage: React.FC = () => {
 
       default:
         return (
-          <div className="settings-section">
+          <div className='settings-section'>
             <h2>Settings</h2>
             <p>Select a section from the sidebar to configure.</p>
           </div>
@@ -1414,30 +1713,48 @@ const OptionsPage: React.FC = () => {
   };
 
   return (
-    <div className="options-container">
-      <div className="options-header">
+    <div className='options-container'>
+      <div className='options-header'>
         <h1>Backlog AI Extension - Settings</h1>
       </div>
 
-      <div className="options-layout">
-        <div className="options-sidebar">
-          <nav className="sidebar-nav">
+      <div className='options-layout'>
+        <div className='options-sidebar'>
+          <nav className='sidebar-nav'>
             {sidebarItems.map((item) => (
               <button
                 key={item.id}
-                className={`sidebar-item ${activeSection === item.id ? 'active' : ''}`}
+                className={`sidebar-item ${
+                  activeSection === item.id ? 'active' : ''
+                }`}
                 onClick={() => handleSectionChange(item.id)}
               >
-                <span className="sidebar-icon">{item.icon}</span>
-                <span className="sidebar-label">{item.label}</span>
+                <span className='sidebar-icon'>{item.icon}</span>
+                <span className='sidebar-label'>{item.label}</span>
               </button>
             ))}
           </nav>
+          <div className='sidebar-version-info'>
+            <div className='version-line'>
+              <span className='version-label'>Version:</span>
+              <span className='version-value'>
+                v
+                {typeof __APP_VERSION__ !== 'undefined'
+                  ? __APP_VERSION__
+                  : '1.0.0'}
+              </span>
+            </div>
+            {typeof __COMMIT_ID__ !== 'undefined' &&
+              __COMMIT_ID__ !== 'unknown' && (
+                <div className='commit-line'>
+                  <span className='commit-label'>Build:</span>
+                  <span className='commit-value'>{__COMMIT_ID__}</span>
+                </div>
+              )}
+          </div>
         </div>
 
-        <div className="options-content">
-          {renderContent()}
-        </div>
+        <div className='options-content'>{renderContent()}</div>
       </div>
     </div>
   );

@@ -1,7 +1,20 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const { execSync } = require('child_process');
+
+// Get version from manifest.json
+const manifest = require('./manifest.json');
+
+// Get commit ID (short form)
+let commitId;
+try {
+  commitId = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+} catch (error) {
+  commitId = 'unknown';
+}
 
 module.exports = {
   mode: 'development',
@@ -10,7 +23,6 @@ module.exports = {
   entry: {
     content: './src/content/content.ts',
     background: './src/background/background.ts',
-    popup: './src/popup/popup.tsx',
     options: './src/options/options.tsx',
     chatbot: './src/chatbot/chatbot.tsx',
     'chatbot-aside-panel': './src/content/ChatbotAsidePanelEntry.tsx',
@@ -59,6 +71,10 @@ module.exports = {
     ]
   },
   plugins: [
+    new webpack.DefinePlugin({
+      __APP_VERSION__: JSON.stringify(manifest.version),
+      __COMMIT_ID__: JSON.stringify(commitId),
+    }),
     new MiniCssExtractPlugin({
       filename: '[name].css'
     }),
@@ -68,10 +84,7 @@ module.exports = {
           from: 'manifest.json',
           to: 'manifest.json'
         },
-        {
-          from: 'src/popup/popup.html',
-          to: 'popup.html'
-        },
+
         {
           from: 'src/options/options.html',
           to: 'options.html'

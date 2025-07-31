@@ -546,6 +546,11 @@ class BackgroundService {
       this.handleMessage(message, sender, sendResponse);
       return true; // Keep message channel open for async response
     });
+
+    // Handle extension icon click to open options page
+    chrome.action.onClicked.addListener(() => {
+      this.handleOpenOptionsPage();
+    });
   }
 
   private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {

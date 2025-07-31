@@ -14,7 +14,6 @@ module.exports = {
   entry: {
     content: './src/content/content.ts',
     background: './src/background/background.ts',
-    popup: './src/popup/popup.tsx',
     chatbot: './src/chatbot/chatbot.tsx',
     'chatbot-aside-panel': './src/content/ChatbotAsidePanelEntry.tsx',
     // SCSS entries
@@ -57,10 +56,7 @@ module.exports = {
     }),
     new CopyPlugin({
       patterns: [
-        {
-          from: 'src/popup/popup.html',
-          to: 'popup.html'
-        },
+
         {
           from: 'src/assets/icons',
           to: 'icons',

@@ -29,8 +29,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "Backlog AI Assistant"
+    "default_title": "Backlog AI Assistant - Open Settings"
   },
   "options_page": "options.html",
   "content_security_policy": {
