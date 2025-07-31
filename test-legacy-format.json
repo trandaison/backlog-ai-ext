@@ -1,0 +1,34 @@
+{
+  "exportedAt": "2025-07-31T10:30:00.000Z",
+  "extensionVersion": "1.0.0",
+  "configs": {
+    "general": {
+      "language": "en",
+      "userRole": "manager"
+    },
+    "features": {
+      "rememberChatboxSize": false,
+      "autoOpenChatbox": true,
+      "enterToSend": false
+    },
+    "aiModels": {
+      "selectedModels": ["gpt-4o", "gemini-2.5-flash"],
+      "preferredModel": "gpt-4o",
+      "encryptedApiKey": "legacy_openai_key",
+      "encryptedGeminiApiKey": "legacy_gemini_key"
+    },
+    "backlog": [
+      {
+        "id": "legacy-key-1",
+        "domain": "test.backlog.com",
+        "apiKey": "legacy_api_key_here",
+        "note": "Legacy import test",
+        "namespace": "Test Company"
+      }
+    ],
+    "sidebarWidth": 300
+  },
+  "chatData": {
+    "chat-history-legacy": "legacy_chat_data"
+  }
+}

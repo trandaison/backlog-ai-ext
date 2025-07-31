@@ -173,4 +173,39 @@ export class EncryptionService {
     const end = apiKey.substring(apiKey.length - 4);
     return `${start}...${end}`;
   }
+
+  // =====================================================================
+  // DIGITAL SIGNATURE METHODS FOR EXPORT/IMPORT SECURITY
+  // =====================================================================
+
+  /**
+   * Sign export data to ensure authenticity and integrity
+   * TEMPORARILY DISABLED - Return mock signature for now
+   */
+  static async signExportData(data: any): Promise<{ signature: string; metadata: any }> {
+    console.log('🔐 signExportData: Temporarily disabled, returning mock signature');
+
+    // Return mock signature for now
+    return {
+      signature: '',
+      metadata: {
+        extensionId: chrome.runtime.id,
+        signedAt: new Date().toISOString(),
+        version: '1.0.0',
+        unsigned: true,
+        note: 'Digital signature temporarily disabled'
+      }
+    };
+  }
+
+  /**
+   * Verify the signature of imported data
+   * TEMPORARILY DISABLED - Always return false (unsigned)
+   */
+  static async verifyImportData(data: any, signature: string, metadata: any): Promise<boolean> {
+    console.log('🔍 verifyImportData: Temporarily disabled, treating all files as unsigned');
+
+    // Always treat as unsigned for now
+    return false;
+  }
 }

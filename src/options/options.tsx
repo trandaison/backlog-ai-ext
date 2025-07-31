@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './options.scss';
 import { EncryptionService } from '../shared/encryption';
@@ -272,6 +272,14 @@ const OptionsPage: React.FC = () => {
   const [enterToSend, setEnterToSend] = useState<boolean>(true);
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(true);
 
+  // Import/Export state
+  const [exportConfigs, setExportConfigs] = useState<boolean>(true);
+  const [exportChatHistory, setExportChatHistory] = useState<boolean>(true);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null); // Cache file content
+
   // Initialize active section from URL hash
   React.useEffect(() => {
     const getInitialSection = (): SettingsSection => {
@@ -521,6 +529,265 @@ const OptionsPage: React.FC = () => {
       await chrome.storage.sync.set({ selectedModels: newSelectedModels });
     } catch (error) {
       console.error('Failed to save selected models:', error);
+    }
+  };
+
+  // Export/Import functions
+  const handleExportData = async () => {
+    if (!exportConfigs && !exportChatHistory) return;
+
+    setIsExporting(true);
+    try {
+      const exportData: any = {
+        exportedAt: new Date().toISOString(),
+        extensionVersion: "1.0.0" // Get from manifest
+      };
+
+      if (exportConfigs) {
+        // Export specific configuration data instead of all sync storage
+        const configKeys = [
+          'language', 'userRole', 'rememberChatboxSize', 'autoOpenChatbox',
+          'enterToSend', 'selectedModels', 'preferredModel', 'encryptedApiKey',
+          'encryptedGeminiApiKey', 'backlogAPIKeys'
+        ];
+        const configData = await chrome.storage.sync.get(configKeys);
+
+        // Get sidebar width from local storage
+        const localData = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+
+        // Process selected models - use current UI state for most accurate data
+        const selectedModelIds = selectedModels; // Use current UI state instead of storage
+        console.log('🔍 [Export] Selected models to export:', selectedModelIds);
+        console.log('🔍 [Export] Total selected models count:', selectedModelIds.length);
+        console.log('🔍 [Export] Storage selectedModels:', configData.selectedModels);
+
+        // Encrypt API keys in backlog data
+        const backlogData = configData.backlogAPIKeys
+          ? await Promise.all(
+              configData.backlogAPIKeys.map(async (key: any) => ({
+                id: key.id,
+                domain: key.domain,
+                apiKey: await EncryptionService.encryptApiKey(key.apiKey),
+                note: key.note,
+                namespace: key.namespace
+              }))
+            )
+          : [];
+
+        exportData.configs = {
+          general: {
+            language: configData.language,
+            userRole: configData.userRole
+          },
+          features: {
+            rememberChatboxSize: configData.rememberChatboxSize,
+            autoOpenChatbox: configData.autoOpenChatbox,
+            enterToSend: configData.enterToSend
+          },
+          aiModels: {
+            selectedModels: selectedModelIds, // Export as ID array only
+            preferredModel: configData.preferredModel,
+            encryptedApiKey: configData.encryptedApiKey,
+            encryptedGeminiApiKey: configData.encryptedGeminiApiKey
+          },
+          backlog: backlogData,
+          sidebarWidth: localData['ai-ext-sidebar-width']
+        };
+      }
+
+      if (exportChatHistory) {
+        // Export chat history from local storage, excluding sidebar width
+        const chatData = await chrome.storage.local.get();
+        const { 'ai-ext-sidebar-width': _, ...filteredChatData } = chatData;
+        exportData.chatData = filteredChatData;
+      }
+
+      // Clean undefined values
+      const cleanedData = JSON.parse(JSON.stringify(exportData, (key, value) =>
+        value === undefined ? null : value
+      ));
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.getFullYear().toString() +
+        (now.getMonth() + 1).toString().padStart(2, '0') +
+        now.getDate().toString().padStart(2, '0') + '_' +
+        now.getHours().toString().padStart(2, '0') +
+        now.getMinutes().toString().padStart(2, '0');
+
+      const filename = `backlog-ai-ext_data_v1.0.0_${timestamp}.json`;
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log('Data exported successfully:', filename);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || file.type !== 'application/json') {
+      alert('Please select a valid JSON file');
+      setImportFile(null);
+      setFileContent(null);
+      return;
+    }
+
+    setImportFile(file);
+
+    // Cache file content for import
+    try {
+      const text = await file.text();
+      setFileContent(text); // Cache the content
+      console.log('📄 [Import] File loaded successfully');
+    } catch (error) {
+      console.error('❌ [Import] File reading error:', error);
+      setFileContent(null);
+    }
+  };
+
+  const handleImportData = async () => {
+    if (!importFile || !fileContent) return;
+
+    const confirmed = confirm(
+      'Import will merge data with existing settings. This action may overwrite current configurations. Continue?'
+    );
+    if (!confirmed) return;
+
+    setIsImporting(true);
+    let backup: any = null;
+
+    try {
+      // Create backup of current data
+      backup = {
+        sync: await chrome.storage.sync.get(),
+        local: await chrome.storage.local.get()
+      };
+
+      // Use cached file content instead of reading again
+      const importData = JSON.parse(fileContent);
+
+      // Validate import data structure
+      if (!importData.exportedAt || !importData.extensionVersion) {
+        throw new Error('Invalid import file format');
+      }
+
+      // Import configurations if present
+      if (importData.configs) {
+        const { configs } = importData;
+        const syncData: any = {};
+        const localData: any = {};
+
+        // Merge general settings
+        if (configs.general) {
+          if (configs.general.language) syncData.language = configs.general.language;
+          if (configs.general.userRole) syncData.userRole = configs.general.userRole;
+        }
+
+        // Merge feature settings
+        if (configs.features) {
+          if (configs.features.rememberChatboxSize !== undefined)
+            syncData.rememberChatboxSize = configs.features.rememberChatboxSize;
+          if (configs.features.autoOpenChatbox !== undefined)
+            syncData.autoOpenChatbox = configs.features.autoOpenChatbox;
+          if (configs.features.enterToSend !== undefined)
+            syncData.enterToSend = configs.features.enterToSend;
+        }
+
+        // Merge AI model settings
+        if (configs.aiModels) {
+          // selectedModels is now already an array of IDs
+          if (configs.aiModels.selectedModels) {
+            syncData.selectedModels = configs.aiModels.selectedModels;
+          }
+          if (configs.aiModels.preferredModel)
+            syncData.preferredModel = configs.aiModels.preferredModel;
+          if (configs.aiModels.encryptedApiKey)
+            syncData.encryptedApiKey = configs.aiModels.encryptedApiKey;
+          if (configs.aiModels.encryptedGeminiApiKey)
+            syncData.encryptedGeminiApiKey = configs.aiModels.encryptedGeminiApiKey;
+        }
+
+        // Merge Backlog settings - decrypt API keys
+        if (configs.backlog && Array.isArray(configs.backlog)) {
+          const decryptedBacklogKeys = await Promise.all(
+            configs.backlog.map(async (key: any) => ({
+              ...key,
+              apiKey: await EncryptionService.decryptApiKey(key.apiKey)
+            }))
+          );
+          syncData.backlogAPIKeys = decryptedBacklogKeys;
+        }
+
+        // Merge sidebar width
+        if (configs.sidebarWidth !== undefined) {
+          localData['ai-ext-sidebar-width'] = configs.sidebarWidth;
+        }
+
+        // Save to storage
+        if (Object.keys(syncData).length > 0) {
+          await chrome.storage.sync.set(syncData);
+        }
+        if (Object.keys(localData).length > 0) {
+          await chrome.storage.local.set(localData);
+        }
+      }
+
+      // Import chat history if present
+      if (importData.chatData) {
+        await chrome.storage.local.set(importData.chatData);
+      }
+
+      alert('Import completed successfully! Please refresh the page to see changes.');
+
+      // Reset import state
+      setImportFile(null);
+      setFileContent(null);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+
+    } catch (error) {
+      console.error('Import failed:', error);
+
+      // Restore backup if import failed
+      if (backup) {
+        try {
+          await chrome.storage.sync.clear();
+          await chrome.storage.local.clear();
+          await chrome.storage.sync.set(backup.sync);
+          await chrome.storage.local.set(backup.local);
+          alert('Import failed and data has been restored to previous state.');
+        } catch (restoreError) {
+          console.error('Failed to restore backup:', restoreError);
+          alert('Import failed and backup restoration also failed. Please reload the extension.');
+        }
+      } else {
+        alert('Import failed: ' + (error as Error).message);
+      }
+
+      // Reset state on error
+      setImportFile(null);
+      setFileContent(null);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -1033,19 +1300,104 @@ const OptionsPage: React.FC = () => {
       case 'export':
         return (
           <div className="settings-section">
-            <h2>Export Data</h2>
-            <p>Export your settings and chat history.</p>
+            <h2>📤 Import/Export Data</h2>
+            <p>Backup and restore your extension settings and chat history.</p>
 
-            <div className="setting-group">
+            {/* Export Section */}
+            <div className="setting-group export-section">
               <div className="group-header">
-                <h3>📤 Export Options</h3>
-                <p className="group-description">Export your extension data</p>
+                <h3>📤 Export Data</h3>
+                <p className="group-description">Create a backup of your extension data</p>
               </div>
+
               <div className="setting-item">
-                <button className="setting-button">Export Settings</button>
+                <label className="setting-checkbox-label">
+                  <input
+                    type="checkbox"
+                    className="setting-checkbox"
+                    checked={exportConfigs}
+                    onChange={(e) => setExportConfigs(e.target.checked)}
+                    disabled={isExporting}
+                  />
+                  <span>Export configurations</span>
+                </label>
+                <div className="setting-hint">
+                  Include general settings, features, your selected AI models ({selectedModels.length} models), and Backlog API keys
+                </div>
               </div>
+
               <div className="setting-item">
-                <button className="setting-button">Export Chat History</button>
+                <label className="setting-checkbox-label">
+                  <input
+                    type="checkbox"
+                    className="setting-checkbox"
+                    checked={exportChatHistory}
+                    onChange={(e) => setExportChatHistory(e.target.checked)}
+                    disabled={isExporting}
+                  />
+                  <span>Export chat history</span>
+                </label>
+                <div className="setting-hint">
+                  Include all saved chat conversations and ticket analysis
+                </div>
+              </div>
+
+              <div className="setting-item">
+                <button
+                  className="setting-button"
+                  onClick={handleExportData}
+                  disabled={isExporting || (!exportConfigs && !exportChatHistory)}
+                >
+                  {isExporting ? 'Exporting...' : 'Export Data'}
+                </button>
+              </div>
+            </div>
+
+            {/* Import Section */}
+            <div className="setting-group import-section">
+              <div className="group-header">
+                <h3>📥 Import Data</h3>
+                <p className="group-description">Import previously exported extension data</p>
+              </div>
+
+              <div className="setting-item">
+                <label className="setting-label">Select Import File</label>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileSelect}
+                  disabled={isImporting}
+                  className="setting-input"
+                />
+                <div className="setting-hint">
+                  Select a JSON file exported from this extension
+                </div>
+              </div>
+
+              {importFile && (
+                <>
+                  <div className="setting-item">
+                    <div className="import-file-info">
+                      <span>Selected: {importFile.name}</span>
+                      <span className="file-size">({(importFile.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="setting-item">
+                <button
+                  className="setting-button setting-button-warning"
+                  onClick={handleImportData}
+                  disabled={isImporting || !importFile}
+                >
+                  {isImporting ? 'Importing...' : 'Import Data'}
+                </button>
+                {importFile && (
+                  <div className="setting-hint import-warning">
+                    ⚠️ This will merge with existing data. Create a backup first!
+                  </div>
+                )}
               </div>
             </div>
           </div>

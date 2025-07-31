@@ -33,6 +33,9 @@
     "default_title": "Backlog AI Assistant"
   },
   "options_page": "options.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

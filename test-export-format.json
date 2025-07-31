@@ -1,0 +1,43 @@
+{
+  "exportedAt": "2025-07-31T10:30:00.000Z",
+  "extensionVersion": "1.0.0",
+  "configs": {
+    "general": {
+      "language": "vi",
+      "userRole": "developer"
+    },
+    "features": {
+      "rememberChatboxSize": true,
+      "autoOpenChatbox": false,
+      "enterToSend": true
+    },
+    "aiModels": {
+      "selectedModels": ["gpt-4o", "gemini-2.5-pro", "o3-mini"],
+      "preferredModel": "gpt-4o",
+      "encryptedApiKey": "encrypted_openai_key_here",
+      "encryptedGeminiApiKey": "encrypted_gemini_key_here"
+    },
+    "backlog": [
+      {
+        "id": "key-1",
+        "domain": "company.backlog.com",
+        "apiKey": "encrypted_api_key_here",
+        "note": "Production environment",
+        "namespace": "Company"
+      }
+    ],
+    "sidebarWidth": 400
+  },
+  "chatData": {
+    "chat-history-ticket-123": "encrypted_chat_data",
+    "chat-preferences": "user_preferences"
+  },
+  "signature": {
+    "value": "MEUCIQDExample_signature_base64_encoded_here_would_be_much_longer_in_real_scenario",
+    "metadata": {
+      "extensionId": "example-extension-id",
+      "signedAt": "2025-07-31T10:30:00.000Z",
+      "version": "1.0.0"
+    }
+  }
+}

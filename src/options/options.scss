@@ -989,3 +989,163 @@ body {
     }
   }
 }
+
+// =====================================================================
+// EXPORT/IMPORT STYLES
+// =====================================================================
+
+// Section separation with better visual distinction
+.export-section, .import-section {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  .group-header {
+    margin-bottom: 20px;
+
+    h3 {
+      color: #2c3e50;
+      margin-bottom: 8px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .group-description {
+      color: #6c757d;
+      font-size: 14px;
+      margin: 0;
+      font-style: italic;
+    }
+  }
+}
+
+// Export section specific styling
+.export-section {
+  border-left: 4px solid #28a745;
+
+  .group-header h3 {
+    color: #28a745;
+  }
+}
+
+// Import section specific styling
+.import-section {
+  border-left: 4px solid #007bff;
+  border-top: 3px solid #dee2e6;
+  margin-top: 40px;
+
+  .group-header h3 {
+    color: #007bff;
+  }
+}
+
+// File info display
+.import-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  font-size: 14px;
+
+  .file-size {
+    color: #6c757d;
+    font-size: 12px;
+  }
+}
+
+// Signature status indicators
+.signature-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+
+  .status-icon {
+    font-size: 16px;
+    min-width: 20px;
+  }
+
+  &.signature-valid {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  &.signature-invalid {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  &.signature-missing {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+  }
+
+  &.signature-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  &.signature-unknown {
+    background-color: #e2e3e5;
+    color: #495057;
+    border: 1px solid #ced4da;
+  }
+}
+
+// Warning styles
+.import-warning {
+  color: #856404;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+// Button variants
+.setting-button-warning {
+  background-color: #ffc107;
+  color: #212529;
+
+  &:hover:not(:disabled) {
+    background-color: #e0a800;
+  }
+
+  &:disabled {
+    background-color: #6c757d;
+    color: #fff;
+  }
+}
+
+// File input styling
+input[type="file"] {
+  &.setting-input {
+    padding: 8px;
+    border: 2px dashed #ced4da;
+    background-color: #f8f9fa;
+
+    &:hover {
+      border-color: #007bff;
+      background-color: #e3f2fd;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
