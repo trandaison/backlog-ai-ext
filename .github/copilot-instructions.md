@@ -46,6 +46,11 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
 - Cache ticket data appropriately
 - Optimize DOM manipulation in content scripts
 
+### Git Workflow:
+- **DO NOT automatically commit changes** - Always let the user review and commit manually
+- Only build and test automatically, but wait for user's explicit commit instruction
+- User prefers to control git commits themselves for better change management
+
 ### Testing:
 - Test on multiple Backlog domains and page types
 - Verify extension permissions and security

@@ -168,6 +168,25 @@ class BacklogAIInjector {
     if (this.isTicketPage()) {
       this.injectChatbotAsidePanel();
       this.analyzeTicket();
+
+      // Check if auto-open feature is enabled
+      this.checkAutoOpenFeature();
+    }
+  }
+
+  private async checkAutoOpenFeature() {
+    try {
+      const result = await chrome.storage.sync.get(['autoOpenChatbox']);
+      const autoOpenEnabled = result.autoOpenChatbox || false;
+
+      if (autoOpenEnabled && !this.isChatbotOpen) {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          this.openChatbotPanel();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Failed to check auto-open feature:', error);
     }
   }
 
@@ -365,11 +384,17 @@ class BacklogAIInjector {
     return new Promise(async (resolve, reject) => {
       const messageId = Date.now() + Math.random();
 
-      // Load saved width before creating component
+      // Load saved width before creating component (if feature is enabled)
       let savedWidth = null;
       try {
-        const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
-        savedWidth = result['ai-ext-sidebar-width'];
+        // Check if remember chatbox size feature is enabled
+        const featureResult = await chrome.storage.sync.get(['rememberChatboxSize']);
+        const rememberSizeEnabled = featureResult.rememberChatboxSize !== undefined ? featureResult.rememberChatboxSize : true;
+
+        if (rememberSizeEnabled) {
+          const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+          savedWidth = result['ai-ext-sidebar-width'];
+        }
       } catch (error) {
         console.log('❌ [ContentScript] Could not load saved width:', error);
       }
@@ -839,10 +864,19 @@ class BacklogAIInjector {
   private async handleSaveWidth(width: number): Promise<void> {
     try {
       console.log('💾 [Content] Saving width to storage:', width);
-      await chrome.storage.local.set({ 'ai-ext-sidebar-width': width });
-      console.log('✅ [Content] Width saved successfully');
 
-      // Also update width immediately
+      // Check if remember chatbox size feature is enabled
+      const featureResult = await chrome.storage.sync.get(['rememberChatboxSize']);
+      const rememberSizeEnabled = featureResult.rememberChatboxSize !== undefined ? featureResult.rememberChatboxSize : true;
+
+      if (rememberSizeEnabled) {
+        await chrome.storage.local.set({ 'ai-ext-sidebar-width': width });
+        console.log('✅ [Content] Width saved successfully');
+      } else {
+        console.log('📝 [Content] Width saving disabled by user setting');
+      }
+
+      // Always update width immediately regardless of save preference
       this.handleSidebarWidthChange(width);
 
       // Broadcast width change to other tabs

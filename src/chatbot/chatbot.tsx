@@ -442,6 +442,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
   const [backlogSettings, setBacklogSettings] = useState<BacklogMultiSettings>({
     configs: []
   });
+  const [enterToSend, setEnterToSend] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -455,6 +456,19 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
   useEffect(() => {
     loadBacklogSettings();
   }, []);
+
+  useEffect(() => {
+    loadEnterToSendSetting();
+  }, []);
+
+  const loadEnterToSendSetting = async () => {
+    try {
+      const result = await chrome.storage.sync.get(['enterToSend']);
+      setEnterToSend(result.enterToSend !== undefined ? result.enterToSend : true);
+    } catch (error) {
+      console.error('Error loading enterToSend setting:', error);
+    }
+  };
 
   const loadBacklogSettings = async () => {
     try {
@@ -497,7 +511,11 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (enterToSend && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    } else if (!enterToSend && e.key === 'Enter' && e.ctrlKey) {
+      // Allow Ctrl+Enter to send when enterToSend is disabled
       e.preventDefault();
       handleSend();
     }
@@ -699,7 +717,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Hỏi gì đó về ticket này..."
+            placeholder={enterToSend ? "Hỏi gì đó về ticket này... (Enter để gửi)" : "Hỏi gì đó về ticket này... (Ctrl+Enter để gửi)"}
             style={{
               flex: 1,
               padding: '8px 12px',

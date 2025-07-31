@@ -245,9 +245,9 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
 };
 
 const sidebarItems: SidebarItem[] = [
-  { id: 'general', label: 'General', icon: '⚙️' },
-  { id: 'features', label: 'Features', icon: '🎯' },
-  { id: 'ai-keys', label: 'AI & Models', icon: '🔧' },
+    { id: 'general', label: 'General Settings', icon: '⚙️' },
+  { id: 'features', label: 'Features', icon: '✨' },
+  { id: 'ai-keys', label: 'AI & Models', icon: '🤖' },
   { id: 'backlog-keys', label: 'Backlog API Keys', icon: '🔑' },
   { id: 'export', label: 'Export Data', icon: '📤' }
 ];
@@ -265,6 +265,12 @@ const OptionsPage: React.FC = () => {
   const [language, setLanguage] = useState<string>('vi');
   const [userRole, setUserRole] = useState<string>('developer');
   const [isLoadingGeneral, setIsLoadingGeneral] = useState(true);
+
+  // Feature settings state
+  const [rememberChatboxSize, setRememberChatboxSize] = useState<boolean>(true);
+  const [autoOpenChatbox, setAutoOpenChatbox] = useState<boolean>(false);
+  const [enterToSend, setEnterToSend] = useState<boolean>(true);
+  const [isLoadingFeatures, setIsLoadingFeatures] = useState(true);
 
   // Initialize active section from URL hash
   React.useEffect(() => {
@@ -355,6 +361,26 @@ const OptionsPage: React.FC = () => {
     };
 
     loadGeneralSettings();
+  }, []);
+
+  // Load feature settings từ storage
+  React.useEffect(() => {
+    const loadFeatureSettings = async () => {
+      setIsLoadingFeatures(true);
+      try {
+        const result = await chrome.storage.sync.get(['rememberChatboxSize', 'autoOpenChatbox', 'enterToSend']);
+
+        setRememberChatboxSize(result.rememberChatboxSize !== undefined ? result.rememberChatboxSize : true);
+        setAutoOpenChatbox(result.autoOpenChatbox !== undefined ? result.autoOpenChatbox : false);
+        setEnterToSend(result.enterToSend !== undefined ? result.enterToSend : true);
+      } catch (error) {
+        console.error('Failed to load feature settings:', error);
+      } finally {
+        setIsLoadingFeatures(false);
+      }
+    };
+
+    loadFeatureSettings();
   }, []);
 
   // Load Backlog API keys từ storage
@@ -453,6 +479,34 @@ const OptionsPage: React.FC = () => {
       await chrome.storage.sync.set({ userRole: newRole });
     } catch (error) {
       console.error('Failed to save user role:', error);
+    }
+  };
+
+  // Feature handlers
+  const handleRememberChatboxSizeChange = async (enabled: boolean) => {
+    setRememberChatboxSize(enabled);
+    try {
+      await chrome.storage.sync.set({ rememberChatboxSize: enabled });
+    } catch (error) {
+      console.error('Failed to save rememberChatboxSize setting:', error);
+    }
+  };
+
+  const handleAutoOpenChatboxChange = async (enabled: boolean) => {
+    setAutoOpenChatbox(enabled);
+    try {
+      await chrome.storage.sync.set({ autoOpenChatbox: enabled });
+    } catch (error) {
+      console.error('Failed to save autoOpenChatbox setting:', error);
+    }
+  };
+
+  const handleEnterToSendChange = async (enabled: boolean) => {
+    setEnterToSend(enabled);
+    try {
+      await chrome.storage.sync.set({ enterToSend: enabled });
+    } catch (error) {
+      console.error('Failed to save enterToSend setting:', error);
     }
   };
 
@@ -653,25 +707,54 @@ const OptionsPage: React.FC = () => {
       case 'features':
         return (
           <div className="settings-section">
-            <h2>Features</h2>
-            <p>Enable or disable specific extension features.</p>
+            <h2>✨ Features</h2>
+            <p>Enable or disable specific extension features to customize your experience.</p>
 
-            <div className="setting-group">
-              <div className="group-header">
-                <h3>🎯 AI Features</h3>
-                <p className="group-description">Control AI-powered functionality</p>
+            <div className="setting-item">
+              <label className="setting-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="setting-checkbox"
+                  checked={rememberChatboxSize}
+                  onChange={(e) => handleRememberChatboxSizeChange(e.target.checked)}
+                  disabled={isLoadingFeatures}
+                />
+                <span>Remember chatbox size</span>
+              </label>
+              <div className="setting-hint">
+                Automatically save and restore the chatbox dimensions when you resize it
               </div>
-              <div className="setting-item">
-                <label className="setting-checkbox-label">
-                  <input type="checkbox" className="setting-checkbox" defaultChecked />
-                  <span>Auto-analyze tickets when opened</span>
-                </label>
+            </div>
+
+            <div className="setting-item">
+              <label className="setting-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="setting-checkbox"
+                  checked={autoOpenChatbox}
+                  onChange={(e) => handleAutoOpenChatboxChange(e.target.checked)}
+                  disabled={isLoadingFeatures}
+                />
+                <span>Auto-open chatbox on Backlog tickets</span>
+              </label>
+              <div className="setting-hint">
+                Automatically show the AI chatbox when opening a Backlog ticket page
               </div>
-              <div className="setting-item">
-                <label className="setting-checkbox-label">
-                  <input type="checkbox" className="setting-checkbox" defaultChecked />
-                  <span>Show AI suggestions in chat</span>
-                </label>
+            </div>
+
+            <div className="setting-item">
+              <label className="setting-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="setting-checkbox"
+                  checked={enterToSend}
+                  onChange={(e) => handleEnterToSendChange(e.target.checked)}
+                  disabled={isLoadingFeatures}
+                />
+                <span>Press Enter to send messages</span>
+              </label>
+              <div className="setting-hint">
+                Send messages by pressing Enter key (Shift+Enter for new line)
               </div>
             </div>
           </div>
