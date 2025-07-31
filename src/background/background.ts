@@ -602,6 +602,11 @@ class BackgroundService {
           sendResponse(currentUser);
           break;
 
+        case 'openOptionsPage':
+          this.handleOpenOptionsPage();
+          sendResponse({ success: true });
+          break;
+
         default:
           sendResponse({ error: 'Unknown action' });
       }
@@ -1584,6 +1589,19 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 
     } catch (error) {
       console.error('❌ [Background] Error syncing sidebar width:', error);
+    }
+  }
+
+  private handleOpenOptionsPage(): void {
+    try {
+      // Open options page in a new tab
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('options.html'),
+        active: true
+      });
+      console.log('✅ [Background] Options page opened successfully');
+    } catch (error) {
+      console.error('❌ [Background] Error opening options page:', error);
     }
   }
 }

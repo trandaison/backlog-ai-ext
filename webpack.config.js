@@ -9,6 +9,7 @@ module.exports = {
     content: './src/content/content.ts',
     background: './src/background/background.ts',
     popup: './src/popup/popup.tsx',
+    options: './src/options/options.tsx',
     chatbot: './src/chatbot/chatbot.tsx',
     'chatbot-aside-panel': './src/content/ChatbotAsidePanelEntry.tsx',
     // SCSS entries
@@ -55,6 +56,10 @@ module.exports = {
         {
           from: 'src/popup/popup.html',
           to: 'popup.html'
+        },
+        {
+          from: 'src/options/options.html',
+          to: 'options.html'
         },
         {
           from: 'src/assets/icons',

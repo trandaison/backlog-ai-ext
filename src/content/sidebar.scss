@@ -245,19 +245,34 @@ body.ai-ext-sidebar-open {
   }
 }
 
+.ai-ext-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-ext-root .ai-ext-options-button,
 .ai-ext-root .ai-ext-close-button {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
   color: #666;
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: 4px;
   @include transition(background-color, 0.2s);
 
   &:hover {
     background-color: #e9ecef;
   }
+}
+
+.ai-ext-root .ai-ext-options-button {
+  font-size: 16px;
+}
+
+.ai-ext-root .ai-ext-close-button {
+  font-size: 20px;
 }
 
 // Ticket Info Section

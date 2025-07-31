@@ -442,6 +442,10 @@ class BacklogAIInjector {
           this.handleSaveWidth(event.data.width);
           break;
 
+        case 'OPEN_OPTIONS_PAGE':
+          this.handleOpenOptionsPage();
+          break;
+
         case 'REQUEST_TICKET_DATA':
           this.handleTicketDataRequest(event.data.id);
           break;
@@ -850,6 +854,19 @@ class BacklogAIInjector {
       });
     } catch (error) {
       console.error('❌ [Content] Could not save width:', error);
+    }
+  }
+
+  private handleOpenOptionsPage(): void {
+    try {
+      // Send message to background script to open options page
+      chrome.runtime.sendMessage({
+        action: 'openOptionsPage'
+      }).catch((error) => {
+        console.error('❌ [Content] Error sending openOptionsPage message:', error);
+      });
+    } catch (error) {
+      console.error('❌ [Content] Error handling open options page:', error);
     }
   }
 }

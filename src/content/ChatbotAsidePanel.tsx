@@ -627,6 +627,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     return title.substring(0, 50) + '...';
   };
 
+  // Function to open options page
+  const handleOpenOptions = () => {
+    // Send message to content script to open options page
+    window.postMessage({
+      type: 'OPEN_OPTIONS_PAGE'
+    }, '*');
+  };
+
   return (
     <div className="ai-ext-aside-content" ref={sidebarRef}>
       {/* Resize Handle */}
@@ -641,13 +649,22 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           <img src={aiIcon} alt="AI Icon" className="ai-ext-icon" />
           Backlog AI Assistant
         </h3>
-        <button
-          className="ai-ext-close-button"
-          onClick={onClose}
-          title="Đóng chatbot"
-        >
-          ✕
-        </button>
+        <div className="ai-ext-header-controls">
+          <button
+            className="ai-ext-options-button"
+            onClick={handleOpenOptions}
+            title="Mở trang cài đặt"
+          >
+            ⚙️
+          </button>
+          <button
+            className="ai-ext-close-button"
+            onClick={onClose}
+            title="Đóng chatbot"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Storage warning banner */}
