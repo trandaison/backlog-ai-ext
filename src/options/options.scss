@@ -3,6 +3,7 @@ body {
   margin: 0;
   padding: 0;
   background-color: #f5f5f5;
+  overflow: hidden scroll; // Prevent width jumping when switching tabs
 }
 
 .options-container {
@@ -96,6 +97,34 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 0;
   overflow: hidden;
+  animation: contentFadeIn 300ms ease-out;
+  transform-origin: center;
+
+  &.content-transition {
+    animation: contentTransition 300ms ease-out;
+  }
+}
+
+@keyframes contentFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes contentTransition {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .settings-section {
@@ -734,5 +763,227 @@ body {
   &:disabled {
     background: #ccc;
     cursor: not-allowed;
+  }
+}
+
+// Backlog API Keys styles
+.backlog-keys-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  .loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+  }
+
+  .backlog-key-entry {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s ease;
+
+    &:hover {
+      border-color: #007acc;
+    }
+
+    .entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+
+      h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #333;
+      }
+
+      .remove-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: #c82333;
+          transform: scale(1.1);
+        }
+      }
+    }
+
+    .input-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+
+      .input-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        &.full-width {
+          flex: 1 1 100%;
+        }
+
+        label {
+          font-size: 14px;
+          font-weight: 500;
+          color: #333;
+        }
+
+        input {
+          padding: 10px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: white;
+          color: #333;
+          font-size: 14px;
+          transition: border-color 0.2s ease;
+
+          &:focus {
+            outline: none;
+            border-color: #007acc;
+          }
+
+          &::placeholder {
+            color: #999;
+          }
+        }
+
+        .input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+
+          input {
+            flex: 1;
+            padding-right: 40px; // Make space for toggle button
+          }
+
+          .input-toggle-button-inside {
+            position: absolute;
+            right: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+
+            &:hover {
+              background: rgba(0, 0, 0, 0.05);
+            }
+
+            &:focus {
+              outline: 2px solid #007acc;
+              outline-offset: 2px;
+            }
+          }
+        }
+      }
+    }
+
+    .test-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      .test-btn {
+        background: #007acc;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        align-self: flex-start;
+
+        &:hover:not(:disabled) {
+          background: #005a99;
+          transform: translateY(-1px);
+        }
+
+        &:disabled {
+          background: #999;
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
+        &.testing {
+          background: #ffc107;
+          color: #212529;
+          cursor: not-allowed;
+        }
+      }
+
+      .test-result {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+
+        &.success {
+          background: #d4edda;
+          color: #155724;
+          border: 1px solid #c3e6cb;
+        }
+
+        &.error {
+          background: #f8d7da;
+          color: #721c24;
+          border: 1px solid #f5c6cb;
+        }
+      }
+    }
+  }
+
+  .add-key-btn {
+    background: #f8f9fa;
+    border: 2px dashed #ddd;
+    border-radius: 12px;
+    padding: 20px;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: #007acc;
+      color: #007acc;
+      background: rgba(0, 122, 204, 0.05);
+    }
+  }
+}
+
+// Responsive design for mobile
+@media (max-width: 768px) {
+  .backlog-keys-container {
+    .backlog-key-entry {
+      .input-row {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
   }
 }

@@ -19,6 +19,14 @@ interface ModelInfo {
   provider: 'openai' | 'gemini';
 }
 
+interface BacklogAPIKey {
+  id: string;
+  domain: string;
+  apiKey: string;
+  note: string;
+  namespace?: string; // Will be populated after successful test
+}
+
 const availableModels: ModelInfo[] = [
   // OpenAI Models (Latest 2025)
   { id: 'o3', name: 'o3', description: 'Our most powerful reasoning model', provider: 'openai' },
@@ -239,7 +247,7 @@ const APIKeyInput: React.FC<APIKeyInputProps> = ({ label, placeholder, hint, pro
 const sidebarItems: SidebarItem[] = [
   { id: 'general', label: 'General', icon: '⚙️' },
   { id: 'features', label: 'Features', icon: '🎯' },
-  { id: 'ai-keys', label: 'AI Provider Settings', icon: '🔧' },
+  { id: 'ai-keys', label: 'AI & Models', icon: '🔧' },
   { id: 'backlog-keys', label: 'Backlog API Keys', icon: '🔑' },
   { id: 'export', label: 'Export Data', icon: '📤' }
 ];
@@ -250,6 +258,10 @@ const OptionsPage: React.FC = () => {
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [preferredModel, setPreferredModel] = useState<string>('gpt-4.1-mini');
+  const [backlogAPIKeys, setBacklogAPIKeys] = useState<BacklogAPIKey[]>([]);
+  const [isLoadingBacklogKeys, setIsLoadingBacklogKeys] = useState(true);
+  const [testingStates, setTestingStates] = useState<Record<string, { testing: boolean; result?: { success: boolean; namespace?: string; error?: string } }>>({});
+  const [showPasswordStates, setShowPasswordStates] = useState<Record<string, boolean>>({});
 
   // Initialize active section from URL hash
   React.useEffect(() => {
@@ -323,11 +335,73 @@ const OptionsPage: React.FC = () => {
     loadSelectedModels();
   }, []);
 
+  // Load Backlog API keys từ storage
+  React.useEffect(() => {
+    const loadBacklogAPIKeys = async () => {
+      try {
+        const result = await chrome.storage.sync.get(['backlogAPIKeys', 'backlogDomain', 'backlogAPIKey']);
+        
+        // Migration từ popup settings cũ
+        let keys: BacklogAPIKey[] = [];
+        
+        if (result.backlogAPIKeys) {
+          // Nếu đã có format mới
+          keys = result.backlogAPIKeys;
+        } else if (result.backlogDomain && result.backlogAPIKey) {
+          // Migration từ format cũ
+          keys = [{
+            id: 'migrated-' + Date.now(),
+            domain: result.backlogDomain,
+            apiKey: result.backlogAPIKey,
+            note: 'Migrated from popup settings'
+          }];
+          
+          // Save format mới và xóa keys cũ
+          await chrome.storage.sync.set({ backlogAPIKeys: keys });
+          await chrome.storage.sync.remove(['backlogDomain', 'backlogAPIKey']);
+        }
+        
+        // Nếu không có keys nào, tạo một entry trống
+        if (keys.length === 0) {
+          keys = [{
+            id: 'default-' + Date.now(),
+            domain: '',
+            apiKey: '',
+            note: ''
+          }];
+        }
+        
+        setBacklogAPIKeys(keys);
+        
+        // Initialize password visibility states for all keys
+        const initialShowStates: Record<string, boolean> = {};
+        keys.forEach(key => {
+          initialShowStates[key.id] = false;
+        });
+        setShowPasswordStates(initialShowStates);
+      } catch (error) {
+        console.error('Failed to load Backlog API keys:', error);
+      } finally {
+        setIsLoadingBacklogKeys(false);
+      }
+    };
+
+    loadBacklogAPIKeys();
+  }, []);
+
   const handleProviderChange = async (provider: 'openai' | 'gemini') => {
     // This function is no longer needed, but keeping for compatibility
   };
 
   const handleSectionChange = (section: SettingsSection) => {
+    // Add animation class to trigger re-animation
+    const contentElement = document.querySelector('.options-content') as HTMLElement;
+    if (contentElement) {
+      contentElement.classList.remove('content-transition');
+      void contentElement.offsetWidth; // Force reflow
+      contentElement.classList.add('content-transition');
+    }
+    
     setActiveSection(section);
     // Update URL hash without page reload
     window.history.pushState(null, '', `#${section}`);
@@ -353,6 +427,138 @@ const OptionsPage: React.FC = () => {
       await chrome.storage.sync.set({ selectedModels: newSelectedModels });
     } catch (error) {
       console.error('Failed to save selected models:', error);
+    }
+  };
+
+  const addBacklogAPIKey = () => {
+    const newKey: BacklogAPIKey = {
+      id: 'key-' + Date.now(),
+      domain: '',
+      apiKey: '',
+      note: ''
+    };
+    
+    setBacklogAPIKeys([...backlogAPIKeys, newKey]);
+    // Initialize password visibility state for new entry
+    setShowPasswordStates(prev => ({
+      ...prev,
+      [newKey.id]: false
+    }));
+  };
+
+  const removeBacklogAPIKey = async (id: string) => {
+    const updatedKeys = backlogAPIKeys.filter(key => key.id !== id);
+    setBacklogAPIKeys(updatedKeys);
+    
+    // Remove password visibility state for deleted entry
+    setShowPasswordStates(prev => {
+      const newStates = { ...prev };
+      delete newStates[id];
+      return newStates;
+    });
+    
+    try {
+      await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+    } catch (error) {
+      console.error('Failed to save Backlog API keys:', error);
+    }
+  };
+
+  const updateBacklogAPIKey = async (id: string, field: keyof BacklogAPIKey, value: string) => {
+    const updatedKeys = backlogAPIKeys.map(key => 
+      key.id === id ? { ...key, [field]: value } : key
+    );
+    
+    setBacklogAPIKeys(updatedKeys);
+    
+    try {
+      await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+    } catch (error) {
+      console.error('Failed to save Backlog API keys:', error);
+    }
+  };
+
+  const normalizeDomain = (domain: string): string => {
+    if (!domain.trim()) return '';
+    
+    let normalized = domain.trim();
+    
+    // Remove protocol (http:// or https://)
+    normalized = normalized.replace(/^https?:\/\//, '');
+    
+    // Remove trailing slash
+    normalized = normalized.replace(/\/$/, '');
+    
+    // Remove any path (everything after the domain)
+    const domainOnly = normalized.split('/')[0];
+    
+    return domainOnly;
+  };
+
+  const handleDomainBlur = async (id: string, currentValue: string) => {
+    const normalizedDomain = normalizeDomain(currentValue);
+    
+    if (normalizedDomain !== currentValue) {
+      await updateBacklogAPIKey(id, 'domain', normalizedDomain);
+    }
+  };
+
+  const testBacklogConnection = async (id: string) => {
+    const keyEntry = backlogAPIKeys.find(key => key.id === id);
+    if (!keyEntry || !keyEntry.domain || !keyEntry.apiKey) {
+      return;
+    }
+
+    setTestingStates(prev => ({
+      ...prev,
+      [id]: { testing: true }
+    }));
+
+    try {
+      // Use background service to test connection
+      const response = await chrome.runtime.sendMessage({
+        action: 'testBacklogConnection',
+        data: {
+          id: keyEntry.id,
+          domain: keyEntry.domain,
+          spaceName: keyEntry.domain.split('.')[0], // Extract space name from domain
+          apiKey: keyEntry.apiKey
+        }
+      });
+
+      if (response.success) {
+        const namespace = response.data?.name || response.data?.spaceKey || 'Connected';
+        
+        // Update the namespace in the key entry
+        const updatedKeys = backlogAPIKeys.map(key => 
+          key.id === id ? { ...key, namespace } : key
+        );
+        
+        setBacklogAPIKeys(updatedKeys);
+        
+        // Save to Chrome storage when connection is successful
+        try {
+          await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+          console.log('Backlog API keys saved successfully');
+        } catch (storageError) {
+          console.error('Failed to save Backlog API keys:', storageError);
+        }
+        
+        setTestingStates(prev => ({
+          ...prev,
+          [id]: { testing: false, result: { success: true, namespace } }
+        }));
+      } else {
+        setTestingStates(prev => ({
+          ...prev,
+          [id]: { testing: false, result: { success: false, error: response.message || 'Connection failed' } }
+        }));
+      }
+    } catch (error) {
+      setTestingStates(prev => ({
+        ...prev,
+        [id]: { testing: false, result: { success: false, error: (error as Error).message } }
+      }));
     }
   };
 
@@ -411,7 +617,7 @@ const OptionsPage: React.FC = () => {
       case 'ai-keys':
         return (
           <div className="settings-section">
-            <h2>AI Provider Settings</h2>
+            <h2>AI & Models</h2>
             <p>Configure your AI service providers and authentication keys.</p>
 
             <div className="setting-group api-keys-section">
@@ -573,31 +779,108 @@ const OptionsPage: React.FC = () => {
       case 'backlog-keys':
         return (
           <div className="settings-section">
-            <h2>Backlog API Keys</h2>
+            <h2>🔑 Backlog API Configs</h2>
             <p>Configure API keys for different Backlog domains.</p>
-
-            <div className="setting-group">
-              <div className="group-header">
-                <h3>🔑 Domain API Keys</h3>
-                <p className="group-description">Add API keys for your Backlog domains</p>
+            
+            {isLoadingBacklogKeys ? (
+              <div className="loading">Loading Backlog API keys...</div>
+            ) : (
+              <div className="backlog-keys-container">
+                {backlogAPIKeys.map((keyEntry) => (
+                  <div key={keyEntry.id} className="backlog-key-entry">
+                    <div className="entry-header">
+                      <h3>Backlog Configuration</h3>
+                      {backlogAPIKeys.length > 1 && (
+                        <button 
+                          className="remove-btn"
+                          onClick={() => removeBacklogAPIKey(keyEntry.id)}
+                          title="Remove this configuration"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="input-row">
+                      <div className="input-group full-width">
+                        <label htmlFor={`domain-${keyEntry.id}`}>Domain:</label>
+                        <input
+                          id={`domain-${keyEntry.id}`}
+                          type="text"
+                          placeholder="your-space.backlog.com"
+                          value={keyEntry.domain}
+                          onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'domain', e.target.value)}
+                          onBlur={(e) => handleDomainBlur(keyEntry.id, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="input-row">
+                      <div className="input-group full-width">
+                        <label htmlFor={`apikey-${keyEntry.id}`}>API Key:</label>
+                        <div className="input-wrapper">
+                          <input
+                            id={`apikey-${keyEntry.id}`}
+                            type={showPasswordStates[keyEntry.id] ? 'text' : 'password'}
+                            placeholder="Your Backlog API key"
+                            value={keyEntry.apiKey}
+                            onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'apiKey', e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="input-toggle-button-inside"
+                            onClick={() => setShowPasswordStates(prev => ({
+                              ...prev,
+                              [keyEntry.id]: !prev[keyEntry.id]
+                            }))}
+                            title={showPasswordStates[keyEntry.id] ? 'Hide API key' : 'Show API key'}
+                          >
+                            {showPasswordStates[keyEntry.id] ? '🙈' : '👁️'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="input-row">
+                      <div className="input-group full-width">
+                        <label htmlFor={`note-${keyEntry.id}`}>Note (optional):</label>
+                        <input
+                          id={`note-${keyEntry.id}`}
+                          type="text"
+                          placeholder="Description for this configuration"
+                          value={keyEntry.note}
+                          onChange={(e) => updateBacklogAPIKey(keyEntry.id, 'note', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="test-section">
+                      <button 
+                        className={`test-btn ${testingStates[keyEntry.id]?.testing ? 'testing' : ''}`}
+                        onClick={() => testBacklogConnection(keyEntry.id)}
+                        disabled={!keyEntry.domain || !keyEntry.apiKey || testingStates[keyEntry.id]?.testing}
+                      >
+                        {testingStates[keyEntry.id]?.testing ? 'Testing...' : 'Test Connection'}
+                      </button>
+                      
+                      {testingStates[keyEntry.id]?.result && (
+                        <div className={`test-result ${testingStates[keyEntry.id]?.result?.success ? 'success' : 'error'}`}>
+                          {testingStates[keyEntry.id]?.result?.success ? (
+                            <span>✅ Connected to namespace: <strong>{keyEntry.namespace || testingStates[keyEntry.id]?.result?.namespace}</strong></span>
+                          ) : (
+                            <span>❌ {testingStates[keyEntry.id]?.result?.error}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                <button className="add-key-btn" onClick={addBacklogAPIKey}>
+                  + Add Another Backlog
+                </button>
               </div>
-              <div className="setting-item">
-                <label className="setting-label">Backlog Domain</label>
-                <input
-                  type="text"
-                  className="setting-input"
-                  placeholder="your-space.backlog.com"
-                />
-              </div>
-              <div className="setting-item">
-                <label className="setting-label">API Key</label>
-                <input
-                  type="password"
-                  className="setting-input"
-                  placeholder="Enter your Backlog API key"
-                />
-              </div>
-            </div>
+            )}
           </div>
         );
 

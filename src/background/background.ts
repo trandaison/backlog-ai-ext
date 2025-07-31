@@ -1403,8 +1403,25 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
   private async testBacklogConnection(config: BacklogApiConfig): Promise<{success: boolean, message: string, data?: any}> {
     try {
-      const baseUrl = `https://${config.spaceName}.${config.domain}`;
+      // Handle both old format (spaceName + domain) and new format (full domain)
+      let baseUrl: string;
+      let spaceName: string;
+
+      if (config.domain && config.domain.includes('.')) {
+        // New format: domain is "nals.backlogtool.com"
+        const domainParts = config.domain.split('.');
+        spaceName = domainParts[0];
+        const baseDomain = domainParts.slice(1).join('.');
+        baseUrl = `https://${config.domain}`;
+      } else {
+        // Old format: spaceName + domain separately
+        spaceName = config.spaceName;
+        baseUrl = `https://${config.spaceName}.${config.domain}`;
+      }
+
       const apiUrl = `${baseUrl}/api/v2/space?apiKey=${encodeURIComponent(config.apiKey)}`;
+
+      console.log('Testing Backlog connection:', baseUrl);
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -1415,9 +1432,10 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
       if (response.ok) {
         const spaceInfo = await response.json();
+        console.log('Backlog connection successful:', spaceInfo);
         return {
           success: true,
-          message: `Kết nối thành công! Space: ${spaceInfo.name || config.spaceName}`,
+          message: `Kết nối thành công! Space: ${spaceInfo.name || spaceName}`,
           data: spaceInfo
         };
       } else if (response.status === 401 || response.status === 403) {
@@ -1428,12 +1446,13 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
       } else if (response.status === 404) {
         return {
           success: false,
-          message: 'Space name không tồn tại'
+          message: 'Domain không tồn tại hoặc không thể truy cập'
         };
       } else {
+        const errorText = await response.text();
         return {
           success: false,
-          message: `Kết nối thất bại: ${response.status} ${response.statusText}`
+          message: `Kết nối thất bại: ${response.status} ${response.statusText} - ${errorText}`
         };
       }
     } catch (error) {
