@@ -1,5 +1,6 @@
 import { TicketData } from './ticketAnalyzer';
 import { safeTimestampToDate } from './timeUtils';
+import { FileAttachment } from '../types/attachment';
 
 export type ChatMessage = {
   id: string;
@@ -9,6 +10,7 @@ export type ChatMessage = {
   responseId?: string; // Store Gemini responseId for reference
   tokenCount?: number; // Track token usage per message
   compressed?: boolean; // Flag if this message was summarized
+  attachments?: FileAttachment[]; // Array of file attachments
 };
 
 export interface UserInfo {

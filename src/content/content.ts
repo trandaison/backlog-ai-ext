@@ -542,7 +542,8 @@ class BacklogAIInjector {
         currentModel: contextData.currentModel, // Include selected model from chatbot
         ticketId: finalTicketData?.id || finalTicketData?.key,
         ticketUrl: window.location.href, // Add current URL for background script
-        timestamp: contextData.timestamp || new Date().toISOString()
+        timestamp: contextData.timestamp || new Date().toISOString(),
+        attachments: contextData.attachments || [] // Include file attachments
       };
 
       console.log('📤 [Content] Sending to background:', {

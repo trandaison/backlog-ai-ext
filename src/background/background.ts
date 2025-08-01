@@ -4,6 +4,7 @@ import { EncryptionService } from '../shared/encryption';
 import ContextOptimizer from '../shared/contextOptimizer';
 import { availableModels, defaultModelId } from '../configs';
 import type { ChatHistoryData } from '../shared/chatStorageService';
+import { FileAttachment } from '../types/attachment';
 
 interface Settings {
   apiKey: string;
@@ -41,7 +42,7 @@ interface BacklogMultiSettings {
 
 interface AIService {
   analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string>;
-  processUserMessage(message: string, context: any, settings?: Settings): Promise<{
+  processUserMessage(message: string, context: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
@@ -107,14 +108,20 @@ class GeminiService implements AIService {
     return result.response;
   }
 
-  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<{
+  async processUserMessage(message: string, contextData: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
   }> {
+    // Build enhanced message with attachments if any
+    let enhancedMessage = message;
+    if (attachments && attachments.length > 0) {
+      enhancedMessage = this.buildMessageWithAttachments(message, attachments);
+    }
+
     // Check if this is optimized context from ContextOptimizer
     if (contextData.isOptimized) {
-      const result = await this.callGeminiAPI(message, settings);
+      const result = await this.callGeminiAPI(enhancedMessage, settings, attachments);
       return {
         response: result.response,
         responseId: result.responseId,
@@ -123,12 +130,44 @@ class GeminiService implements AIService {
     }
 
     // Legacy handling for non-optimized context
-    const result = await this.callGeminiAPI(message, settings);
+    const result = await this.callGeminiAPI(enhancedMessage, settings, attachments);
     return {
       response: result.response,
       responseId: result.responseId,
       tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
     };
+  }
+
+  private buildMessageWithAttachments(message: string, attachments: FileAttachment[]): string {
+    let enhancedMessage = message;
+
+    for (const attachment of attachments) {
+      enhancedMessage += `\n\n**File: ${attachment.name}** (${attachment.type}, ${this.formatFileSize(attachment.size)})\n`;
+
+      // For files that will be sent as inline_data, just mention them
+      if (attachment.type.startsWith('image/') ||
+          attachment.type.startsWith('text/') ||
+          attachment.type.includes('csv') ||
+          attachment.type.includes('json') ||
+          attachment.type.includes('plain')) {
+        enhancedMessage += `[File content will be processed by AI - please analyze this file]\n`;
+      } else if (attachment.preview) {
+        // For other files with preview, include preview
+        enhancedMessage += `Content preview:\n\`\`\`\n${attachment.preview}\n\`\`\`\n`;
+      } else {
+        enhancedMessage += `[Binary file attached - content type: ${attachment.type}]\n`;
+      }
+    }
+
+    return enhancedMessage;
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
@@ -183,7 +222,7 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     return prompt;
   }
 
-  private async callGeminiAPI(prompt: string, settings?: Settings): Promise<{
+  private async callGeminiAPI(prompt: string, settings?: Settings, attachments?: FileAttachment[]): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
@@ -201,6 +240,47 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       const geminiModel = this.getGeminiModelName(settings?.aiModel);
       const apiUrl = this.getApiUrl(geminiModel);
 
+      // Build parts array for multimodal content
+      const parts: any[] = [{
+        text: prompt
+      }];
+
+      // Add attachments if any
+      if (attachments && attachments.length > 0) {
+        console.log('📎 [Gemini] Processing attachments:', attachments.length);
+        for (const attachment of attachments) {
+          console.log('📎 [Gemini] Attachment:', attachment.name, attachment.type, 'has base64:', !!attachment.base64);
+          if (attachment.base64) {
+            // For images, add as inline_data for vision processing
+            if (attachment.type.startsWith('image/')) {
+              console.log('🖼️ [Gemini] Adding image attachment:', attachment.name);
+              parts.push({
+                inline_data: {
+                  mime_type: attachment.type,
+                  data: attachment.base64
+                }
+              });
+            }
+            // For text files (CSV, TXT, JSON, etc), also add as inline_data for better processing
+            else if (attachment.type.startsWith('text/') ||
+                     attachment.type.includes('csv') ||
+                     attachment.type.includes('json') ||
+                     attachment.type.includes('plain')) {
+              console.log('📄 [Gemini] Adding text file as inline_data:', attachment.name);
+              parts.push({
+                inline_data: {
+                  mime_type: attachment.type,
+                  data: attachment.base64
+                }
+              });
+            }
+            // For other binary files, mention in text (already included in prompt)
+          }
+        }
+      }
+
+      console.log('🚀 [Gemini] Final parts array:', parts.length, parts.map(p => p.inline_data ? `inline_data: ${p.inline_data.mime_type}` : 'text'));
+
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -208,9 +288,7 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: prompt
-            }]
+            parts: parts
           }],
           generationConfig: {
             temperature: 0.3,
@@ -360,7 +438,7 @@ class OpenAIService implements AIService {
     }
   }
 
-  async processUserMessage(message: string, contextData: any, settings?: Settings): Promise<{
+  async processUserMessage(message: string, contextData: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
@@ -373,8 +451,33 @@ class OpenAIService implements AIService {
       };
     }
 
+    // Build enhanced message with attachments if any
+    let enhancedMessage = message;
+    if (attachments && attachments.length > 0) {
+      enhancedMessage = this.buildMessageWithAttachments(message, attachments);
+    }
+
     // The message is already processed by BackgroundService with full context
-    // Build messages array for OpenAI
+    // Build messages array for OpenAI with multimodal support
+    const userContent: any[] = [{
+      type: 'text',
+      text: enhancedMessage
+    }];
+
+    // Add image attachments for GPT-4V
+    if (attachments && attachments.length > 0) {
+      for (const attachment of attachments) {
+        if (attachment.base64 && attachment.type.startsWith('image/')) {
+          userContent.push({
+            type: 'image_url',
+            image_url: {
+              url: `data:${attachment.type};base64,${attachment.base64}`
+            }
+          });
+        }
+      }
+    }
+
     const messages = [
       {
         role: 'system',
@@ -382,7 +485,7 @@ class OpenAIService implements AIService {
       },
       {
         role: 'user',
-        content: message
+        content: userContent.length === 1 ? enhancedMessage : userContent
       }
     ];
 
@@ -423,6 +526,44 @@ class OpenAIService implements AIService {
         tokensUsed: 0
       };
     }
+  }
+
+  private buildMessageWithAttachments(message: string, attachments: FileAttachment[]): string {
+    let enhancedMessage = message;
+
+    for (const attachment of attachments) {
+      enhancedMessage += `\n\n**File: ${attachment.name}** (${attachment.type}, ${this.formatFileSize(attachment.size)})\n`;
+
+      if (attachment.type.startsWith('text/') && attachment.base64) {
+        // For text files, decode and include full content
+        try {
+          const fullContent = atob(attachment.base64);
+          enhancedMessage += `Nội dung file:\n\`\`\`\n${fullContent}\n\`\`\`\n`;
+        } catch (error) {
+          enhancedMessage += `[Lỗi đọc file text: ${error}]\n`;
+        }
+      } else if (attachment.preview) {
+        // Fallback to preview if base64 not available
+        enhancedMessage += `Content preview:\n\`\`\`\n${attachment.preview}\n\`\`\`\n`;
+      } else if (attachment.base64) {
+        // For binary files, mention they are attached
+        if (attachment.type.startsWith('image/')) {
+          enhancedMessage += `[Image file attached - please analyze the visual content]\n`;
+        } else {
+          enhancedMessage += `[Binary file attached - content type: ${attachment.type}]\n`;
+        }
+      }
+    }
+
+    return enhancedMessage;
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   private buildTicketAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
@@ -673,7 +814,9 @@ class BackgroundService {
 
   private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
     try {
-      const { message, messageType, ticketData, chatHistory, userInfo, currentModel } = data;
+      const { message, messageType, ticketData, chatHistory, userInfo, currentModel, attachments } = data;
+
+      console.log('🔍 [Background] handleUserMessage attachments:', attachments?.length || 0, attachments);
 
       // Get current AI service, but override aiModel with currentModel if provided
       const settings = await this.getSettings();
@@ -747,8 +890,9 @@ class BackgroundService {
         }
       }
 
-      // Process with AI service
-      const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings);
+      // Process with AI service, including attachments
+      console.log('🚀 [Background] Sending to AI service with attachments:', attachments?.length || 0);
+      const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings, attachments);
 
       sendResponse({ success: true, response: response.response, tokensUsed: response.tokensUsed, responseId: response.responseId });
 

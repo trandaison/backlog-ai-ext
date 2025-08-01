@@ -1,0 +1,8 @@
+Đây là file test để kiểm tra AI có đọc được nội dung đính kèm hay không.
+
+Nội dung này bao gồm:
+1. Một số thông tin quan trọng
+2. Dữ liệu test để AI phân tích
+3. Kiểm tra khả năng decode base64
+
+AI nên có thể đọc được toàn bộ nội dung này thay vì chỉ preview 200 ký tự đầu.

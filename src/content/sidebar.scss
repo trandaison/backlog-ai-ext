@@ -794,6 +794,48 @@ body.ai-ext-sidebar-open {
     opacity: 0.7;
     margin-top: 4px;
   }
+
+    .ai-ext-attachments-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: #d2e7ff;
+    margin: 8px 0 4px 0;
+    padding-top: 6px;
+  }
+
+  .ai-ext-message-attachments {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 11px;
+    list-style: disc;
+    white-space: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    @include custom-scrollbar;
+
+    // Custom horizontal scrollbar
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 2px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+
+    li {
+      color: inherit;
+    }
+  }
 }
 
 // Typing indicator
@@ -824,21 +866,76 @@ body.ai-ext-sidebar-open {
   flex-shrink: 0;
 }
 
-// Model Selector - Simplified and compact
-.ai-ext-root .ai-ext-model-selector {
-  align-self: flex-start;
-  width: auto;
-  max-width: 200px;
-  padding: 4px 6px;
+// Input Header with Attachment Button and Model Selector
+.ai-ext-input-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #495057;
+}
+
+// Attachment Button with Badge
+.ai-ext-attachment-button {
+  position: relative;
+  width: 23px;
+  height: 23px;
+  border: none;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #6c757d;
+  cursor: pointer;
+  @include flex-center;
+  font-size: 12px;
+  @include transition(all, 0.2s);
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #e9ecef;
+    color: #495057;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .ai-ext-attachment-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    font-weight: 600;
+    @include flex-center;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+}
+
+// Model Selector - Updated to work with new layout
+.ai-ext-root .ai-ext-model-selector {
+  width: auto;
+  min-width: 140px;
+  max-width: 200px;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #6c757d;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-size: 11px;
+  @include transition(all, 0.2s);
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #e9ecef;
+    color: #495057;
+  }
 
   &:focus {
     border-color: $primary-color;
@@ -849,11 +946,97 @@ body.ai-ext-sidebar-open {
     background: #e9ecef;
     color: #6c757d;
     cursor: not-allowed;
+    opacity: 0.6;
   }
 
   option {
     padding: 4px 8px;
     font-size: 11px;
+  }
+}
+
+// File Attachments Styles
+.ai-ext-attachments-container {
+  margin-bottom: 8px;
+}
+
+.ai-ext-attachment-error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-bottom: 8px;
+  border: 1px solid #f5c6cb;
+  white-space: pre-line;
+}
+
+.ai-ext-attachments-list {
+  background: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  max-height: 60px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  @include custom-scrollbar;
+}
+
+.ai-ext-attachment-item {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #4CBA95, #3a9b7a);
+  border: none;
+  border-radius: 12px;
+  padding: 4px 6px 4px 8px;
+  font-size: 11px;
+  height: 20px;
+  box-sizing: border-box;
+  color: white;
+  box-shadow: 0 1px 3px rgba(76, 186, 149, 0.3);
+  @include transition(all, 0.2s);
+
+  &:hover {
+    box-shadow: 0 2px 6px rgba(76, 186, 149, 0.4);
+  }
+
+  .ai-ext-attachment-name {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 6px;
+    color: white;
+    font-weight: 500;
+  }
+
+  .ai-ext-attachment-size {
+    color: rgba(255, 255, 255, 0.8);
+    margin-right: 6px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .ai-ext-attachment-remove {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    width: 14px;
+    height: 14px;
+    @include flex-center;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 50%;
+    @include transition(all, 0.2s);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.1);
+    }
   }
 }
 
@@ -871,15 +1054,15 @@ body.ai-ext-sidebar-open {
 
 .ai-ext-root .ai-ext-chat-input {
   flex: 1;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border: 1px solid #e9ecef;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   resize: none;
   outline: none;
-  min-height: 44px; // Minimum height for 1 line + padding
-  max-height: 252px; // Maximum height for 12 lines + padding
-  line-height: 20px;
+  min-height: 38px; // Minimum height for 1 line + padding
+  max-height: 240px; // Maximum height for 12 lines + padding
+  line-height: 18px;
   font-family: inherit;
   overflow-y: hidden; // Will be controlled by JavaScript
   transition: border-color 0.2s ease, height 0.1s ease;
