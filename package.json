@@ -1,6 +1,6 @@
 {
   "name": "backlog-ai-ext",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "build": "npm run clean && webpack --mode=production",
@@ -11,7 +11,8 @@
     "clean:dev": "rm -rf dev-build",
     "lint": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "release": "changelogen --release"
+    "release": "changelogen --release",
+    "release:prepare": "changelogen --no-commit --no-tag"
   },
   "keywords": [
     "chrome-extension",
