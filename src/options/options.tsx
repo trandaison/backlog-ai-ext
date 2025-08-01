@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './options.scss';
 import { EncryptionService } from '../shared/encryption';
+import { availableModels, defaultModelId, type ModelInfo } from '../configs';
 
 // Inline component để tránh module import issues
 type SettingsSection =
@@ -17,13 +18,6 @@ interface SidebarItem {
   icon: string;
 }
 
-interface ModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  provider: 'openai' | 'gemini';
-}
-
 interface BacklogAPIKey {
   id: string;
   domain: string;
@@ -31,90 +25,6 @@ interface BacklogAPIKey {
   note: string;
   namespace?: string; // Will be populated after successful test
 }
-
-const availableModels: ModelInfo[] = [
-  // OpenAI Models (Latest 2025)
-  {
-    id: 'o3',
-    name: 'o3',
-    description: 'Our most powerful reasoning model',
-    provider: 'openai',
-  },
-  {
-    id: 'o3-pro',
-    name: 'o3 Pro',
-    description: 'Version of o3 with more compute for better responses',
-    provider: 'openai',
-  },
-  {
-    id: 'o3-mini',
-    name: 'o3 Mini',
-    description: 'A small model alternative to o3',
-    provider: 'openai',
-  },
-  {
-    id: 'gpt-4.1',
-    name: 'GPT-4.1',
-    description: 'Flagship GPT model for complex tasks',
-    provider: 'openai',
-  },
-  {
-    id: 'gpt-4.1-mini',
-    name: 'GPT-4.1 Mini',
-    description: 'Balanced for intelligence, speed, and cost',
-    provider: 'openai',
-  },
-  {
-    id: 'gpt-4.1-nano',
-    name: 'GPT-4.1 Nano',
-    description: 'Fastest, most cost-effective GPT-4.1 model',
-    provider: 'openai',
-  },
-  {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    description: 'Fast, intelligent, flexible GPT model',
-    provider: 'openai',
-  },
-  {
-    id: 'chatgpt-4o',
-    name: 'ChatGPT-4o',
-    description: 'GPT-4o model used in ChatGPT',
-    provider: 'openai',
-  },
-  {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    description: 'Fast, affordable small model for focused tasks',
-    provider: 'openai',
-  },
-  {
-    id: 'o4-mini',
-    name: 'o4 Mini',
-    description: 'Faster, more affordable reasoning model',
-    provider: 'openai',
-  },
-
-  // Google Gemini Models (Latest 2025)
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    description: 'Most advanced Gemini model with enhanced reasoning',
-    provider: 'gemini',
-  },
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    description: 'Fast and efficient multimodal model',
-    provider: 'gemini',
-  },
-  {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash-Lite',
-    description: 'Lightweight version optimized for speed and cost',
-    provider: 'gemini',
-  },
-];
 
 interface APIKeyInputProps {
   label: string;
@@ -368,7 +278,7 @@ const OptionsPage: React.FC = () => {
   const [isLoadingProvider, setIsLoadingProvider] = useState(true);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
-  const [preferredModel, setPreferredModel] = useState<string>('gpt-4.1-mini');
+  const [preferredModel, setPreferredModel] = useState<string>(defaultModelId);
   const [backlogAPIKeys, setBacklogAPIKeys] = useState<BacklogAPIKey[]>([]);
   const [isLoadingBacklogKeys, setIsLoadingBacklogKeys] = useState(true);
   const [testingStates, setTestingStates] = useState<
@@ -447,8 +357,17 @@ const OptionsPage: React.FC = () => {
     const loadPreferredModel = async () => {
       try {
         const result = await chrome.storage.sync.get(['preferredModel']);
-        const model = result.preferredModel || 'gpt-4.1-mini';
+        const model = result.preferredModel || defaultModelId;
         setPreferredModel(model);
+
+        // Also set the preferred provider based on the model
+        const selectedModel = availableModels.find(m => m.id === model);
+        if (selectedModel) {
+          await chrome.storage.sync.set({
+            preferredProvider: selectedModel.provider
+          });
+          console.log(`🔧 [Options] Initialized preferred provider: ${selectedModel.provider} for model: ${model}`);
+        }
       } catch (error) {
         console.error('Failed to load preferred model:', error);
       } finally {
@@ -466,11 +385,10 @@ const OptionsPage: React.FC = () => {
         const result = await chrome.storage.sync.get(['selectedModels']);
         // Default models: Mới, tối ưu chi phí, thông minh, nhanh
         const defaultModels = [
-          'gpt-4.1-mini', // Balanced for intelligence, speed, and cost
+          defaultModelId, // Primary default model
           'gpt-4o-mini', // Fast, affordable small model for focused tasks
           'o3-mini', // Small alternative to o3 reasoning model
           'gemini-2.5-pro', // Most advanced Gemini model with enhanced reasoning
-          'gemini-2.5-flash', // Fast and efficient multimodal model
           'gemini-2.5-flash-lite', // Lightweight version optimized for speed and cost
         ];
         const models = result.selectedModels || defaultModels;
@@ -621,7 +539,16 @@ const OptionsPage: React.FC = () => {
   const handlePreferredModelChange = async (modelId: string) => {
     setPreferredModel(modelId);
     try {
-      await chrome.storage.sync.set({ preferredModel: modelId });
+      // Determine provider based on selected model
+      const selectedModel = availableModels.find(model => model.id === modelId);
+      const preferredProvider = selectedModel?.provider || 'openai';
+
+      await chrome.storage.sync.set({
+        preferredModel: modelId,
+        preferredProvider: preferredProvider
+      });
+
+      console.log(`🔧 [Options] Preferred model changed to: ${modelId} (provider: ${preferredProvider})`);
     } catch (error) {
       console.error('Failed to save preferred model:', error);
     }

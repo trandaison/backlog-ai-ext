@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Preferred Model Selection</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        select, input {
+            margin: 5px;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Preferred Model Selection</h1>
+
+    <div class="test-section">
+        <h3>📋 Current Settings</h3>
+        <div id="currentSettings" class="info test-result">Loading...</div>
+        <button onclick="loadCurrentSettings()">🔄 Refresh Settings</button>
+    </div>
+
+    <div class="test-section">
+        <h3>⚙️ Change Preferred Model</h3>
+        <label for="modelSelect">Select Model:</label>
+        <select id="modelSelect">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Google) - DEFAULT</option>
+            <option value="gpt-4.1-mini">GPT-4.1 Mini (OpenAI)</option>
+            <option value="gpt-4o">GPT-4o (OpenAI)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Google)</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Google)</option>
+        </select>
+        <button onclick="changePreferredModel()">💾 Save Model</button>
+        <div id="modelChangeResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🤖 Test AI Request</h3>
+        <input type="text" id="testMessage" placeholder="Enter test message..." value="Hello, which AI model are you?" style="width: 300px;">
+        <button onclick="testAIRequest()">🚀 Send Test Message</button>
+        <div id="aiTestResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📝 Debug Logs</h3>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        <button onclick="captureBackgroundLogs()">📊 Capture Background Logs</button>
+        <div id="debugLogs" class="log-container">Debug logs will appear here...</div>
+    </div>
+
+    <script>
+        let debugLogs = [];
+
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+
+        console.log = function(...args) {
+            debugLogs.push(`[LOG] ${new Date().toLocaleTimeString()}: ${args.join(' ')}`);
+            updateLogDisplay();
+            originalLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            debugLogs.push(`[ERROR] ${new Date().toLocaleTimeString()}: ${args.join(' ')}`);
+            updateLogDisplay();
+            originalError.apply(console, args);
+        };
+
+        function updateLogDisplay() {
+            const container = document.getElementById('debugLogs');
+            container.innerHTML = debugLogs.slice(-20).join('\n');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLogs() {
+            debugLogs = [];
+            updateLogDisplay();
+        }
+
+        async function loadCurrentSettings() {
+            try {
+                console.log('🔍 Loading current settings...');
+
+                // Get settings from chrome storage
+                const result = await chrome.storage.sync.get([
+                    'preferredModel',
+                    'preferredProvider',
+                    'encryptedApiKey',
+                    'encryptedGeminiApiKey'
+                ]);
+
+                const hasOpenAI = !!result.encryptedApiKey;
+                const hasGemini = !!result.encryptedGeminiApiKey;
+
+                const settingsInfo = `
+                    <strong>Preferred Model:</strong> ${result.preferredModel || 'Not set'}<br>
+                    <strong>Preferred Provider:</strong> ${result.preferredProvider || 'Not set'}<br>
+                    <strong>OpenAI API Key:</strong> ${hasOpenAI ? '✅ Configured' : '❌ Not configured'}<br>
+                    <strong>Gemini API Key:</strong> ${hasGemini ? '✅ Configured' : '❌ Not configured'}
+                `;
+
+                document.getElementById('currentSettings').innerHTML = settingsInfo;
+                document.getElementById('currentSettings').className = 'info test-result';
+
+                console.log('✅ Settings loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading settings:', error);
+                document.getElementById('currentSettings').innerHTML = `Error: ${error.message}`;
+                document.getElementById('currentSettings').className = 'error test-result';
+            }
+        }
+
+        async function changePreferredModel() {
+            try {
+                const selectedModel = document.getElementById('modelSelect').value;
+                console.log(`🔄 Changing preferred model to: ${selectedModel}`);
+
+                // Determine provider based on model
+                const isGemini = selectedModel.startsWith('gemini-');
+                const preferredProvider = isGemini ? 'gemini' : 'openai';
+
+                // Save to storage (mimicking options page logic)
+                await chrome.storage.sync.set({
+                    preferredModel: selectedModel,
+                    preferredProvider: preferredProvider
+                });
+
+                console.log(`✅ Model changed to: ${selectedModel} (provider: ${preferredProvider})`);
+
+                document.getElementById('modelChangeResult').innerHTML =
+                    `✅ Successfully changed to: <strong>${selectedModel}</strong> (${preferredProvider})`;
+                document.getElementById('modelChangeResult').className = 'success test-result';
+
+                // Refresh current settings display
+                setTimeout(loadCurrentSettings, 500);
+
+            } catch (error) {
+                console.error('❌ Error changing model:', error);
+                document.getElementById('modelChangeResult').innerHTML = `❌ Error: ${error.message}`;
+                document.getElementById('modelChangeResult').className = 'error test-result';
+            }
+        }
+
+        async function testAIRequest() {
+            try {
+                const message = document.getElementById('testMessage').value;
+                if (!message.trim()) {
+                    throw new Error('Please enter a test message');
+                }
+
+                console.log(`🚀 Sending test message: "${message}"`);
+
+                // Send message to background script
+                const response = await chrome.runtime.sendMessage({
+                    action: 'processUserMessage',
+                    data: {
+                        message: message,
+                        messageType: 'user',
+                        ticketData: {
+                            id: 'TEST-123',
+                            title: 'Test Ticket',
+                            description: 'This is a test ticket for preferred model testing'
+                        },
+                        chatHistory: [],
+                        userInfo: {
+                            name: 'Test User',
+                            id: 'test-user'
+                        }
+                    }
+                });
+
+                console.log('📨 AI Response received:', response);
+
+                if (response.success) {
+                    document.getElementById('aiTestResult').innerHTML =
+                        `✅ <strong>AI Response:</strong><br>${response.response.substring(0, 300)}${response.response.length > 300 ? '...' : ''}`;
+                    document.getElementById('aiTestResult').className = 'success test-result';
+                } else {
+                    throw new Error(response.error || 'Unknown error');
+                }
+
+            } catch (error) {
+                console.error('❌ Error testing AI request:', error);
+                document.getElementById('aiTestResult').innerHTML = `❌ Error: ${error.message}`;
+                document.getElementById('aiTestResult').className = 'error test-result';
+            }
+        }
+
+        async function captureBackgroundLogs() {
+            try {
+                console.log('📊 Attempting to capture background script logs...');
+
+                // Send a ping to background to trigger logging
+                const response = await chrome.runtime.sendMessage({
+                    action: 'getApiKey'
+                });
+
+                console.log('📋 Background script response:', response);
+
+            } catch (error) {
+                console.error('❌ Error capturing background logs:', error);
+            }
+        }
+
+        // Load current settings on page load
+        document.addEventListener('DOMContentLoaded', loadCurrentSettings);
+    </script>
+</body>
+</html>

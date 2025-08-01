@@ -2,6 +2,7 @@
 import { TicketData } from '../shared/ticketAnalyzer';
 import { EncryptionService } from '../shared/encryption';
 import ContextOptimizer from '../shared/contextOptimizer';
+import { availableModels, defaultModelId } from '../configs';
 import type { ChatHistoryData } from '../shared/chatStorageService';
 
 interface Settings {
@@ -67,7 +68,31 @@ class GeminiService implements AIService {
     }
   }
 
-  private getApiUrl(model: string = 'gemini-pro'): string {
+  // Map preferred model to actual Gemini API model name
+  private getGeminiModelName(preferredModel?: string): string {
+    if (!preferredModel) {
+      // Use default model from config and map to actual Gemini model
+      const defaultModel = availableModels.find(m => m.id === defaultModelId);
+      if (defaultModel?.provider === 'gemini') {
+        return this.mapToGeminiAPI(defaultModelId);
+      }
+      return 'gemini-1.5-flash-latest'; // fallback
+    }
+
+    return this.mapToGeminiAPI(preferredModel);
+  }
+
+  private mapToGeminiAPI(modelId: string): string {
+    const modelMap: Record<string, string> = {
+      'gemini-2.5-pro': 'gemini-1.5-pro-latest',
+      'gemini-2.5-flash': 'gemini-1.5-flash-latest',
+      'gemini-2.5-flash-lite': 'gemini-1.5-flash'
+    };
+
+    return modelMap[modelId] || 'gemini-1.5-flash-latest';
+  }
+
+  private getApiUrl(model: string = 'gemini-1.5-flash-latest'): string {
     return `${this.baseApiUrl}/${model}:generateContent`;
   }
 
@@ -168,11 +193,12 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
         };
       }
 
-      // Get model from settings or default to gemini-pro
-      const model = settings?.aiModel || 'gemini-pro';
-      const apiUrl = this.getApiUrl(model);
+      // Get the actual Gemini model name from preferred model
+      const geminiModel = this.getGeminiModelName(settings?.aiModel);
+      const apiUrl = this.getApiUrl(geminiModel);
 
-      console.log('🔄 [Gemini] Calling Gemini API with model:', model);
+      console.log('🔄 [Gemini] Calling Gemini API with preferred model:', settings?.aiModel);
+      console.log('🔄 [Gemini] Using actual Gemini model:', geminiModel);
       console.log('🔧 [Gemini] Estimated input tokens:', ContextOptimizer.estimateTokenCount(prompt));
 
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
@@ -266,10 +292,37 @@ class OpenAIService implements AIService {
   }
 
   private getOpenAIModel(settings?: Settings): string {
-    const model = settings?.aiModel || 'gpt-3.5-turbo';
-    // Ensure we only use OpenAI models
-    const openAIModels = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'];
-    return openAIModels.includes(model) ? model : 'gpt-3.5-turbo';
+    const preferredModel = settings?.aiModel || defaultModelId;
+
+    // Map preferred model to actual OpenAI API model name
+    const modelMap: Record<string, string> = {
+      'o3': 'o3',
+      'o3-pro': 'o3-pro',
+      'o3-mini': 'o3-mini',
+      'gpt-4.1': 'gpt-4',
+      'gpt-4.1-mini': 'gpt-4-turbo',
+      'gpt-4.1-nano': 'gpt-3.5-turbo',
+      'gpt-4o': 'gpt-4o',
+      'chatgpt-4o': 'gpt-4o',
+      'gpt-4o-mini': 'gpt-4o-mini',
+      'o4-mini': 'gpt-4o-mini'
+    };
+
+    const mappedModel = modelMap[preferredModel] || preferredModel;
+
+    // Ensure we only use valid OpenAI models
+    const validOpenAIModels = [
+      'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-4o-mini',
+      'o3', 'o3-pro', 'o3-mini'
+    ];
+
+    // Use default model mapping if current model is not OpenAI
+    const defaultModel = availableModels.find(m => m.id === defaultModelId);
+    const fallbackModel = defaultModel?.provider === 'openai'
+      ? (modelMap[defaultModelId] || 'gpt-4o-mini')
+      : 'gpt-4o-mini';
+
+    return validOpenAIModels.includes(mappedModel) ? mappedModel : fallbackModel;
   }
 
   async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
@@ -1292,7 +1345,8 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         'userRole',
         'language',
         'aiModel',
-        'preferredProvider'
+        'preferredProvider',
+        'preferredModel'
       ]);
 
       // Decrypt OpenAI API key if exists
@@ -1315,13 +1369,21 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         }
       }
 
+      // Determine preferred provider based on preferred model if not explicitly set
+      let preferredProvider = result.preferredProvider;
+      if (!preferredProvider && result.preferredModel) {
+        // Use availableModels to determine provider
+        const selectedModel = availableModels.find(m => m.id === result.preferredModel);
+        preferredProvider = selectedModel?.provider || 'openai';
+      }
+
       return {
         apiKey,
         geminiApiKey,
         userRole: result.userRole || 'developer',
         language: result.language || 'vi',
-        aiModel: result.aiModel || 'gpt-3.5-turbo',
-        preferredProvider: result.preferredProvider || 'openai'
+        aiModel: result.aiModel || result.preferredModel || defaultModelId,
+        preferredProvider: preferredProvider || 'openai'
       };
     } catch (error) {
       console.error('Error getting settings:', error);
@@ -1330,7 +1392,7 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         geminiApiKey: '',
         userRole: 'developer',
         language: 'vi',
-        aiModel: 'gpt-3.5-turbo',
+        aiModel: defaultModelId,
         preferredProvider: 'openai' as const
       };
     }

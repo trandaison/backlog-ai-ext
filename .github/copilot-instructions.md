@@ -34,6 +34,18 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
 - Implement proper error handling and user feedback
 - Use Chrome extension APIs according to Manifest V3 specifications
 
+### Configuration Management:
+- **Centralized Constants**: All reusable constants, configurations, and common values should be defined in `src/configs/` directory
+- Use `src/configs/index.ts` as the main export point for all configuration modules
+- Split large configuration files into smaller, focused modules (e.g., `aiModels.ts`, `uiConstants.ts`, `apiEndpoints.ts`) and re-export through the index file
+- Always import configurations from `src/configs` instead of hardcoding values throughout the codebase
+- Common configuration patterns:
+  - AI model definitions and defaults (`availableModels`, `defaultModelId`)
+  - UI constants (colors, sizes, timeouts)
+  - API endpoints and configuration
+  - Feature flags and settings defaults
+- When adding new constants that may change over time, create them in the configs directory first
+
 ### Security:
 - Store API keys securely using Chrome storage APIs
 - Validate all user inputs
