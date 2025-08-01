@@ -284,8 +284,6 @@ export class TicketURLMonitor {
       timestamp: Date.now()
     };
 
-    console.log('🔄 [TicketURLMonitor] Ticket change detected:', event);
-
     this.observers.forEach(callback => {
       try {
         callback(event);

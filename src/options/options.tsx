@@ -366,7 +366,6 @@ const OptionsPage: React.FC = () => {
           await chrome.storage.sync.set({
             preferredProvider: selectedModel.provider
           });
-          console.log(`🔧 [Options] Initialized preferred provider: ${selectedModel.provider} for model: ${model}`);
         }
       } catch (error) {
         console.error('Failed to load preferred model:', error);
@@ -547,8 +546,6 @@ const OptionsPage: React.FC = () => {
         preferredModel: modelId,
         preferredProvider: preferredProvider
       });
-
-      console.log(`🔧 [Options] Preferred model changed to: ${modelId} (provider: ${preferredProvider})`);
     } catch (error) {
       console.error('Failed to save preferred model:', error);
     }

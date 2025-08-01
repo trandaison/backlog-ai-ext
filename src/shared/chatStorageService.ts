@@ -723,12 +723,6 @@ export class ChatStorageService {
           maxTokens: 6000
         });
 
-        console.log('🚀 [ChatStorage] Auto-optimized chat history:', {
-          originalMessages: updatedMessages.length,
-          optimizedMessages: optimized.messages.length,
-          hasSummary: !!optimized.contextSummary
-        });
-
         return await this.saveChatHistory(
           ticketId,
           optimized.messages,

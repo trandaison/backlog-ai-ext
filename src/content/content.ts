@@ -3,6 +3,7 @@ import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
 import { ChatMessage } from '../shared/chatStorageService';
 import { TicketURLMonitor, TicketChangeEvent } from '../shared/ticketURLMonitor';
+import { availableModels } from '../configs';
 
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
@@ -59,8 +60,6 @@ class BacklogAIInjector {
 
       // Also update our content script width management
       this.handleSidebarWidthChange(width);
-
-      console.log('🔧 [Content] Received width update from background:', width);
     } catch (error) {
       console.error('❌ [Content] Error handling width update:', error);
     }
@@ -83,8 +82,6 @@ class BacklogAIInjector {
   }
 
   private handleTicketChange(event: TicketChangeEvent): void {
-    console.log('🔄 [Content] Ticket changed:', event);
-
     const oldTicketId = this.currentTicketId;
     this.currentTicketId = event.newTicketId;
 
@@ -499,6 +496,14 @@ class BacklogAIInjector {
         case 'CHAT_STORAGE_CLEAR':
           this.handleChatStorageClear(event.data.id, event.data.ticketKey);
           break;
+
+        case 'GET_MODEL_SETTINGS':
+          this.handleGetModelSettings();
+          break;
+
+        case 'UPDATE_PREFERRED_MODEL':
+          this.handleUpdatePreferredModel(event.data.modelId);
+          break;
       }
     });
   }
@@ -534,6 +539,7 @@ class BacklogAIInjector {
         ticketData: finalTicketData,
         chatHistory: contextData.chatHistory || [],
         userInfo: contextData.userInfo,
+        currentModel: contextData.currentModel, // Include selected model from chatbot
         ticketId: finalTicketData?.id || finalTicketData?.key,
         ticketUrl: window.location.href, // Add current URL for background script
         timestamp: contextData.timestamp || new Date().toISOString()
@@ -717,6 +723,55 @@ class BacklogAIInjector {
     }
   }
 
+  private async handleGetModelSettings(): Promise<void> {
+    try {
+      const result = await chrome.storage.sync.get(['selectedModels', 'preferredModel']);
+
+      window.postMessage({
+        type: 'MODEL_SETTINGS_RESPONSE',
+        success: true,
+        data: {
+          selectedModels: result.selectedModels || [],
+          preferredModel: result.preferredModel || 'gemini-2.5-flash'
+        }
+      }, '*');
+    } catch (error) {
+      console.error('Error getting model settings:', error);
+      window.postMessage({
+        type: 'MODEL_SETTINGS_RESPONSE',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleUpdatePreferredModel(modelId: string): Promise<void> {
+    try {
+      // Use statically imported availableModels to determine provider
+      const selectedModel = availableModels.find(model => model.id === modelId);
+      const preferredProvider = selectedModel?.provider || 'openai';
+
+      await chrome.storage.sync.set({
+        preferredModel: modelId,
+        preferredProvider: preferredProvider
+      });
+
+      window.postMessage({
+        type: 'PREFERRED_MODEL_UPDATED',
+        success: true,
+        modelId: modelId,
+        provider: preferredProvider
+      }, '*');
+    } catch (error) {
+      console.error('Error updating preferred model:', error);
+      window.postMessage({
+        type: 'PREFERRED_MODEL_UPDATED',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
   private async waitForGlobals(maxAttempts = 10, delay = 200): Promise<void> {
     return new Promise((resolve, reject) => {
       let attempts = 0;
@@ -854,8 +909,6 @@ class BacklogAIInjector {
         this.chatbotAsideContainer.style.width = `${width}px`;
         // Don't manually set right position - let CSS handle it via .ai-ext-open class
       }
-
-      console.log('🔧 [Content] Sidebar width updated to:', width);
     } catch (error) {
       console.error('❌ [Content] Error updating sidebar width:', error);
     }
@@ -871,7 +924,6 @@ class BacklogAIInjector {
 
       if (rememberSizeEnabled) {
         await chrome.storage.local.set({ 'ai-ext-sidebar-width': width });
-        console.log('✅ [Content] Width saved successfully');
       } else {
         console.log('📝 [Content] Width saving disabled by user setting');
       }

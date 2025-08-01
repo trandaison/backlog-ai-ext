@@ -63,6 +63,39 @@
 - ✅ All hardcoded fallbacks removed in favor of config-based defaults
 
 ## Next Steps
+- ✅ **Added In-Chat Model Selector**: Users can now select AI model directly in chatbox
 - Test the preferred model selection in actual extension
 - Consider moving other constants (UI colors, timeouts, etc.) to configs
 - Add model capabilities metadata to support feature detection
+
+## Recent Update: In-Chat Model Selector
+
+### New Features Added:
+1. **Model Selector UI**:
+   - Added dropdown selector above textarea in chatbox
+   - Shows available models from user's selected models in settings
+   - Displays model name and provider (e.g., "Gemini 2.5 Flash (gemini)")
+   - Disabled during loading or when AI is typing
+
+2. **Real-time Model Switching**:
+   - Users can switch AI model mid-conversation
+   - Selected model is immediately used for next message
+   - Updates preferred model setting automatically
+
+3. **Enhanced Message Context**:
+   - Chat messages now include `currentModel` in context
+   - Background script uses selected model instead of global preference
+   - Model selection persists across chat sessions
+
+### Technical Implementation:
+- **ChatbotAsidePanel.tsx**: Added model selector state and UI
+- **content.ts**: Added message handlers for model settings sync
+- **background.ts**: Enhanced to accept model override per message
+- **sidebar.scss**: Added styling for model selector component
+- All changes use centralized `availableModels` and `defaultModelId` from configs
+
+### User Experience:
+- **Seamless Integration**: Model selector fits naturally in chat interface
+- **Visual Feedback**: Clear indication of current model with provider info
+- **Automatic Sync**: Changes immediately update extension preferences
+- **Fallback Support**: Graceful handling when models unavailable

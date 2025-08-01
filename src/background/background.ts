@@ -61,7 +61,6 @@ class GeminiService implements AIService {
       const result = await chrome.storage.sync.get(['encryptedGeminiApiKey']);
       if (result.encryptedGeminiApiKey) {
         this.apiKey = await EncryptionService.decryptApiKey(result.encryptedGeminiApiKey);
-        console.log('🔑 [Gemini] API key loaded successfully');
       }
     } catch (error) {
       console.error('❌ [Gemini] Error loading API key:', error);
@@ -76,23 +75,29 @@ class GeminiService implements AIService {
       if (defaultModel?.provider === 'gemini') {
         return this.mapToGeminiAPI(defaultModelId);
       }
-      return 'gemini-1.5-flash-latest'; // fallback
+      return 'gemini-2.0-flash-exp'; // Updated fallback to Gemini 2.0
     }
 
     return this.mapToGeminiAPI(preferredModel);
   }
 
   private mapToGeminiAPI(modelId: string): string {
+    // Map our model IDs to actual Gemini API model names
+    // All 2.5 variants use Gemini 2.0 Flash Experimental for consistency
     const modelMap: Record<string, string> = {
-      'gemini-2.5-pro': 'gemini-1.5-pro-latest',
-      'gemini-2.5-flash': 'gemini-1.5-flash-latest',
-      'gemini-2.5-flash-lite': 'gemini-1.5-flash'
+      'gemini-2.5-pro': 'gemini-2.0-flash-exp',
+      'gemini-2.5-flash': 'gemini-2.0-flash-exp',
+      'gemini-2.5-flash-lite': 'gemini-2.0-flash-exp', // ✅ Now uses Gemini 2.0 as expected
+      // OpenAI models that might accidentally come through
+      'gpt-4o': 'gemini-2.0-flash-exp', // fallback
+      'gpt-4o-mini': 'gemini-2.0-flash-exp', // fallback
+      'o1-preview': 'gemini-2.0-flash-thinking-exp', // reasoning model
+      'o1-mini': 'gemini-2.0-flash-thinking-exp', // reasoning model
+      'o3-mini': 'gemini-2.0-flash-thinking-exp' // reasoning model
     };
 
-    return modelMap[modelId] || 'gemini-1.5-flash-latest';
-  }
-
-  private getApiUrl(model: string = 'gemini-1.5-flash-latest'): string {
+    return modelMap[modelId] || 'gemini-2.0-flash-exp';
+  }  private getApiUrl(model: string = 'gemini-2.0-flash-exp'): string {
     return `${this.baseApiUrl}/${model}:generateContent`;
   }
 
@@ -109,7 +114,6 @@ class GeminiService implements AIService {
   }> {
     // Check if this is optimized context from ContextOptimizer
     if (contextData.isOptimized) {
-      console.log('🚀 [Gemini] Using optimized context, estimated tokens:', contextData.estimatedTokens);
       const result = await this.callGeminiAPI(message, settings);
       return {
         response: result.response,
@@ -197,10 +201,6 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       const geminiModel = this.getGeminiModelName(settings?.aiModel);
       const apiUrl = this.getApiUrl(geminiModel);
 
-      console.log('🔄 [Gemini] Calling Gemini API with preferred model:', settings?.aiModel);
-      console.log('🔄 [Gemini] Using actual Gemini model:', geminiModel);
-      console.log('🔧 [Gemini] Estimated input tokens:', ContextOptimizer.estimateTokenCount(prompt));
-
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -221,8 +221,6 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
         })
       });
 
-      console.log('🔧 [Gemini] Response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [Gemini] API Error Response:', errorText);
@@ -230,12 +228,6 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       }
 
       const data = await response.json();
-      console.log('🔧 [Gemini] API Response structure:', {
-        hasCandidates: !!data.candidates,
-        candidatesLength: data.candidates?.length,
-        hasError: !!data.error,
-        hasUsageMetadata: !!data.usageMetadata
-      });
 
       if (data.error) {
         throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`);
@@ -245,13 +237,6 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
         const content = data.candidates[0].content.parts[0].text;
         const responseId = data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() || undefined;
         const tokensUsed = data.usageMetadata?.totalTokenCount || ContextOptimizer.estimateTokenCount(content);
-
-        console.log('✅ [Gemini] Response generated successfully');
-        console.log('🔧 [Gemini] Token usage:', {
-          totalTokens: tokensUsed,
-          promptTokens: data.usageMetadata?.promptTokenCount,
-          candidatesTokens: data.usageMetadata?.candidatesTokenCount
-        });
 
         return {
           response: content,
@@ -679,9 +664,6 @@ class BackgroundService {
       // Cache ticket data only - no automatic AI analysis
       this.ticketDataCache.set(ticketData.id, ticketData);
 
-      console.log('🎯 [Background] Ticket data cached for:', ticketData.id);
-      console.log('💡 [Background] AI analysis will only run when user requests it');
-
       sendResponse({ success: true, cached: true });
     } catch (error) {
       console.error('Error caching ticket data:', error);
@@ -691,12 +673,14 @@ class BackgroundService {
 
   private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
     try {
-      console.log('🔍 [Background] handleUserMessage received data:', data);
+      const { message, messageType, ticketData, chatHistory, userInfo, currentModel } = data;
 
-      const { message, messageType, ticketData, chatHistory, userInfo } = data;
-
-      // Get current AI service
+      // Get current AI service, but override aiModel with currentModel if provided
       const settings = await this.getSettings();
+      if (currentModel) {
+        settings.aiModel = currentModel;
+      }
+
       const aiService = await this.getCurrentAIService();
 
       if (!aiService) {
@@ -712,8 +696,6 @@ class BackgroundService {
       } else {
         // For regular chat, use optimized context processing
         if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-          console.log('🚀 [Background] Using ContextOptimizer for chat context');
-
           // Prepare ChatHistoryData for optimization
           const historyData: ChatHistoryData = {
             ticketId: ticketData?.id || 'current',
@@ -759,12 +741,6 @@ class BackgroundService {
             estimatedTokens: optimizedResult.estimatedTokens,
             recentMessages: optimizedResult.recentMessages
           };
-
-          console.log('🔧 [Background] Optimized context:', {
-            originalMessages: chatHistory.length,
-            recentMessages: optimizedResult.recentMessages.length,
-            estimatedTokens: optimizedResult.estimatedTokens
-          });
         } else {
           // For regular chat without history, include full context
           processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
@@ -773,9 +749,6 @@ class BackgroundService {
 
       // Process with AI service
       const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings);
-
-      console.log('✅ [Background] AI response received:', response.response.substring(0, 200) + '...');
-      console.log('🔧 [Background] Token usage:', response.tokensUsed, 'tokens');
 
       sendResponse({ success: true, response: response.response, tokensUsed: response.tokensUsed, responseId: response.responseId });
 
@@ -816,13 +789,10 @@ class BackgroundService {
 
   private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {
     try {
-      console.log('🔄 [Background] Handling ticket summary request:', data);
-
       let ticketData = data.ticketData;
 
       // If ticket data is not provided, try to extract from active tab
       if (!ticketData) {
-        console.log('🔧 [Background] No ticket data provided, extracting from active tab...');
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tabs[0]?.id || !tabs[0]?.url) {
           throw new Error('No active tab found');
@@ -834,34 +804,17 @@ class BackgroundService {
         throw new Error('Could not extract ticket data');
       }
 
-      console.log('🔧 [Background] Ticket data for summary:', {
-        id: ticketData.id,
-        title: ticketData.title,
-        status: ticketData.status,
-        hasDescription: !!ticketData.description
-      });
-
       // Cache the ticket data
       this.ticketDataCache.set(ticketData.id, ticketData);
 
       // Get user settings for personalized summary
       const settings = await this.getSettings();
-      console.log('🔧 [Background] Settings for summary:', {
-        hasApiKey: !!settings.apiKey,
-        userRole: settings.userRole,
-        language: settings.language,
-        aiModel: settings.aiModel
-      });
 
       // Create specialized summary prompt
       const summaryPrompt = this.buildTicketSummaryPrompt(ticketData, settings);
-      console.log('🔧 [Background] Summary prompt length:', summaryPrompt.length);
 
       const aiService = await this.getCurrentAIService();
       const summary = await aiService.processUserMessage(summaryPrompt, { ticketData }, settings);
-
-      console.log('✅ [Background] Summary generated, length:', summary.response.length);
-      console.log('🔧 [Background] Summary token usage:', summary.tokensUsed);
 
       sendResponse({ success: true, summary: summary.response, tokensUsed: summary.tokensUsed });
     } catch (error) {
@@ -1272,10 +1225,6 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
       }
 
-      console.log('🔄 [Background] Calling OpenAI API for summary...');
-      console.log('🔧 [Background] API Key exists:', !!apiKey);
-      console.log('🔧 [Background] Model:', settings?.aiModel || 'gpt-3.5-turbo');
-
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -1299,9 +1248,6 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         })
       });
 
-      console.log('🔧 [Background] Response status:', response.status);
-      console.log('🔧 [Background] Response ok:', response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [Background] API Error Response:', errorText);
@@ -1309,15 +1255,6 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
       }
 
       const data = await response.json();
-      console.log('🔧 [Background] API Response:', {
-        hasChoices: !!data.choices,
-        choicesLength: data.choices?.length,
-        firstChoice: data.choices?.[0] ? {
-          hasMessage: !!data.choices[0].message,
-          hasContent: !!data.choices[0].message?.content
-        } : null,
-        error: data.error
-      });
 
       if (data.error) {
         throw new Error(`OpenAI API Error: ${data.error.message || JSON.stringify(data.error)}`);
@@ -1325,7 +1262,6 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
       if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
         const summary = data.choices[0].message.content;
-        console.log('✅ [Background] Summary generated successfully');
         return summary;
       } else {
         console.error('❌ [Background] Invalid API response structure:', data);
@@ -1650,8 +1586,6 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 
   private async handleSidebarWidthSync(width: number, sender: chrome.runtime.MessageSender): Promise<void> {
     try {
-      console.log('🔧 [Background] Syncing sidebar width across tabs:', width);
-
       // Get all tabs to sync width
       const tabs = await chrome.tabs.query({});
 
@@ -1671,8 +1605,6 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       });
 
       await Promise.allSettled(promises);
-      console.log('✅ [Background] Width sync completed');
-
     } catch (error) {
       console.error('❌ [Background] Error syncing sidebar width:', error);
     }
@@ -1685,7 +1617,6 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
         url: chrome.runtime.getURL('options.html'),
         active: true
       });
-      console.log('✅ [Background] Options page opened successfully');
     } catch (error) {
       console.error('❌ [Background] Error opening options page:', error);
     }

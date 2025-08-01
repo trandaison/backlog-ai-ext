@@ -824,6 +824,45 @@ body.ai-ext-sidebar-open {
   flex-shrink: 0;
 }
 
+// Model Selector - Simplified and compact
+.ai-ext-root .ai-ext-model-selector {
+  align-self: flex-start;
+  width: auto;
+  max-width: 200px;
+  padding: 4px 6px;
+  margin-bottom: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 11px;
+  background: white;
+  color: #495057;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    border-color: $primary-color;
+    box-shadow: 0 0 0 2px rgba(76, 186, 149, 0.2);
+  }
+
+  &:disabled {
+    background: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+  }
+
+  option {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+.ai-ext-chat-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .ai-ext-chat-input-wrapper {
   display: flex;
   gap: 8px;
