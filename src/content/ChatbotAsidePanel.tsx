@@ -52,6 +52,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
+  // Quick actions state
+  const [quickActionValue, setQuickActionValue] = useState('');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -549,6 +552,16 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
     // Send the suggestion as a message with 'suggestion' type
     handleSendMessage(suggestionMessages[type], 'suggestion');
+  };
+
+  const handleQuickActionChange = (value: string) => {
+    if (value && value !== '') {
+      // Execute the selected action
+      handleSuggestionClick(value as 'summary' | 'explain' | 'translate');
+
+      // Reset dropdown to default state
+      setQuickActionValue('');
+    }
   };
 
   const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
@@ -1072,22 +1085,21 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
         {/* Input */}
         <div className="ai-ext-chat-input-container">
-          {/* Model Selector and Attachment Button Row */}
+          {/* Quick Actions, Model Selector and Attachment Button Row */}
           <div className="ai-ext-input-header">
-            {/* Attachment button with badge */}
-            <button
-              className="ai-ext-attachment-button"
-              onClick={handleAttachmentClick}
-              disabled={isTyping || isProcessingFile}
-              title={isProcessingFile ? 'Processing files...' : 'Attach files'}
+            {/* Quick Actions Dropdown */}
+            <select
+              className="ai-ext-quick-actions"
+              value={quickActionValue}
+              onChange={(e) => handleQuickActionChange(e.target.value)}
+              disabled={isTyping}
+              title="Quick actions for common requests"
             >
-              {isProcessingFile ? '⏳' : '📎'}
-              {attachments.length > 0 && (
-                <span className="ai-ext-attachment-badge">
-                  {attachments.length}
-                </span>
-              )}
-            </button>
+              <option value="">⚡️ Quick Actions</option>
+              <option value="summary">📝 Tóm tắt nội dung</option>
+              <option value="explain">💡 Giải thích yêu cầu</option>
+              <option value="translate">🌍 Dịch nội dung</option>
+            </select>
 
             {/* Model Selector */}
             <select
@@ -1114,6 +1126,21 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
                 })
               )}
             </select>
+
+            {/* Attachment button with badge */}
+            <button
+              className="ai-ext-attachment-button"
+              onClick={handleAttachmentClick}
+              disabled={isTyping || isProcessingFile}
+              title={isProcessingFile ? 'Processing files...' : 'Attach files'}
+            >
+              {isProcessingFile ? '⏳' : '📎'}
+              {attachments.length > 0 && (
+                <span className="ai-ext-attachment-badge">
+                  {attachments.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* File Attachments Area */}

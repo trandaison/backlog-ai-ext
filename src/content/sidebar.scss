@@ -881,8 +881,8 @@ body.ai-ext-sidebar-open {
   height: 23px;
   border: none;
   border-radius: 6px;
-  background: #f8f9fa;
-  color: #6c757d;
+  background: #e9ecef;
+  color: #495057;
   cursor: pointer;
   @include flex-center;
   font-size: 12px;
@@ -890,8 +890,8 @@ body.ai-ext-sidebar-open {
   flex-shrink: 0;
 
   &:hover:not(:disabled) {
-    background: #e9ecef;
-    color: #495057;
+    background: #dee2e6;
+    color: #343a40;
   }
 
   &:disabled {
@@ -924,8 +924,8 @@ body.ai-ext-sidebar-open {
   padding: 4px;
   border: none;
   border-radius: 6px;
-  background: #f8f9fa;
-  color: #6c757d;
+  background: #e9ecef;
+  color: #495057;
   cursor: pointer;
   outline: none;
   font-size: 11px;
@@ -933,8 +933,8 @@ body.ai-ext-sidebar-open {
   flex-shrink: 0;
 
   &:hover:not(:disabled) {
-    background: #e9ecef;
-    color: #495057;
+    background: #dee2e6;
+    color: #343a40;
   }
 
   &:focus {
@@ -943,10 +943,49 @@ body.ai-ext-sidebar-open {
   }
 
   &:disabled {
-    background: #e9ecef;
+    background: #dee2e6;
     color: #6c757d;
     cursor: not-allowed;
     opacity: 0.6;
+  }
+}
+
+// Quick Actions Dropdown - Similar styling to model selector
+.ai-ext-root .ai-ext-quick-actions {
+  width: 120px;
+  max-width: 180px;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: #e9ecef;
+  color: #495057;
+  cursor: pointer;
+  outline: none;
+  font-size: 11px;
+  @include transition(all, 0.2s);
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #dee2e6;
+    color: #343a40;
+  }
+
+  &:focus {
+    border-color: $primary-color;
+    box-shadow: 0 0 0 2px rgba(76, 186, 149, 0.2);
+  }
+
+  &:disabled {
+    background: #dee2e6;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  // Highlight the default option differently
+  option[value=""] {
+    font-weight: 500;
+    color: #495057;
   }
 
   option {
