@@ -7,7 +7,7 @@ import { availableModels } from '../configs';
 
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
-  private chatbotManager: ChatbotManager;
+  private chatbotManager?: ChatbotManager; // Make optional since it might not be used everywhere
   private chatbotAsideContainer: HTMLElement | null = null;
   private chatbotToggleButton: HTMLButtonElement | null = null;
   private isChatbotOpen: boolean = false;
@@ -17,8 +17,66 @@ class BacklogAIInjector {
 
   constructor() {
     this.ticketAnalyzer = new TicketAnalyzer();
-    this.chatbotManager = new ChatbotManager();
-    this.init();
+    this.initializeTicketMonitoring();
+    this.setupChromeMessageListeners();
+    this.loadSidebarCSS();
+    this.setupChatbot();
+  }
+
+  /**
+   * Retry connection with background script with exponential backoff
+   */
+  private async retryBackgroundConnection(action: string, data?: any, maxRetries = 3): Promise<any> {
+    // Check if chrome extension context is available
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      throw new Error('Chrome extension context not available');
+    }
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 [Content] Connection attempt ${attempt}/${maxRetries} for action: ${action}`);
+
+        // Test connection first
+        const pingPromise = chrome.runtime.sendMessage({ action: 'ping' });
+        const pingTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Ping timeout')), 3000)
+        );
+
+        await Promise.race([pingPromise, pingTimeout]);
+        console.log(`✅ [Content] Ping successful on attempt ${attempt}`);
+
+        // Send actual message
+        const messagePromise = chrome.runtime.sendMessage({ action, data });
+        const messageTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Message timeout')), 15000)
+        );
+
+        const response = await Promise.race([messagePromise, messageTimeout]);
+        console.log(`✅ [Content] Message successful on attempt ${attempt}`);
+
+        return response;
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`⚠️ [Content] Attempt ${attempt} failed:`, lastError.message);
+
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.log(`⏳ [Content] Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    // All attempts failed
+    const errorMessage = lastError?.message.includes('Receiving end does not exist')
+      ? 'Background script disconnected. Please reload the extension or refresh the page.'
+      : `Connection failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`;
+
+    throw new Error(errorMessage);
   }
 
   private init() {
@@ -553,13 +611,14 @@ class BacklogAIInjector {
         chatHistoryLength: fullContextData.chatHistory.length
       });
 
-      // Send to background script with full context
-      const response = await chrome.runtime.sendMessage({
-        action: 'processUserMessage',
-        data: fullContextData
-      });
+      // Send to background script with retry mechanism
+      const response = await this.retryBackgroundConnection('processUserMessage', fullContextData);
 
       console.log('📨 [Content] Background response:', response);
+
+      if (!response) {
+        throw new Error('No response from background script');
+      }
 
       window.postMessage({
         type: 'CHAT_RESPONSE',
@@ -581,13 +640,10 @@ class BacklogAIInjector {
 
   private async handleSummaryRequest(ticketData: any, messageId: string): Promise<void> {
     try {
-      // Handle summary request via background script
-      const response = await chrome.runtime.sendMessage({
-        action: 'requestTicketSummary',
-        data: {
-          ticketId: ticketData.id,
-          ticketData: ticketData
-        }
+      // Handle summary request via background script with retry
+      const response = await this.retryBackgroundConnection('requestTicketSummary', {
+        ticketId: ticketData.id,
+        ticketData: ticketData
       });
 
       window.postMessage({
@@ -598,6 +654,7 @@ class BacklogAIInjector {
         error: response.success ? null : response.error
       }, '*');
     } catch (error) {
+      console.error('❌ [Content] Error handling summary request:', error);
       window.postMessage({
         type: 'SUMMARY_RESPONSE',
         id: messageId,
@@ -609,10 +666,8 @@ class BacklogAIInjector {
 
   private async handleGetUserInfo(messageId: string): Promise<void> {
     try {
-      // Request user info via background script
-      const response = await chrome.runtime.sendMessage({
-        action: 'getCurrentUser'
-      });
+      // Request user info via background script with retry
+      const response = await this.retryBackgroundConnection('getCurrentUser');
 
       window.postMessage({
         type: 'USER_INFO_RESPONSE',
@@ -622,7 +677,7 @@ class BacklogAIInjector {
         error: response.success ? null : response.error
       }, '*');
     } catch (error) {
-      console.error('Error getting user info:', error);
+      console.error('❌ [Content] Error getting user info:', error);
       window.postMessage({
         type: 'USER_INFO_RESPONSE',
         id: messageId,

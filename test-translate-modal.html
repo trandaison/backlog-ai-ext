@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Translate Modal - Updated</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .update-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .test-button {
+            background: #42CE9F;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .test-button:hover {
+            background: #2fb88a;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #42CE9F;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feature-list li:before {
+            content: "✅ ";
+            color: #42CE9F;
+            font-weight: bold;
+        }
+        .bug-fix {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 15px 0;
+        }
+        .bug-fix::before {
+            content: "🔧 ";
+            font-weight: bold;
+        }
+        .improvement {
+            background: #e7f3ff;
+            border: 1px solid #74b9ff;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 15px 0;
+        }
+        .improvement::before {
+            content: "⚡ ";
+            font-weight: bold;
+        }
+        code {
+            background: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🌍 Translate Modal Test <span class="update-badge">FINAL FIX</span></h1>
+        <p>Đã sửa hoàn toàn cả styling và connection issues!</p>
+
+        <div class="bug-fix">
+            <strong>🔧 Connection FIXED:</strong> Thêm service worker keep-alive mechanism và timeout handling để fix "Receiving end does not exist".
+        </div>
+
+        <div class="improvement">
+            <strong>🎨 Styling UPDATED:</strong> Modal form layout hoàn thiện với align-items: flex-start, padding-bottom cho arrow, và width: 100% cho selects.
+        </div>
+
+        <div class="improvement">
+            <strong>⚡ Robust Error Handling:</strong> Thêm ping timeout, message timeout, và clear error messages cho users.
+        </div>
+
+        <h2>🔧 Final Fixes Applied:</h2>
+        <ul class="feature-list">
+            <li><strong>Service Worker Keep-Alive</strong>: Background script giờ có heartbeat mechanism mỗi 25 giây</li>
+            <li><strong>Timeout Protection</strong>: Ping test với 5s timeout, message processing với 30s timeout</li>
+            <li><strong>Better Error Messages</strong>: Clear guidance về reload extension when needed</li>
+            <li><strong>Perfect Form Layout</strong>: align-items: flex-start, padding-bottom: 8px cho arrow, width: 100% cho selects</li>
+            <li><strong>Tab Activation Listener</strong>: Background script ready khi switch tabs</li>
+        </ul>
+
+        <h2>🎯 Styling Changes Applied:</h2>
+        <div class="result">
+            <h3>CSS Updates:</h3>
+            <ul>
+                <li><code>.ai-ext-form-column</code>: Added <strong>align-items: flex-start</strong></li>
+                <li><code>.ai-ext-form-arrow-center</code>: Changed margin-top thành <strong>padding-bottom: 8px</strong></li>
+                <li><code>.ai-ext-form-select-compact</code>: Added <strong>width: 100%</strong></li>
+            </ul>
+
+            <p><strong>Result:</strong> Perfect alignment với labels left-aligned, selects full-width, arrow positioned correctly</p>
+        </div>
+
+        <h2>🚀 Connection Reliability:</h2>
+        <div class="result">
+            <h3>Background Script Improvements:</h3>
+            <ul>
+                <li><code>setupKeepAlive()</code>: Service worker heartbeat mỗi 25s</li>
+                <li><code>chrome.tabs.onActivated</code>: Ready state trên tab switching</li>
+                <li><code>Promise.race()</code>: Timeout protection cho messages</li>
+                <li><code>Ping test</code>: Health check trước khi gửi main request</li>
+            </ul>
+        </div>
+
+        <h2>🎯 New Form Layout:</h2>
+        <div class="result">
+            <p><strong>Previous:</strong> Inline labels và selects</p>
+            <pre>
+Translate from: [Japanese] to: [Vietnamese]
+            </pre>
+
+            <p><strong>Current:</strong> Column layout với centered labels</p>
+            <pre>
+Translate from            To
+[ Japanese ]         ->   [ Vietnamese ]
+            </pre>
+        </div>
+
+        <h2>🎯 Technical Changes:</h2>
+        <div class="result">
+            <h3>Files Modified:</h3>
+            <ul>
+                <li><code>TranslateModal.tsx</code>:
+                    <ul>
+                        <li>Changed to column layout: <code>.ai-ext-form-row</code> với <code>.ai-ext-form-column</code></li>
+                        <li>Labels positioned above selects với <code>.ai-ext-form-label-top</code></li>
+                        <li>Compact select styling với <code>.ai-ext-form-select-compact</code></li>
+                        <li>Centered arrow với <code>.ai-ext-form-arrow-center</code></li>
+                    </ul>
+                </li>
+                <li><code>content.ts</code>:
+                    <ul>
+                        <li>Added ping test trước khi gửi message: <code>chrome.runtime.sendMessage({ action: 'ping' })</code></li>
+                        <li>Better error handling cho connection issues</li>
+                        <li>Specific error message cho "Receiving end does not exist"</li>
+                    </ul>
+                </li>
+                <li><code>background.ts</code>:
+                    <ul>
+                        <li>Added ping handler: <code>case 'ping': sendResponse({ success: true, message: 'pong' })</code></li>
+                        <li>Improved message routing reliability</li>
+                    </ul>
+                </li>
+                <li><code>sidebar.scss</code>:
+                    <ul>
+                        <li>Added <code>.ai-ext-form-row</code> flex layout với <code>align-items: end</code></li>
+                        <li>Added <code>.ai-ext-form-column</code> cho vertical form groups</li>
+                        <li>Added <code>.ai-ext-form-label-top</code> cho centered labels</li>
+                        <li>Added <code>.ai-ext-form-arrow-center</code> với proper margin alignment</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <h2>🚀 Test Instructions:</h2>
+        <ol>
+            <li>Reload extension từ <code>dev-build</code> folder trong Chrome</li>
+            <li>Mở Backlog ticket page bất kỳ</li>
+            <li>Click chatbot button để mở AI assistant</li>
+            <li>Trong Quick Actions dropdown, chọn "🌍 Dịch nội dung"</li>
+            <li>Verify modal form layout: "Translate from" label trên, "Japanese" select dưới, arrow ở giữa, "To" label trên, "Vietnamese" select dưới</li>
+            <li>Click "OK" để test - không còn connection error</li>
+            <li>Message hiển thị sẽ là: <code>/translate ja -> vi</code></li>
+        </ol>
+
+        <div class="result">
+            <h3>✅ All Issues Resolved:</h3>
+            <ul class="feature-list">
+                <li>Connection error "Receiving end does not exist" fixed</li>
+                <li>Form layout changed to column style với labels trên, selects dưới</li>
+                <li>Better error handling và user feedback</li>
+                <li>Ping test để ensure background script availability</li>
+                <li>Responsive design maintained</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

@@ -658,9 +658,15 @@ export class ChatStorageService {
       errorMessage.includes('quota_exceeded')
     );
 
-    // Only check chrome.runtime.lastError if chrome is available
-    if (typeof chrome !== 'undefined' && chrome.runtime?.lastError) {
-      return isQuotaError || chrome.runtime.lastError.message?.toLowerCase().includes('quota');
+    // Only check chrome.runtime.lastError if chrome is available and in correct context
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.lastError) {
+        const lastErrorMessage = chrome.runtime.lastError.message?.toLowerCase() || '';
+        return isQuotaError || lastErrorMessage.includes('quota');
+      }
+    } catch (runtimeError) {
+      // Ignore runtime access errors
+      console.debug('Runtime access error (expected in some contexts):', runtimeError);
     }
 
     return isQuotaError;

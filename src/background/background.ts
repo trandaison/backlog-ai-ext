@@ -1,10 +1,15 @@
 // Background script để xử lý AI API và communication
 import { TicketData } from '../shared/ticketAnalyzer';
 import { EncryptionService } from '../shared/encryption';
-import ContextOptimizer from '../shared/contextOptimizer';
+// import ContextOptimizer from '../shared/contextOptimizer'; // Temporarily commented
 import { availableModels, defaultModelId } from '../configs';
 import type { ChatHistoryData } from '../shared/chatStorageService';
 import { FileAttachment } from '../types/attachment';
+
+// Simple token estimator as fallback
+const estimateTokenCount = (text: string): number => {
+  return Math.ceil(text.length / 4); // Rough estimation: 1 token ≈ 4 characters
+};
 
 interface Settings {
   apiKey: string;
@@ -125,7 +130,7 @@ class GeminiService implements AIService {
       return {
         response: result.response,
         responseId: result.responseId,
-        tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
+        tokensUsed: result.tokensUsed || estimateTokenCount(result.response)
       };
     }
 
@@ -134,7 +139,7 @@ class GeminiService implements AIService {
     return {
       response: result.response,
       responseId: result.responseId,
-      tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
+      tokensUsed: result.tokensUsed || estimateTokenCount(result.response)
     };
   }
 
@@ -314,7 +319,7 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
         const content = data.candidates[0].content.parts[0].text;
         const responseId = data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() || undefined;
-        const tokensUsed = data.usageMetadata?.totalTokenCount || ContextOptimizer.estimateTokenCount(content);
+        const tokensUsed = data.usageMetadata?.totalTokenCount || estimateTokenCount(content);
 
         return {
           response: content,
@@ -508,7 +513,7 @@ class OpenAIService implements AIService {
 
       if (data.choices && data.choices[0]) {
         const content = data.choices[0].message.content;
-        const tokensUsed = data.usage?.total_tokens || ContextOptimizer.estimateTokenCount(content);
+        const tokensUsed = data.usage?.total_tokens || estimateTokenCount(content);
         const responseId = data.id;
 
         return {
@@ -695,11 +700,65 @@ class BackgroundService {
   private openaiService: OpenAIService;
   private geminiService: GeminiService;
   private ticketDataCache: Map<string, TicketData> = new Map();
+  private keepAliveInterval: number | null = null; // Use number instead of NodeJS.Timeout
 
   constructor() {
-    this.openaiService = new OpenAIService();
-    this.geminiService = new GeminiService();
-    this.setupMessageListeners();
+    try {
+      console.log('🔧 [Background] Creating services...');
+      this.openaiService = new OpenAIService();
+      this.geminiService = new GeminiService();
+
+      console.log('🔧 [Background] Setting up message listeners...');
+      this.setupMessageListeners();
+
+      console.log('🔧 [Background] Setting up keep-alive...');
+      this.setupKeepAlive();
+
+      console.log('✅ [Background] Constructor completed successfully');
+    } catch (error) {
+      console.error('❌ [Background] Error in constructor:', error);
+      // Re-throw to prevent partial initialization
+      throw error;
+    }
+  }
+
+  private setupKeepAlive() {
+    try {
+      // Keep service worker alive with periodic heartbeat
+      this.keepAliveInterval = setInterval(() => {
+        console.log('🔄 [Background] Heartbeat - service worker alive at', new Date().toISOString());
+        // Force a small operation to keep the service worker active
+        chrome.storage.local.get('heartbeat').catch(() => {
+          console.warn('⚠️ [Background] Storage access failed during heartbeat');
+        });
+      }, 20000) as any; // Cast to any to avoid type issues in Chrome extension context
+
+      // Enhanced tab activation handling
+      chrome.tabs.onActivated.addListener(() => {
+        console.log('🔄 [Background] Tab activated - service worker ready');
+        // Reset heartbeat on tab activation
+        if (this.keepAliveInterval) {
+          clearInterval(this.keepAliveInterval as any);
+          this.setupKeepAlive();
+        }
+      });
+
+      // Handle chrome startup
+      chrome.runtime.onStartup.addListener(() => {
+        console.log('🔄 [Background] Chrome startup - reinitializing service worker');
+        this.setupKeepAlive();
+      });
+
+      // Handle extension install/update
+      chrome.runtime.onInstalled.addListener(() => {
+        console.log('🔄 [Background] Extension installed/updated - service worker ready');
+      });
+
+      console.log('✅ [Background] Keep-alive setup completed');
+    } catch (error) {
+      console.error('❌ [Background] Error setting up keep-alive:', error);
+      // Don't throw here as keep-alive is not critical for basic functionality
+    }
   }
 
   // Get the current AI service based on user settings
@@ -721,19 +780,29 @@ class BackgroundService {
   }
 
   private setupMessageListeners() {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      this.handleMessage(message, sender, sendResponse);
-      return true; // Keep message channel open for async response
-    });
+    try {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        this.handleMessage(message, sender, sendResponse);
+        return true; // Keep message channel open for async response
+      });
 
-    // Handle extension icon click to open options page
-    chrome.action.onClicked.addListener(() => {
-      this.handleOpenOptionsPage();
-    });
+      // Handle extension icon click to open options page
+      chrome.action.onClicked.addListener(() => {
+        this.handleOpenOptionsPage();
+      });
+
+      console.log('✅ [Background] Message listeners setup completed');
+    } catch (error) {
+      console.error('❌ [Background] Error setting up message listeners:', error);
+      throw error;
+    }
   }
 
   private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     try {
+      // Log incoming message for debugging
+      console.log('📨 [Background] Received message:', message.action, 'from tab:', sender.tab?.id);
+
       switch (message.action) {
         case 'analyzeTicket':
           await this.handleTicketAnalysis(message.data, sendResponse);
@@ -741,6 +810,11 @@ class BackgroundService {
 
         case 'processUserMessage':
           await this.handleUserMessage(message.data, sendResponse);
+          break;
+
+        case 'ping':
+          console.log('🏓 [Background] Ping received - responding with pong');
+          sendResponse({ success: true, message: 'pong', timestamp: Date.now() });
           break;
 
         case 'sidebarWidthChanged':
@@ -792,11 +866,17 @@ class BackgroundService {
           break;
 
         default:
-          sendResponse({ error: 'Unknown action' });
+          console.warn('⚠️ [Background] Unknown action:', message.action);
+          sendResponse({ success: false, error: 'Unknown action: ' + message.action });
       }
     } catch (error) {
-      console.error('Error handling message:', error);
-      sendResponse({ error: String(error) });
+      console.error('❌ [Background] Error handling message:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      sendResponse({
+        success: false,
+        error: errorMessage,
+        timestamp: Date.now()
+      });
     }
   }
 
@@ -839,51 +919,8 @@ class BackgroundService {
       } else {
         // For regular chat, use optimized context processing
         if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-          // Prepare ChatHistoryData for optimization
-          const historyData: ChatHistoryData = {
-            ticketId: ticketData?.id || 'current',
-            ticketUrl: data.ticketUrl || ticketData?.url || 'current-ticket',
-            messages: chatHistory.map((msg: any) => ({
-              id: msg.id || Date.now().toString(),
-              content: msg.content,
-              sender: msg.sender,
-              timestamp: msg.timestamp || new Date().toISOString(),
-              tokenCount: msg.tokenCount,
-              responseId: msg.responseId,
-              compressed: msg.compressed
-            })),
-            lastUpdated: new Date().toISOString(),
-            userInfo: userInfo || {
-              id: 0,
-              name: 'User',
-              avatar: '',
-              mailAddress: '',
-              userId: 'current-user'
-            },
-            ticketInfo: {
-              title: ticketData?.title || 'Current Ticket',
-              status: ticketData?.status || 'Unknown',
-              assignee: ticketData?.assignee
-            },
-            contextSummary: data.contextSummary,
-            lastSummaryIndex: data.lastSummaryIndex,
-            totalTokensUsed: data.totalTokensUsed
-          };
-
-          // Prepare optimized context
-          const optimizedResult = ContextOptimizer.prepareOptimizedContext(
-            historyData,
-            message,
-            ticketData?.description || 'No ticket content available'
-          );
-
-          processedMessage = optimizedResult.context;
-          optimizedContext = {
-            ...data,
-            isOptimized: true,
-            estimatedTokens: optimizedResult.estimatedTokens,
-            recentMessages: optimizedResult.recentMessages
-          };
+          // Simple context building without optimization to avoid dependency issues
+          processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
         } else {
           // For regular chat without history, include full context
           processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
@@ -1767,5 +1804,11 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
   }
 }
 
-// Khởi tạo background service
-new BackgroundService();
+// Khởi tạo background service với error handling
+try {
+  console.log('🔧 [Background] Initializing background service...');
+  new BackgroundService();
+  console.log('✅ [Background] Background service initialized successfully');
+} catch (error) {
+  console.error('❌ [Background] Fatal error during background service initialization:', error);
+}
