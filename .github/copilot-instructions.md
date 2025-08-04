@@ -46,6 +46,51 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
   - Feature flags and settings defaults
 - When adding new constants that may change over time, create them in the configs directory first
 
+### Webpack Bundle Splitting & Dynamic Imports:
+**CRITICAL**: Avoid dynamic imports in Chrome extensions - they cause webpack bundle splitting issues that are difficult to debug and resolve.
+
+**Problems with Dynamic Imports:**
+- Webpack creates separate chunks for dynamic imports
+- Chrome extension content scripts have strict loading constraints
+- Manifest V3 security policies interfere with dynamic chunk loading
+- Loading failures are hard to debug and occur inconsistently across environments
+
+**Solution - Dependency Injection Pattern:**
+Instead of using dynamic imports, implement a dependency injection pattern:
+
+```typescript
+// ❌ AVOID: Dynamic imports
+const Component = React.lazy(() => import('./SomeComponent'));
+
+// ✅ PREFERRED: Dependency injection with fallback
+interface Props {
+  SomeComponent?: React.ComponentType<SomeComponentProps>;
+}
+
+function MyComponent({ SomeComponent: InjectedComponent }: Props) {
+  if (InjectedComponent) {
+    return <InjectedComponent />;
+  }
+
+  // Fallback implementation or default component
+  return <DefaultComponent />;
+}
+```
+
+**Implementation Guidelines:**
+- Always provide fallback components for optional dependencies
+- Use static imports at the top level whenever possible
+- Pass components as props through dependency injection
+- Test both scenarios: with and without injected dependencies
+- Document which components support dependency injection
+
+**Historical Context:**
+This pattern was developed after multiple incidents where dynamic imports caused:
+- Bundle loading failures in production
+- Inconsistent behavior across different Backlog domains
+- Hours of debugging webpack chunk loading issues
+- Content script injection failures
+
 ### Security:
 - Store API keys securely using Chrome storage APIs
 - Validate all user inputs

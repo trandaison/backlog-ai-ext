@@ -3,6 +3,8 @@ import { TicketData } from '../shared/ticketAnalyzer';
 import { EncryptionService } from '../shared/encryption';
 import ContextOptimizer from '../shared/contextOptimizer';
 import { availableModels, defaultModelId } from '../configs';
+import { parseCommand } from '../shared/commandUtils';
+import { getLanguageDisplayName } from '../shared/languageUtils';
 import type { ChatHistoryData } from '../shared/chatStorageService';
 import { FileAttachment } from '../types/attachment';
 
@@ -833,8 +835,14 @@ class BackgroundService {
       let processedMessage = message;
       let optimizedContext: any = data;
 
-      // Build context-aware prompt based on message type
-      if (messageType === 'suggestion') {
+      // Check if this is a command
+      const commandResult = parseCommand(message);
+      if (commandResult && commandResult.command === 'translate') {
+        // Extract source and target languages from the command
+        const [, sourceLanguage, targetLanguage] = commandResult.matches;
+        processedMessage = this.buildTranslatePrompt(ticketData, sourceLanguage, targetLanguage);
+      } else if (messageType === 'suggestion') {
+        // Build context-aware prompt based on message type
         processedMessage = this.buildSuggestionPrompt(message, ticketData);
       } else {
         // For regular chat, use optimized context processing
@@ -1235,10 +1243,15 @@ Bao gồm: mục tiêu chính, yêu cầu chức năng, và những điểm quan
 Phân tích các tác vụ cần thực hiện, dependencies, và impact của thay đổi này.`;
   }
 
-  private buildTranslatePrompt(ticketData: any): string {
+  private buildTranslatePrompt(ticketData: any, sourceLanguage?: string, targetLanguage?: string): string {
     if (!ticketData) {
-      return 'Hãy dịch toàn bộ nội dung ticket sang tiếng Anh.';
+      const sourceDisplay = sourceLanguage ? getLanguageDisplayName(sourceLanguage) : 'ngôn ngữ nguồn';
+      const targetDisplay = targetLanguage ? getLanguageDisplayName(targetLanguage) : 'tiếng Anh';
+      return `Hãy dịch toàn bộ nội dung ticket từ ${sourceDisplay} sang ${targetDisplay}.`;
     }
+
+    const sourceDisplay = sourceLanguage ? getLanguageDisplayName(sourceLanguage) : 'ngôn ngữ hiện tại';
+    const targetDisplay = targetLanguage ? getLanguageDisplayName(targetLanguage) : 'tiếng Anh';
 
     const commentsSection = ticketData.comments && ticketData.comments.length > 0
       ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
@@ -1246,7 +1259,7 @@ Phân tích các tác vụ cần thực hiện, dependencies, và impact của t
           .join('\n')}`
       : '';
 
-    return `Hãy dịch toàn bộ nội dung của ticket sau sang tiếng Anh:
+    return `Hãy dịch toàn bộ nội dung của ticket sau từ ${sourceDisplay} sang ${targetDisplay}:
 
 **Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
 **Mô tả**: ${ticketData.description || 'Không có mô tả'}

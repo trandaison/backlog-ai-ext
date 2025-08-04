@@ -47,6 +47,7 @@ $shadow-heavy: 0 4px 20px rgba(0, 0, 0, 0.15);
   box-shadow: $shadow-heavy;
   border-radius: $border-radius;
   overflow: hidden;
+  position: relative; // For scoped modal positioning
 
   @include scrollbar-style;
 }
