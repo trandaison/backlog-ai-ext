@@ -12,6 +12,7 @@ import {
   AttachmentUtils
 } from '../types/attachment';
 import TranslateModal from '../shared/TranslateModal';
+import CreateTicketModal from '../shared/CreateTicketModal';
 import Modal from '../shared/Modal';
 
 // AI Icon as data URL
@@ -60,6 +61,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   // Modal states
   const [isTranslateModalOpen, setIsTranslateModalOpen] = useState(false);
+  const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -565,6 +567,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       if (value === 'translate') {
         // Open translate modal instead of sending message directly
         setIsTranslateModalOpen(true);
+      } else if (value === 'create-ticket') {
+        // Open create ticket modal
+        setIsCreateTicketModalOpen(true);
       } else {
         // Execute other actions normally
         handleSuggestionClick(value as 'summary' | 'explain' | 'translate');
@@ -586,7 +591,73 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     setIsTranslateModalOpen(false);
   };
 
-  const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
+  const handleCreateTicketModalClose = () => {
+    setIsCreateTicketModalOpen(false);
+  };
+
+  const handleCreateTicketCommand = (command: string) => {
+    // Send the create ticket command as a user message
+    handleSendMessage(command, 'user');
+    setIsCreateTicketModalOpen(false);
+  };
+
+  // Load backlog configurations for modal
+  const loadBacklogConfigs = async (): Promise<any[]> => {
+    try {
+      console.log('🔍 [ChatbotAsidePanel] Loading backlog configs via postMessage...');
+
+      // Use postMessage to communicate with content script (which has Chrome API access)
+      const response = await new Promise((resolve) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (event.data.type === 'BACKLOG_CONFIGS_RESPONSE' && event.data.id === messageId) {
+            window.removeEventListener('message', responseHandler);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        // Send request to content script
+        window.postMessage({
+          type: 'REQUEST_BACKLOG_CONFIGS',
+          id: messageId
+        }, '*');
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          resolve({ success: false, error: 'Timeout' });
+        }, 5000);
+      });
+
+      console.log('📦 [ChatbotAsidePanel] PostMessage response:', response);
+
+      if (response && (response as any).configs) {
+        const configs = (response as any).configs;
+        // Data already in the correct format from background script
+        const backlogConfigs = configs.map((config: any) => ({
+          id: config.id,
+          domain: config.domain,
+          spaceName: config.spaceName,
+          apiKey: config.apiKey,
+          note: config.spaceName || config.domain,
+          namespace: config.spaceName
+        }));
+        console.log('✅ [ChatbotAsidePanel] Transformed configs:', backlogConfigs);
+        return backlogConfigs;
+      } else {
+        console.warn('⚠️ [ChatbotAsidePanel] No configs found in response:', response);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ [ChatbotAsidePanel] Error loading backlog configs:', error);
+      return [];
+    }
+  };  const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
     if (!message.trim() || isTyping) return;
 
     // Check if this is a command that needs special processing
@@ -1128,6 +1199,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
               <option value="summary">📝 Tóm tắt nội dung</option>
               <option value="explain">💡 Giải thích yêu cầu</option>
               <option value="translate">🌍 Dịch nội dung</option>
+              <option value="create-ticket">📋 Tạo Backlog ticket</option>
             </select>
 
             {/* Model Selector */}
@@ -1255,6 +1327,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         onClose={handleTranslateModalClose}
         onConfirm={handleTranslateCommand}
         ModalComponent={Modal}
+      />
+
+      {/* Create Ticket Modal */}
+      <CreateTicketModal
+        isOpen={isCreateTicketModalOpen}
+        onClose={handleCreateTicketModalClose}
+        onSubmit={handleCreateTicketCommand}
+        Modal={Modal}
+        loadBacklogConfigs={loadBacklogConfigs}
       />
     </div>
   );

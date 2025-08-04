@@ -504,6 +504,10 @@ class BacklogAIInjector {
         case 'UPDATE_PREFERRED_MODEL':
           this.handleUpdatePreferredModel(event.data.modelId);
           break;
+
+        case 'REQUEST_BACKLOG_CONFIGS':
+          this.handleRequestBacklogConfigs(event.data.id);
+          break;
       }
     });
   }
@@ -768,6 +772,36 @@ class BacklogAIInjector {
       window.postMessage({
         type: 'PREFERRED_MODEL_UPDATED',
         success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleRequestBacklogConfigs(messageId: string): Promise<void> {
+    try {
+      console.log('🔍 [Content] Handling backlog configs request...');
+
+      // Send message to background script to get backlog configs
+      const response = await chrome.runtime.sendMessage({
+        action: 'getBacklogConfigs'
+      });
+
+      console.log('📦 [Content] Background response for configs:', response);
+
+      window.postMessage({
+        type: 'BACKLOG_CONFIGS_RESPONSE',
+        id: messageId,
+        success: response && response.configs ? true : false,
+        configs: response?.configs || [],
+        error: response?.error || null
+      }, '*');
+    } catch (error) {
+      console.error('❌ [Content] Error handling backlog configs request:', error);
+      window.postMessage({
+        type: 'BACKLOG_CONFIGS_RESPONSE',
+        id: messageId,
+        success: false,
+        configs: [],
         error: error instanceof Error ? error.message : 'Unknown error'
       }, '*');
     }

@@ -18,6 +18,13 @@ export const availableCommands: CommandConfig[] = [
     description: 'Translate ticket content from one language to another',
     example: '/translate ja -> vi',
     requiresModal: true
+  },
+  {
+    command: 'create-ticket',
+    pattern: /^\/create-ticket\s+([\w.-]+\.backlog\.(?:com|jp|tool\.com))\s+([a-z]{2})$/i,
+    description: 'Create a new ticket in target backlog with translated content',
+    example: '/create-ticket myspace.backlog.com vi',
+    requiresModal: true
   }
 ];
 
