@@ -7,15 +7,10 @@ import { parseCommand } from '../shared/commandUtils';
 import { getLanguageDisplayName } from '../shared/commandUtils';
 import type { ChatHistoryData } from '../shared/chatStorageService';
 import { FileAttachment } from '../types/attachment.d';
+import { SettingsAdapter, type LegacySettings } from '../shared/settingsAdapter';
 
-interface Settings {
-  apiKey: string;
-  userRole: string;
-  language: string;
-  aiModel: string;
-  geminiApiKey?: string;
-  preferredProvider?: 'openai' | 'gemini';
-}
+// Legacy interfaces for backward compatibility during migration
+interface Settings extends LegacySettings {} // Alias for easier migration
 
 interface StoredSettings {
   encryptedApiKey: string;
@@ -697,18 +692,35 @@ class BackgroundService {
   private openaiService: OpenAIService;
   private geminiService: GeminiService;
   private ticketDataCache: Map<string, TicketData> = new Map();
+  private settingsAdapter: SettingsAdapter;
 
   constructor() {
     this.openaiService = new OpenAIService();
     this.geminiService = new GeminiService();
-    this.setupMessageListeners();
+    this.settingsAdapter = SettingsAdapter.getInstance();
+    this.initializeWithMigration();
+  }
+
+  private async initializeWithMigration(): Promise<void> {
+    try {
+      // Initialize settings service (which will trigger migration if needed)
+      await this.settingsAdapter.getLegacySettings();
+      console.log('✅ Settings service initialized');
+
+      // Setup message listeners after migration is complete
+      this.setupMessageListeners();
+    } catch (error) {
+      console.error('❌ Settings migration failed, continuing with defaults:', error);
+      // Continue with message listeners even if migration fails
+      this.setupMessageListeners();
+    }
   }
 
   // Get the current AI service based on user settings
   private async getCurrentAIService(): Promise<AIService> {
-    const settings = await this.getSettings();
+    const preferredProvider = await this.settingsAdapter.getPreferredProvider();
 
-    if (settings.preferredProvider === 'gemini') {
+    if (preferredProvider === 'gemini') {
       return this.geminiService;
     } else {
       return this.openaiService;
@@ -1432,52 +1444,8 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
   private async getSettings(): Promise<Settings> {
     try {
-      const result = await chrome.storage.sync.get([
-        'encryptedApiKey',
-        'encryptedGeminiApiKey',
-        'userRole',
-        'language',
-        'aiModel',
-        'preferredProvider',
-        'preferredModel'
-      ]);
-
-      // Decrypt OpenAI API key if exists
-      let apiKey = '';
-      if (result.encryptedApiKey) {
-        try {
-          apiKey = await EncryptionService.decryptApiKey(result.encryptedApiKey);
-        } catch (error) {
-          console.error('Failed to decrypt OpenAI API key in getSettings:', error);
-        }
-      }
-
-      // Decrypt Gemini API key if exists
-      let geminiApiKey = '';
-      if (result.encryptedGeminiApiKey) {
-        try {
-          geminiApiKey = await EncryptionService.decryptApiKey(result.encryptedGeminiApiKey);
-        } catch (error) {
-          console.error('Failed to decrypt Gemini API key in getSettings:', error);
-        }
-      }
-
-      // Determine preferred provider based on preferred model if not explicitly set
-      let preferredProvider = result.preferredProvider;
-      if (!preferredProvider && result.preferredModel) {
-        // Use availableModels to determine provider
-        const selectedModel = availableModels.find(m => m.id === result.preferredModel);
-        preferredProvider = selectedModel?.provider || 'openai';
-      }
-
-      return {
-        apiKey,
-        geminiApiKey,
-        userRole: result.userRole || 'developer',
-        language: result.language || 'vi',
-        aiModel: result.aiModel || result.preferredModel || defaultModelId,
-        preferredProvider: preferredProvider || 'openai'
-      };
+      // Use SettingsAdapter to get settings in legacy format
+      return await this.settingsAdapter.getLegacySettings();
     } catch (error) {
       console.error('Error getting settings:', error);
       return {
@@ -1486,25 +1454,18 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         userRole: 'developer',
         language: 'vi',
         aiModel: defaultModelId,
-        preferredProvider: 'openai' as const
+        preferredProvider: 'openai'
       };
     }
   }
 
   private async saveSettings(settings: Settings) {
     try {
-      // Encrypt API key before storing
-      const encryptedApiKey = await EncryptionService.encryptApiKey(settings.apiKey);
-
-      await chrome.storage.sync.set({
-        encryptedApiKey,
-        userRole: settings.userRole,
-        language: settings.language,
-        aiModel: settings.aiModel
-      });
+      // Use SettingsAdapter to save settings in new format
+      await this.settingsAdapter.updateLegacySettings(settings);
+      console.log('✅ Settings saved successfully');
     } catch (error) {
-      console.error('Error saving settings:', error);
-      throw error;
+      console.error('❌ Settings save failed:', error);
     }
   }
 
