@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings Client Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .test-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .output {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Settings Client Test Page</h1>
+  <p>Test the new message-based settings communication</p>
+
+  <div class="test-section">
+    <h2>Core Settings Operations</h2>
+    <button onclick="testGetAllSettings()">Get All Settings</button>
+    <button onclick="testUpdateLanguage()">Update Language to English</button>
+    <button onclick="testUpdateFeatureFlag()">Toggle Auto Open Chatbox</button>
+    <div id="core-output" class="output"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>AI Model Settings</h2>
+    <button onclick="testGetAiSettings()">Get AI Settings</button>
+    <button onclick="testUpdatePreferredModel()">Set Preferred Model</button>
+    <button onclick="testUpdateApiKey()">Update OpenAI API Key</button>
+    <div id="ai-output" class="output"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Backlog Integration</h2>
+    <button onclick="testGetBacklogs()">Get Backlog Configs</button>
+    <button onclick="testAddBacklog()">Add Test Backlog</button>
+    <div id="backlog-output" class="output"></div>
+  </div>
+
+  <script>
+    // Test functions
+    async function testGetAllSettings() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'GET_SETTINGS'
+        });
+
+        document.getElementById('core-output').textContent =
+          'GET_SETTINGS Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('core-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testUpdateLanguage() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'UPDATE_SECTION',
+          section: 'general',
+          data: { language: 'en' }
+        });
+
+        document.getElementById('core-output').textContent =
+          'UPDATE_SECTION (general) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('core-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testUpdateFeatureFlag() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'UPDATE_SECTION',
+          section: 'features',
+          data: { autoOpenChatbox: true }
+        });
+
+        document.getElementById('core-output').textContent =
+          'UPDATE_SECTION (features) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('core-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testGetAiSettings() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'GET_SECTION',
+          section: 'aiModels'
+        });
+
+        document.getElementById('ai-output').textContent =
+          'GET_SECTION (aiModels) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('ai-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testUpdatePreferredModel() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'UPDATE_SECTION',
+          section: 'aiModels',
+          data: { preferredModel: 'gpt-4o' }
+        });
+
+        document.getElementById('ai-output').textContent =
+          'UPDATE_SECTION (aiModels) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('ai-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testUpdateApiKey() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'UPDATE_SECTION',
+          section: 'aiModels',
+          data: {
+            aiProviderKeys: {
+              openAi: 'sk-test-key-12345',
+              gemini: ''
+            }
+          }
+        });
+
+        document.getElementById('ai-output').textContent =
+          'UPDATE_SECTION (aiModels API Key) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('ai-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testGetBacklogs() {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'GET_SECTION',
+          section: 'backlog'
+        });
+
+        document.getElementById('backlog-output').textContent =
+          'GET_SECTION (backlog) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('backlog-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    async function testAddBacklog() {
+      try {
+        // First get current backlogs
+        const getResponse = await chrome.runtime.sendMessage({
+          type: 'GET_SECTION',
+          section: 'backlog'
+        });
+
+        const currentBacklogs = getResponse.data || [];
+
+        // Add new backlog
+        const newBacklog = {
+          id: `test-${Date.now()}`,
+          domain: 'test.backlogtool.com',
+          apiKey: 'test-api-key',
+          note: 'Test backlog configuration',
+          namespace: 'TEST'
+        };
+
+        const response = await chrome.runtime.sendMessage({
+          type: 'UPDATE_SECTION',
+          section: 'backlog',
+          data: [...currentBacklogs, newBacklog]
+        });
+
+        document.getElementById('backlog-output').textContent =
+          'UPDATE_SECTION (backlog add) Response:\n' + JSON.stringify(response, null, 2);
+      } catch (error) {
+        document.getElementById('backlog-output').textContent =
+          'Error: ' + error.message;
+      }
+    }
+
+    // Auto-load on page start
+    window.onload = function() {
+      console.log('🧪 Settings Client Test Page loaded');
+      console.log('📡 Testing message-based settings communication...');
+
+      // Show initial message
+      document.getElementById('core-output').textContent =
+        'Ready to test! Click buttons above to test settings operations.';
+
+      document.getElementById('ai-output').textContent =
+        'AI settings tests ready.';
+
+      document.getElementById('backlog-output').textContent =
+        'Backlog integration tests ready.';
+    };
+  </script>
+</body>
+</html>

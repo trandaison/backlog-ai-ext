@@ -14,6 +14,8 @@ module.exports = {
   entry: {
     content: './src/content/content.ts',
     background: './src/background/background.ts',
+    options: './src/options/options.tsx',
+
     chatbot: './src/chatbot/chatbot.tsx',
     'chatbot-aside-panel': './src/content/ChatbotAsidePanelEntry.tsx',
     // SCSS entries
@@ -42,7 +44,12 @@ module.exports = {
       },
       {
         test: /\.scss$/,
+        exclude: /options\.scss$/,
         use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader']
+      },
+      {
+        test: /options\.scss$/,
+        use: ['style-loader', 'css-loader', 'sass-loader']
       },
       {
         test: /\.(png|jpg|jpeg|gif|svg)$/,
@@ -56,7 +63,11 @@ module.exports = {
     }),
     new CopyPlugin({
       patterns: [
-
+        {
+          from: 'src/options/options.html',
+          to: 'options.html',
+          noErrorOnMissing: true
+        },
         {
           from: 'src/assets/icons',
           to: 'icons',

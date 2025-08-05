@@ -1,3 +1,6 @@
+import { settingsClient } from '../shared/settingsClient';
+import { BacklogIntegration } from '../types/settings';
+
 // Backlog API service để lấy thông tin ticket thay vì DOM extraction
 export interface BacklogTicketData {
   id: number;
@@ -188,24 +191,8 @@ export interface BacklogComment {
   }>;
 }
 
-export interface BacklogSettings {
-  apiKey: string;
-  spaceName: string;
-}
-
-export interface BacklogApiConfig {
-  id: string;
-  domain: string;
-  spaceName: string;
-  apiKey: string;
-}
-
-export interface BacklogMultiSettings {
-  configs: BacklogApiConfig[];
-}
-
 export class BacklogApiService {
-  private configs: BacklogApiConfig[] = [];
+  private configs: BacklogIntegration[] = [];
 
   constructor() {
     this.loadSettings();
@@ -213,59 +200,25 @@ export class BacklogApiService {
 
   private async loadSettings() {
     try {
-      const result = await chrome.storage.sync.get(['backlogConfigs']);
-      this.configs = result.backlogConfigs || [];
+      this.configs = await settingsClient.getBacklogs() || [];
     } catch (error) {
       console.error('Error loading Backlog settings:', error);
     }
   }
 
-  private getCurrentConfig(): BacklogApiConfig | null {
-    const currentUrl = window.location.href;
+  private getCurrentConfig(): BacklogIntegration | null {
+    const { hostname } = window.location;
 
-    // Try to find matching config based on current URL
-    for (const config of this.configs) {
-      if (currentUrl.includes(`.${config.domain}`) &&
-          currentUrl.includes(config.spaceName)) {
-        return config;
-      }
-    }
-
-    // Fallback: return first config if any
-    const fallbackConfig = this.configs.length > 0 ? this.configs[0] : null;
-    return fallbackConfig;
+    return this.configs.find(config => hostname === config.domain) || (this.configs[0] ?? null);
   }
 
-  private getBaseUrl(config: BacklogApiConfig): string {
-    const baseUrl = `https://${config.spaceName}.${config.domain}/api/v2`;
+  private getBaseUrl(config: BacklogIntegration): string {
+    const baseUrl = `https://${config.domain}/api/v2`;
     return baseUrl;
   }
 
-  public updateSettings(settings: BacklogMultiSettings) {
-    this.configs = settings.configs;
-  }
-
-  // Legacy method for backward compatibility
-  public updateSettingsLegacy(settings: BacklogSettings) {
-    // Convert to new format
-    const config: BacklogApiConfig = {
-      id: 'legacy',
-      domain: this.detectDomainFromUrl(),
-      spaceName: settings.spaceName,
-      apiKey: settings.apiKey
-    };
-    this.configs = [config];
-  }
-
-  private detectDomainFromUrl(): string {
-    const currentUrl = window.location.href;
-    if (currentUrl.includes('.backlog.jp')) {
-      return 'backlog.jp';
-    } else if (currentUrl.includes('.backlogtool.com')) {
-      return 'backlogtool.com';
-    } else {
-      return 'backlog.com';
-    }
+  public updateSettings(settings: BacklogIntegration[]) {
+    this.configs = settings;
   }
 
   public async getIssue(issueKey: string): Promise<BacklogTicketData> {

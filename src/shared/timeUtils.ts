@@ -103,3 +103,14 @@ export function formatFullTimestamp(date: Date, locale: string = 'vi-VN'): strin
     second: '2-digit'
   });
 }
+
+export function formatDateForFilename(date: Date): string {
+  // Format date as YYYYMMDD_HHMM for filenames
+  return date.toLocaleString('ja', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(/[\/:,]/g, '').replace(/ /g, '_');
+}

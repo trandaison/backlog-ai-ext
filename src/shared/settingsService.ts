@@ -1,5 +1,5 @@
 /**
- * Unified Settings Service - Centralized settings management with automatic migration
+ * Unified Settings Service - Centralized settings management with fresh start approach
  */
 
 import type {
@@ -7,18 +7,21 @@ import type {
   GeneralSettings,
   FeatureFlags,
   AiModelSettings,
-  BacklogIntegration,
-  MigrationStatus
-} from '../types/settings.d';
-import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../configs/settings-defaults';
+  BacklogIntegration
+} from '../configs/settingsTypes';
+import { DEFAULT_SETTINGS } from '../configs/settingsTypes';
 import { EncryptionService } from './encryption';
+
+const STORAGE_KEYS = {
+  CONFIGS: 'configs'
+} as const;
 
 export class SettingsService {
   private static instance: SettingsService;
   private settingsCache: Settings | null = null;
 
   private constructor() {
-    // No need for encryptionService instance since using static methods
+    // Private constructor for singleton pattern
   }
 
   public static getInstance(): SettingsService {
@@ -39,24 +42,18 @@ export class SettingsService {
         return this.settingsCache;
       }
 
-      // Attempt to get migrated settings
+      // Try to get current settings
       const result = await chrome.storage.sync.get(STORAGE_KEYS.CONFIGS);
       if (result[STORAGE_KEYS.CONFIGS]) {
-        this.settingsCache = result[STORAGE_KEYS.CONFIGS];
-        return this.settingsCache!;
+        const settings = result[STORAGE_KEYS.CONFIGS] as Settings;
+        this.settingsCache = settings;
+        return settings;
       }
 
-      // Attempt migration if old format exists
-      const migrationOccurred = await this.performMigrationIfNeeded();
-      if (migrationOccurred) {
-        const migratedResult = await chrome.storage.sync.get(STORAGE_KEYS.CONFIGS);
-        this.settingsCache = migratedResult[STORAGE_KEYS.CONFIGS] || DEFAULT_SETTINGS;
-        return this.settingsCache!;
-      }
-
-      // Return default settings
+      // No settings found, initialize with defaults
+      await this.initializeSettings();
       this.settingsCache = DEFAULT_SETTINGS;
-      return this.settingsCache;
+      return DEFAULT_SETTINGS;
 
     } catch (error) {
       console.error('❌ Settings load failed, using defaults:', error);
@@ -73,7 +70,6 @@ export class SettingsService {
       // Update cache
       this.settingsCache = settings;
 
-      // Verify settings were saved correctly
       const allSettings = await this.getAllSettings();
       console.log('✅ Settings saved successfully', allSettings);
 
@@ -99,51 +95,33 @@ export class SettingsService {
 
   async getAiModelSettings(): Promise<AiModelSettings> {
     const settings = await this.getAllSettings();
-    const aiSettings = { ...settings.aiModels };
 
     // Decrypt API keys
-    if (aiSettings.aiProviderKeys.openAi) {
-      try {
-        aiSettings.aiProviderKeys.openAi = await EncryptionService.decryptApiKey(
-          aiSettings.aiProviderKeys.openAi
-        );
-      } catch (error) {
-        console.warn('Failed to decrypt OpenAI key:', error);
-        aiSettings.aiProviderKeys.openAi = '';
+    const decryptedSettings: AiModelSettings = {
+      ...settings.aiModels,
+      aiProviderKeys: {
+        openAi: settings.aiModels.aiProviderKeys.openAi ?
+          await EncryptionService.decryptApiKey(settings.aiModels.aiProviderKeys.openAi) : '',
+        gemini: settings.aiModels.aiProviderKeys.gemini ?
+          await EncryptionService.decryptApiKey(settings.aiModels.aiProviderKeys.gemini) : ''
       }
-    }
+    };
 
-    if (aiSettings.aiProviderKeys.gemini) {
-      try {
-        aiSettings.aiProviderKeys.gemini = await EncryptionService.decryptApiKey(
-          aiSettings.aiProviderKeys.gemini
-        );
-      } catch (error) {
-        console.warn('Failed to decrypt Gemini key:', error);
-        aiSettings.aiProviderKeys.gemini = '';
-      }
-    }
-
-    return aiSettings;
+    return decryptedSettings;
   }
 
   async getBacklogs(): Promise<BacklogIntegration[]> {
     const settings = await this.getAllSettings();
-    const backlogs = [...settings.backlog];
 
-    // Decrypt API keys
-    for (const backlog of backlogs) {
-      if (backlog.apiKey) {
-        try {
-          backlog.apiKey = await EncryptionService.decryptApiKey(backlog.apiKey);
-        } catch (error) {
-          console.warn(`Failed to decrypt API key for ${backlog.domain}:`, error);
-          backlog.apiKey = '';
-        }
-      }
-    }
+    // Decrypt API keys for all backlog integrations
+    const decryptedBacklogs = await Promise.all(
+      settings.backlog.map(async config => ({
+        ...config,
+        apiKey: config.apiKey ? await EncryptionService.decryptApiKey(config.apiKey) : ''
+      }))
+    );
 
-    return backlogs;
+    return decryptedBacklogs;
   }
 
   async getSidebarWidth(): Promise<number> {
@@ -169,37 +147,43 @@ export class SettingsService {
 
   async updateAiModelSettings(partial: Partial<AiModelSettings>): Promise<void> {
     const settings = await this.getAllSettings();
-    const updatedAiSettings = { ...settings.aiModels, ...partial };
 
-    // Encrypt API keys if provided
     if (partial.aiProviderKeys?.openAi) {
-      updatedAiSettings.aiProviderKeys.openAi = await EncryptionService.encryptApiKey(
-        partial.aiProviderKeys.openAi
-      );
+      partial.aiProviderKeys.openAi = await EncryptionService.encryptApiKey(partial.aiProviderKeys.openAi);
+      partial.aiProviderKeys.gemini = await EncryptionService.encryptApiKey(partial.aiProviderKeys.gemini);
     }
 
-    if (partial.aiProviderKeys?.gemini) {
-      updatedAiSettings.aiProviderKeys.gemini = await EncryptionService.encryptApiKey(
-        partial.aiProviderKeys.gemini
-      );
+    // Deep merge the partial settings
+    settings.aiModels = {
+      ...settings.aiModels,
+      ...partial,
+      aiProviderKeys: {
+        ...settings.aiModels.aiProviderKeys,
+        ...partial.aiProviderKeys,
+      },
     }
 
-    settings.aiModels = updatedAiSettings;
     await this.saveAllSettings(settings);
   }
 
   async updateBacklogs(configs: BacklogIntegration[]): Promise<void> {
     const settings = await this.getAllSettings();
-    const encryptedConfigs = [...configs];
+    const { backlog } = settings;
 
-    // Encrypt API keys
-    for (const config of encryptedConfigs) {
-      if (config.apiKey) {
-        config.apiKey = await EncryptionService.encryptApiKey(config.apiKey);
-      }
-    }
+    // Encrypt API keys for all backlog integrations
+    const encryptedBacklogs = await Promise.all(
+      backlog.map(async config => {
+        const updatedConfig = configs.find(c => c.domain === config.domain);
+        if (!updatedConfig) return config;
 
-    settings.backlog = encryptedConfigs;
+        return {
+          ...config,
+          apiKey: updatedConfig.apiKey ? await EncryptionService.encryptApiKey(updatedConfig.apiKey) : ''
+        };
+      })
+    );
+
+    settings.backlog = encryptedBacklogs;
     await this.saveAllSettings(settings);
   }
 
@@ -215,14 +199,16 @@ export class SettingsService {
 
   async addBacklog(config: Omit<BacklogIntegration, 'id'>): Promise<string> {
     const settings = await this.getAllSettings();
+
     const newConfig: BacklogIntegration = {
       ...config,
-      id: `backlog-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `backlog-${Date.now()}`,
       apiKey: config.apiKey ? await EncryptionService.encryptApiKey(config.apiKey) : ''
     };
 
     settings.backlog.push(newConfig);
     await this.saveAllSettings(settings);
+
     return newConfig.id;
   }
 
@@ -237,133 +223,52 @@ export class SettingsService {
   }
 
   // ===========================================
-  // Migration and cleanup methods
+  // Initialization methods
   // ===========================================
 
-  async performMigrationIfNeeded(): Promise<boolean> {
+  async initializeSettings(): Promise<void> {
     try {
-      // Check if migration already completed for current version
-      const migrationStatus = await this.getMigrationStatus();
-      const currentVersion = chrome.runtime.getManifest().version;
+      // Check if new settings format exists
+      const result = await chrome.storage.sync.get(STORAGE_KEYS.CONFIGS);
 
-      if (migrationStatus.isCompleted && migrationStatus.version === currentVersion) {
-        console.log('Migration already completed for version:', currentVersion);
-        return false;
+      if (!result[STORAGE_KEYS.CONFIGS]) {
+        // Clean up any old storage keys
+        await this.cleanupOldStorage();
+
+        // Initialize with default settings
+        await this.saveAllSettings(DEFAULT_SETTINGS);
+
+        console.log('✅ Fresh settings initialized');
+      } else {
+        console.log('✅ Existing settings found');
       }
-
-      // Check if old settings exist
-      const oldSettings = await this.getAllOldFormatSettings();
-      if (!this.hasOldSettings(oldSettings)) {
-        // No old settings found, mark migration as completed
-        await this.markMigrationCompleted(currentVersion, []);
-        return false;
-      }
-
-      console.log('Starting automatic migration for version:', currentVersion);
-
-      // Backup old settings before migration (safety measure)
-      await this.createBackup(oldSettings);
-
-      // Perform migration
-      const newSettings = await this.migrateAndMergeSettings(oldSettings);
-
-      // Save new settings
-      await this.saveAllSettings(newSettings);
-
-      // Cleanup old settings
-      const cleanedKeys = await this.cleanupOldSettings();
-
-      // Mark migration as completed
-      await this.markMigrationCompleted(currentVersion, cleanedKeys);
-
-      console.log('✅ Migration completed successfully');
-      return true;
-
     } catch (error) {
-      console.error('❌ Migration failed:', error);
-      await this.recordMigrationError(error);
+      console.error('❌ Settings initialization failed:', error);
+      // Fallback to defaults
+      await this.saveAllSettings(DEFAULT_SETTINGS);
+    }
+  }
+
+  async resetAllSettings(): Promise<void> {
+    try {
+      // Clear all storage
+      await chrome.storage.sync.clear();
+
+      // Reinitialize with defaults
+      await this.saveAllSettings(DEFAULT_SETTINGS);
+
+      // Clear cache
+      await this.clearCache();
+
+      console.log('✅ All settings reset to defaults');
+    } catch (error) {
+      console.error('❌ Settings reset failed:', error);
       throw error;
     }
   }
 
-  private async getAllOldFormatSettings(): Promise<any> {
-    // Get all potential old setting keys
+  private async cleanupOldStorage(): Promise<void> {
     const oldKeys = [
-      'encryptedApiKey', 'encryptedGeminiApiKey', 'selectedModels', 'preferredModel',
-      'language', 'userRole', 'rememberChatboxSize', 'autoOpenChatbox', 'enterToSend',
-      'backlogAPIKeys', 'backlogDomain', 'backlogAPIKey', 'sidebarWidth'
-    ];
-
-    return await chrome.storage.sync.get(oldKeys);
-  }
-
-  private hasOldSettings(settings: any): boolean {
-    // Check if any old format keys exist
-    const oldKeys = [
-      'encryptedApiKey', 'language', 'userRole', 'selectedModels',
-      'backlogAPIKeys', 'backlogDomain'
-    ];
-
-    return oldKeys.some(key => settings[key] !== undefined);
-  }
-
-  private async migrateAndMergeSettings(oldConfigs: any): Promise<Settings> {
-    const settings: Settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-
-    // General Settings Migration
-    if (oldConfigs.language) settings.general.language = oldConfigs.language;
-    if (oldConfigs.userRole) settings.general.userRole = oldConfigs.userRole;
-
-    // Feature Flags Migration
-    if (oldConfigs.rememberChatboxSize !== undefined) {
-      settings.features.rememberChatboxSize = oldConfigs.rememberChatboxSize;
-    }
-    if (oldConfigs.autoOpenChatbox !== undefined) {
-      settings.features.autoOpenChatbox = oldConfigs.autoOpenChatbox;
-    }
-    if (oldConfigs.enterToSend !== undefined) {
-      settings.features.enterToSend = oldConfigs.enterToSend;
-    }
-
-    // AI Models Migration
-    if (oldConfigs.selectedModels) {
-      settings.aiModels.selectedModels = oldConfigs.selectedModels;
-    }
-    if (oldConfigs.preferredModel) {
-      settings.aiModels.preferredModel = oldConfigs.preferredModel;
-    }
-    if (oldConfigs.encryptedApiKey) {
-      settings.aiModels.aiProviderKeys.openAi = oldConfigs.encryptedApiKey;
-    }
-    if (oldConfigs.encryptedGeminiApiKey) {
-      settings.aiModels.aiProviderKeys.gemini = oldConfigs.encryptedGeminiApiKey;
-    }
-
-    // Backlog Migration (multiple legacy formats)
-    if (oldConfigs.backlogAPIKeys && Array.isArray(oldConfigs.backlogAPIKeys)) {
-      // New multi-config format
-      settings.backlog = oldConfigs.backlogAPIKeys;
-    } else if (oldConfigs.backlogDomain && oldConfigs.backlogAPIKey) {
-      // Single legacy format
-      settings.backlog = [{
-        id: `migrated-${Date.now()}`,
-        domain: oldConfigs.backlogDomain,
-        apiKey: oldConfigs.backlogAPIKey,
-        note: 'Migrated from legacy format',
-        namespace: ''
-      }];
-    }
-
-    // Sidebar Width Migration
-    if (oldConfigs.sidebarWidth) {
-      settings.sidebarWidth = oldConfigs.sidebarWidth;
-    }
-
-    return settings;
-  }
-
-  private async cleanupOldSettings(): Promise<string[]> {
-    const keysToRemove = [
       // AI Settings
       'encryptedApiKey',
       'encryptedGeminiApiKey',
@@ -387,95 +292,12 @@ export class SettingsService {
       'backlogSpaceName',
 
       // Other legacy keys
-      'aiModel', // Very old format
-      'sidebarWidth' // Now part of configs
+      'aiModel',
+      'sidebarWidth'
     ];
 
-    // Remove old keys from chrome storage
-    await chrome.storage.sync.remove(keysToRemove);
-
-    console.log('🧹 Cleaned up old settings:', keysToRemove);
-    return keysToRemove;
-  }
-
-  private async createBackup(oldSettings: any): Promise<void> {
-    const backup = {
-      timestamp: Date.now(),
-      version: chrome.runtime.getManifest().version,
-      data: oldSettings
-    };
-
-    // Store backup in local storage (not synced)
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.SETTINGS_BACKUP]: backup
-    });
-
-    console.log('💾 Created settings backup');
-  }
-
-  private async markMigrationCompleted(version: string, cleanedKeys: string[]): Promise<void> {
-    const migrationStatus: MigrationStatus = {
-      isCompleted: true,
-      version,
-      timestamp: Date.now(),
-      migratedKeys: cleanedKeys,
-      errors: []
-    };
-
-    await chrome.storage.sync.set({
-      [STORAGE_KEYS.MIGRATION_STATUS]: migrationStatus
-    });
-  }
-
-  private async recordMigrationError(error: any): Promise<void> {
-    const migrationStatus: MigrationStatus = {
-      isCompleted: false,
-      version: chrome.runtime.getManifest().version,
-      timestamp: Date.now(),
-      migratedKeys: [],
-      errors: [error.message || String(error)]
-    };
-
-    await chrome.storage.sync.set({
-      [STORAGE_KEYS.MIGRATION_STATUS]: migrationStatus
-    });
-
-    console.error('❌ Migration error recorded:', error.message || String(error));
-  }
-
-  async getMigrationStatus(): Promise<MigrationStatus> {
-    const result = await chrome.storage.sync.get(STORAGE_KEYS.MIGRATION_STATUS);
-    return result[STORAGE_KEYS.MIGRATION_STATUS] || {
-      isCompleted: false,
-      version: '',
-      timestamp: 0,
-      migratedKeys: [],
-      errors: []
-    };
-  }
-
-  async rollbackMigration(): Promise<void> {
-    try {
-      const backup = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS_BACKUP);
-      if (backup[STORAGE_KEYS.SETTINGS_BACKUP]) {
-        // Restore old format settings
-        await chrome.storage.sync.set(backup[STORAGE_KEYS.SETTINGS_BACKUP].data);
-
-        // Remove new format
-        await chrome.storage.sync.remove(STORAGE_KEYS.CONFIGS);
-
-        // Reset migration status
-        await chrome.storage.sync.remove(STORAGE_KEYS.MIGRATION_STATUS);
-
-        // Clear cache
-        this.settingsCache = null;
-
-        console.log('🔄 Migration rolled back successfully');
-      } else {
-        console.warn('⚠️ No backup found for rollback');
-      }
-    } catch (error) {
-      console.error('❌ Rollback failed:', error);
-    }
+    // Remove all old keys
+    await chrome.storage.sync.remove(oldKeys);
+    console.log('🧹 Old storage cleaned up');
   }
 }

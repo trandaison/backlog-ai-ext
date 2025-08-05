@@ -1,711 +1,35 @@
 // Background script để xử lý AI API và communication
-import { TicketData } from '../shared/ticketAnalyzer';
-import { EncryptionService } from '../shared/encryption';
 import ContextOptimizer from '../shared/contextOptimizer';
-import { availableModels, defaultModelId } from '../configs';
+import { defaultModelId } from '../configs';
 import { parseCommand } from '../shared/commandUtils';
 import { getLanguageDisplayName } from '../shared/commandUtils';
-import type { ChatHistoryData } from '../shared/chatStorageService';
-import { FileAttachment } from '../types/attachment.d';
-import { SettingsAdapter, type LegacySettings } from '../shared/settingsAdapter';
-
-// Legacy interfaces for backward compatibility during migration
-interface Settings extends LegacySettings {} // Alias for easier migration
-
-interface StoredSettings {
-  encryptedApiKey: string;
-  userRole: string;
-  language: string;
-  aiModel: string;
-  encryptedGeminiApiKey?: string;
-  preferredProvider?: 'openai' | 'gemini';
-}
-
-interface BacklogSettings {
-  backlogApiKey: string;
-  backlogSpaceName: string;
-}
-
-interface BacklogApiConfig {
-  id: string;
-  domain: string;
-  spaceName: string;
-  apiKey: string;
-}
-
-interface BacklogMultiSettings {
-  configs: BacklogApiConfig[];
-}
-
-interface AIService {
-  analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string>;
-  processUserMessage(message: string, context: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
-    response: string;
-    responseId?: string;
-    tokensUsed?: number;
-  }>;
-}
-
-class GeminiService implements AIService {
-  private apiKey: string = '';
-  private baseApiUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-  constructor() {
-    this.loadApiKey();
-  }
-
-  private async loadApiKey() {
-    try {
-      const result = await chrome.storage.sync.get(['encryptedGeminiApiKey']);
-      if (result.encryptedGeminiApiKey) {
-        this.apiKey = await EncryptionService.decryptApiKey(result.encryptedGeminiApiKey);
-      }
-    } catch (error) {
-      console.error('❌ [Gemini] Error loading API key:', error);
-    }
-  }
-
-  // Map preferred model to actual Gemini API model name
-  private getGeminiModelName(preferredModel?: string): string {
-    if (!preferredModel) {
-      // Use default model from config and map to actual Gemini model
-      const defaultModel = availableModels.find(m => m.id === defaultModelId);
-      if (defaultModel?.provider === 'gemini') {
-        return this.mapToGeminiAPI(defaultModelId);
-      }
-      return 'gemini-2.0-flash-exp'; // Updated fallback to Gemini 2.0
-    }
-
-    return this.mapToGeminiAPI(preferredModel);
-  }
-
-  private mapToGeminiAPI(modelId: string): string {
-    // Map our model IDs to actual Gemini API model names
-    // All 2.5 variants use Gemini 2.0 Flash Experimental for consistency
-    const modelMap: Record<string, string> = {
-      'gemini-2.5-pro': 'gemini-2.0-flash-exp',
-      'gemini-2.5-flash': 'gemini-2.0-flash-exp',
-      'gemini-2.5-flash-lite': 'gemini-2.0-flash-exp', // ✅ Now uses Gemini 2.0 as expected
-      // OpenAI models that might accidentally come through
-      'gpt-4o': 'gemini-2.0-flash-exp', // fallback
-      'gpt-4o-mini': 'gemini-2.0-flash-exp', // fallback
-      'o1-preview': 'gemini-2.0-flash-thinking-exp', // reasoning model
-      'o1-mini': 'gemini-2.0-flash-thinking-exp', // reasoning model
-      'o3-mini': 'gemini-2.0-flash-thinking-exp' // reasoning model
-    };
-
-    return modelMap[modelId] || 'gemini-2.0-flash-exp';
-  }  private getApiUrl(model: string = 'gemini-2.0-flash-exp'): string {
-    return `${this.baseApiUrl}/${model}:generateContent`;
-  }
-
-  async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
-    const prompt = this.buildAnalysisPrompt(ticketData, settings);
-    const result = await this.callGeminiAPI(prompt, settings);
-    return result.response;
-  }
-
-  async processUserMessage(message: string, contextData: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
-    response: string;
-    responseId?: string;
-    tokensUsed?: number;
-  }> {
-    // Build enhanced message with attachments if any
-    let enhancedMessage = message;
-    if (attachments && attachments.length > 0) {
-      enhancedMessage = this.buildMessageWithAttachments(message, attachments);
-    }
-
-    // Check if this is optimized context from ContextOptimizer
-    if (contextData.isOptimized) {
-      const result = await this.callGeminiAPI(enhancedMessage, settings, attachments);
-      return {
-        response: result.response,
-        responseId: result.responseId,
-        tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
-      };
-    }
-
-    // Legacy handling for non-optimized context
-    const result = await this.callGeminiAPI(enhancedMessage, settings, attachments);
-    return {
-      response: result.response,
-      responseId: result.responseId,
-      tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
-    };
-  }
-
-  private buildMessageWithAttachments(message: string, attachments: FileAttachment[]): string {
-    let enhancedMessage = message;
-
-    for (const attachment of attachments) {
-      enhancedMessage += `\n\n**File: ${attachment.name}** (${attachment.type}, ${this.formatFileSize(attachment.size)})\n`;
-
-      // For files that will be sent as inline_data, just mention them
-      if (attachment.type.startsWith('image/') ||
-          attachment.type.startsWith('text/') ||
-          attachment.type.includes('csv') ||
-          attachment.type.includes('json') ||
-          attachment.type.includes('plain')) {
-        enhancedMessage += `[File content will be processed by AI - please analyze this file]\n`;
-      } else if (attachment.preview) {
-        // For other files with preview, include preview
-        enhancedMessage += `Content preview:\n\`\`\`\n${attachment.preview}\n\`\`\`\n`;
-      } else {
-        enhancedMessage += `[Binary file attached - content type: ${attachment.type}]\n`;
-      }
-    }
-
-    return enhancedMessage;
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
-    const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
-    const role = settings?.userRole || 'developer';
-
-    return `Bạn là một AI assistant chuyên phân tích ticket/issue cho ${role}.
-Hãy phân tích ticket sau và đưa ra nhận xét hữu ích bằng ${language}:
-
-**Thông tin ticket:**
-- ID: ${ticketData.id}
-- Tiêu đề: ${ticketData.title}
-- Mô tả: ${ticketData.description}
-- Trạng thái: ${ticketData.status}
-- Độ ưu tiên: ${ticketData.priority}
-- Người được giao: ${ticketData.assignee}
-- Người báo cáo: ${ticketData.reporter}
-- Hạn chót: ${ticketData.dueDate}
-- Nhãn: ${ticketData.labels?.join(', ')}
-
-Hãy cung cấp:
-1. Tóm tắt ngắn gọn
-2. Mức độ phức tạp và ước tính thời gian
-3. Các bước xử lý được đề xuất
-4. Rủi ro và lưu ý cần chú ý`;
-  }
-
-  private buildChatPrompt(message: string, context: any, settings?: Settings): string {
-    const language = settings?.language === 'vi' ? 'tiếng Việt' : 'English';
-    const role = settings?.userRole || 'developer';
-
-    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
-Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
-
-    if (context.ticketData) {
-      prompt += `**Bối cảnh ticket hiện tại:**
-- ID: ${context.ticketData.id}
-- Tiêu đề: ${context.ticketData.title}
-- Trạng thái: ${context.ticketData.status}\n\n`;
-    }
-
-    if (context.chatHistory && context.chatHistory.length > 0) {
-      prompt += `**Lịch sử chat gần đây:**\n`;
-      context.chatHistory.slice(-3).forEach((msg: any) => {
-        prompt += `${msg.sender}: ${msg.content}\n`;
-      });
-      prompt += '\n';
-    }
-
-    prompt += `**Câu hỏi:** ${message}`;
-
-    return prompt;
-  }
-
-  private async callGeminiAPI(prompt: string, settings?: Settings, attachments?: FileAttachment[]): Promise<{
-    response: string;
-    responseId?: string;
-    tokensUsed?: number;
-  }> {
-    try {
-      const apiKey = settings?.geminiApiKey || this.apiKey;
-      if (!apiKey) {
-        return {
-          response: 'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
-          tokensUsed: 0
-        };
-      }
-
-      // Get the actual Gemini model name from preferred model
-      const geminiModel = this.getGeminiModelName(settings?.aiModel);
-      const apiUrl = this.getApiUrl(geminiModel);
-
-      // Build parts array for multimodal content
-      const parts: any[] = [{
-        text: prompt
-      }];
-
-      // Add attachments if any
-      if (attachments && attachments.length > 0) {
-        console.log('📎 [Gemini] Processing attachments:', attachments.length);
-        for (const attachment of attachments) {
-          console.log('📎 [Gemini] Attachment:', attachment.name, attachment.type, 'has base64:', !!attachment.base64);
-          if (attachment.base64) {
-            // For images, add as inline_data for vision processing
-            if (attachment.type.startsWith('image/')) {
-              console.log('🖼️ [Gemini] Adding image attachment:', attachment.name);
-              parts.push({
-                inline_data: {
-                  mime_type: attachment.type,
-                  data: attachment.base64
-                }
-              });
-            }
-            // For text files (CSV, TXT, JSON, etc), also add as inline_data for better processing
-            else if (attachment.type.startsWith('text/') ||
-                     attachment.type.includes('csv') ||
-                     attachment.type.includes('json') ||
-                     attachment.type.includes('plain')) {
-              console.log('📄 [Gemini] Adding text file as inline_data:', attachment.name);
-              parts.push({
-                inline_data: {
-                  mime_type: attachment.type,
-                  data: attachment.base64
-                }
-              });
-            }
-            // For other binary files, mention in text (already included in prompt)
-          }
-        }
-      }
-
-      console.log('🚀 [Gemini] Final parts array:', parts.length, parts.map(p => p.inline_data ? `inline_data: ${p.inline_data.mime_type}` : 'text'));
-
-      const response = await fetch(`${apiUrl}?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: parts
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 4096, // Increased from 1024 to handle longer responses
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Gemini] API Error Response:', errorText);
-        throw new Error(`Gemini API Error ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-
-      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-        const content = data.candidates[0].content.parts[0].text;
-        const responseId = data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() || undefined;
-        const tokensUsed = data.usageMetadata?.totalTokenCount || ContextOptimizer.estimateTokenCount(content);
-
-        return {
-          response: content,
-          responseId,
-          tokensUsed
-        };
-      } else {
-        console.error('❌ [Gemini] Invalid API response structure:', data);
-        throw new Error('Invalid Gemini API response - no content in candidates');
-      }
-    } catch (error) {
-      console.error('❌ [Gemini] Error calling API:', error);
-      throw error;
-    }
-  }
-}
-
-class OpenAIService implements AIService {
-  private apiKey: string = '';
-  private apiUrl: string = 'https://api.openai.com/v1/chat/completions';
-
-  constructor() {
-    this.loadApiKey();
-  }
-
-  private async loadApiKey() {
-    try {
-      const result = await chrome.storage.sync.get(['encryptedApiKey']);
-      if (result.encryptedApiKey) {
-        this.apiKey = await EncryptionService.decryptApiKey(result.encryptedApiKey);
-      } else {
-        this.apiKey = '';
-      }
-    } catch (error) {
-      console.error('Failed to load/decrypt API key:', error);
-      this.apiKey = '';
-    }
-  }
-
-  private getOpenAIModel(settings?: Settings): string {
-    const preferredModel = settings?.aiModel || defaultModelId;
-
-    // Map preferred model to actual OpenAI API model name
-    const modelMap: Record<string, string> = {
-      'o3': 'o3',
-      'o3-pro': 'o3-pro',
-      'o3-mini': 'o3-mini',
-      'gpt-4.1': 'gpt-4',
-      'gpt-4.1-mini': 'gpt-4-turbo',
-      'gpt-4.1-nano': 'gpt-3.5-turbo',
-      'gpt-4o': 'gpt-4o',
-      'chatgpt-4o': 'gpt-4o',
-      'gpt-4o-mini': 'gpt-4o-mini',
-      'o4-mini': 'gpt-4o-mini'
-    };
-
-    const mappedModel = modelMap[preferredModel] || preferredModel;
-
-    // Ensure we only use valid OpenAI models
-    const validOpenAIModels = [
-      'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-4o-mini',
-      'o3', 'o3-pro', 'o3-mini'
-    ];
-
-    // Use default model mapping if current model is not OpenAI
-    const defaultModel = availableModels.find(m => m.id === defaultModelId);
-    const fallbackModel = defaultModel?.provider === 'openai'
-      ? (modelMap[defaultModelId] || 'gpt-4o-mini')
-      : 'gpt-4o-mini';
-
-    return validOpenAIModels.includes(mappedModel) ? mappedModel : fallbackModel;
-  }
-
-  async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
-    const apiKey = settings?.apiKey || this.apiKey;
-    if (!apiKey) {
-      await this.loadApiKey(); // Try to reload in case it was updated
-      const fallbackApiKey = settings?.apiKey || this.apiKey;
-      if (!fallbackApiKey) {
-        return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
-      }
-    }
-
-    const finalApiKey = settings?.apiKey || this.apiKey;
-    const prompt = this.buildTicketAnalysisPrompt(ticketData, settings);
-
-    try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${finalApiKey}`
-        },
-        body: JSON.stringify({
-          model: this.getOpenAIModel(settings),
-          messages: [
-            {
-              role: 'system',
-              content: this.buildSystemPrompt(settings)
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content;
-      } else {
-        throw new Error('Invalid API response');
-      }
-    } catch (error) {
-      console.error('Error calling OpenAI API:', error);
-      return `Lỗi khi gọi AI API: ${error}`;
-    }
-  }
-
-  async processUserMessage(message: string, contextData: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
-    response: string;
-    responseId?: string;
-    tokensUsed?: number;
-  }> {
-    const apiKey = settings?.apiKey || this.apiKey;
-    if (!apiKey) {
-      return {
-        response: 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
-        tokensUsed: 0
-      };
-    }
-
-    // Build enhanced message with attachments if any
-    let enhancedMessage = message;
-    if (attachments && attachments.length > 0) {
-      enhancedMessage = this.buildMessageWithAttachments(message, attachments);
-    }
-
-    // The message is already processed by BackgroundService with full context
-    // Build messages array for OpenAI with multimodal support
-    const userContent: any[] = [{
-      type: 'text',
-      text: enhancedMessage
-    }];
-
-    // Add image attachments for GPT-4V
-    if (attachments && attachments.length > 0) {
-      for (const attachment of attachments) {
-        if (attachment.base64 && attachment.type.startsWith('image/')) {
-          userContent.push({
-            type: 'image_url',
-            image_url: {
-              url: `data:${attachment.type};base64,${attachment.base64}`
-            }
-          });
-        }
-      }
-    }
-
-    const messages = [
-      {
-        role: 'system',
-        content: this.buildSystemPrompt(settings)
-      },
-      {
-        role: 'user',
-        content: userContent.length === 1 ? enhancedMessage : userContent
-      }
-    ];
-
-    try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.getOpenAIModel(settings),
-          messages,
-          max_tokens: 1500, // Increased from 800
-          temperature: 0.7
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.choices && data.choices[0]) {
-        const content = data.choices[0].message.content;
-        const tokensUsed = data.usage?.total_tokens || ContextOptimizer.estimateTokenCount(content);
-        const responseId = data.id;
-
-        return {
-          response: content,
-          responseId,
-          tokensUsed
-        };
-      } else {
-        throw new Error('Invalid API response');
-      }
-    } catch (error) {
-      console.error('Error calling OpenAI API:', error);
-      return {
-        response: `Lỗi khi gọi AI API: ${error}`,
-        tokensUsed: 0
-      };
-    }
-  }
-
-  private buildMessageWithAttachments(message: string, attachments: FileAttachment[]): string {
-    let enhancedMessage = message;
-
-    for (const attachment of attachments) {
-      enhancedMessage += `\n\n**File: ${attachment.name}** (${attachment.type}, ${this.formatFileSize(attachment.size)})\n`;
-
-      if (attachment.type.startsWith('text/') && attachment.base64) {
-        // For text files, decode and include full content
-        try {
-          const fullContent = atob(attachment.base64);
-          enhancedMessage += `Nội dung file:\n\`\`\`\n${fullContent}\n\`\`\`\n`;
-        } catch (error) {
-          enhancedMessage += `[Lỗi đọc file text: ${error}]\n`;
-        }
-      } else if (attachment.preview) {
-        // Fallback to preview if base64 not available
-        enhancedMessage += `Content preview:\n\`\`\`\n${attachment.preview}\n\`\`\`\n`;
-      } else if (attachment.base64) {
-        // For binary files, mention they are attached
-        if (attachment.type.startsWith('image/')) {
-          enhancedMessage += `[Image file attached - please analyze the visual content]\n`;
-        } else {
-          enhancedMessage += `[Binary file attached - content type: ${attachment.type}]\n`;
-        }
-      }
-    }
-
-    return enhancedMessage;
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  private buildTicketAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
-    const roleContext = this.getRoleContext(settings?.userRole || 'developer');
-    const languagePrompt = this.getLanguagePrompt(settings?.language || 'vi');
-
-    return `${languagePrompt}
-
-${roleContext}
-
-Hãy phân tích ticket Backlog sau:
-
-**ID**: ${ticketData.id || 'Unknown'}
-**Tiêu đề**: ${ticketData.title || 'No title'}
-**Mô tả**: ${ticketData.description || 'No description'}
-**Trạng thái**: ${ticketData.status || 'Unknown'}
-**Độ ưu tiên**: ${ticketData.priority || 'Unknown'}
-**Người được gán**: ${ticketData.assignee || 'Unassigned'}
-**Người báo cáo**: ${ticketData.reporter || 'Unknown'}
-**Hạn**: ${ticketData.dueDate || 'No due date'}
-**Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
-
-**Comments**:
-${ticketData.comments
-  .filter((comment: any) => comment.content && comment.content.trim())
-  .sort((a: any, b: any) => {
-    // Sort by timestamp field ascending (oldest first, newest last)
-    // timestamp contains ISO 8601 format from Backlog API's 'created' field
-    const timeA = new Date(a.timestamp || a.created || 0).getTime();
-    const timeB = new Date(b.timestamp || b.created || 0).getTime();
-    return timeA - timeB;
-  })
-  .map((comment: any) => {
-    const content = comment.content || '';
-    return `- ${comment.author} (${comment.timestamp}): ${content}`;
-  }).join('\n')}
-
-Hãy đưa ra:
-1. Tóm tắt nội dung ticket
-2. Phân tích mức độ phức tạp
-3. Đề xuất approach để giải quyết
-4. Những điểm cần chú ý
-5. Timeline ước tính (nếu có thể)
-`;
-  }
-
-  private buildSystemPrompt(settings?: Settings): string {
-    const roleContext = this.getRoleContext(settings?.userRole || 'developer');
-    const languageContext = this.getLanguagePrompt(settings?.language || 'vi');
-
-    let systemPrompt = `${languageContext}
-
-${roleContext}
-
-Bạn là AI assistant chuyên hỗ trợ phân tích và thảo luận về ticket Backlog.
-Bạn có thể:
-- Phân tích chi tiết nội dung ticket
-- Đề xuất giải pháp kỹ thuật
-- Giải thích các khái niệm kỹ thuật
-- Hỗ trợ communication giữa các team member
-- Đưa ra estimate và timeline
-- Translate và explain content
-
-Hãy response một cách chuyên nghiệp, chi tiết và hữu ích.`;
-
-    return systemPrompt;
-  }
-
-  private getRoleContext(userRole: string): string {
-    const roleContexts = {
-      developer: `
-Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
-- Technical implementation details
-- Code architecture và design patterns
-- Performance và optimization
-- Security considerations
-- Development best practices`,
-      pm: `
-Bạn đang tương tác với một Project Manager. Hãy focus vào:
-- Project timeline và milestones
-- Resource planning và allocation
-- Risk assessment và mitigation
-- Stakeholder communication
-- Delivery estimation`,
-      qa: `
-Bạn đang tương tác với một QA/Testing specialist. Hãy focus vào:
-- Test cases và test scenarios
-- Quality assurance processes
-- Bug reproduction steps
-- Testing strategies
-- Quality metrics`,
-      designer: `
-Bạn đang tương tác với một Designer. Hãy focus vào:
-- User experience và user interface
-- Design consistency và guidelines
-- Accessibility considerations
-- Visual design elements
-- User journey optimization`,
-      devops: `
-Bạn đang tương tác với một DevOps engineer. Hãy focus vào:
-- Infrastructure và deployment
-- CI/CD pipeline optimization
-- Monitoring và alerting
-- System reliability
-- Performance tuning`,
-      other: `
-Bạn đang tương tác với một team member. Hãy cung cấp:
-- General overview và context
-- Clear explanations
-- Actionable insights
-- Collaborative recommendations`
-    };
-
-    return roleContexts[userRole as keyof typeof roleContexts] || roleContexts.other;
-  }
-
-  private getLanguagePrompt(language: string): string {
-    const languagePrompts = {
-      vi: `Hãy respond bằng tiếng Việt. Giữ technical terms bằng tiếng Anh khi cần thiết.`,
-      en: `Please respond in English with clear and professional language.`,
-      ja: `日本語で回答してください。技術用語は適切に使用してください。`
-    };
-
-    return languagePrompts[language as keyof typeof languagePrompts] || languagePrompts.vi;
-  }
-}
+import { SettingsService } from '../shared/settingsService';
+import type { Settings } from '../configs/settingsTypes';
+import type { SettingsMessage, SettingsResponse } from '../types/messages.d';
+import { OpenAIService } from '../services/OpenAIService';
+import { GeminiService } from '../services/GeminiService';
+import { TicketData } from '../types/backlog';
+import { AIService } from '../types';
+import { ChatHistoryData } from '../types/chat';
 
 class BackgroundService {
   private openaiService: OpenAIService;
   private geminiService: GeminiService;
   private ticketDataCache: Map<string, TicketData> = new Map();
-  private settingsAdapter: SettingsAdapter;
+  private settingsService: SettingsService;
 
   constructor() {
     this.openaiService = new OpenAIService();
     this.geminiService = new GeminiService();
-    this.settingsAdapter = SettingsAdapter.getInstance();
+    this.settingsService = SettingsService.getInstance();
     this.initializeWithMigration();
   }
 
   private async initializeWithMigration(): Promise<void> {
     try {
       // Initialize settings service (which will trigger migration if needed)
-      await this.settingsAdapter.getLegacySettings();
-      console.log('✅ Settings service initialized');
+      const settings = await this.settingsService.getAllSettings();
+      console.log('✅ Settings service initialized', settings);
 
       // Setup message listeners after migration is complete
       this.setupMessageListeners();
@@ -718,20 +42,14 @@ class BackgroundService {
 
   // Get the current AI service based on user settings
   private async getCurrentAIService(): Promise<AIService> {
-    const preferredProvider = await this.settingsAdapter.getPreferredProvider();
+    const aiModelSettings = await this.settingsService.getAiModelSettings();
+    const preferredProvider = aiModelSettings.preferredModel?.includes('gemini') ? 'gemini' : 'openai';
 
     if (preferredProvider === 'gemini') {
       return this.geminiService;
     } else {
       return this.openaiService;
     }
-  }
-
-  // Helper to get safe OpenAI model name
-  private getOpenAIModelName(settings?: Settings): string {
-    const model = settings?.aiModel || 'gpt-3.5-turbo';
-    const openAIModels = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'];
-    return openAIModels.includes(model) ? model : 'gpt-3.5-turbo';
   }
 
   private setupMessageListeners() {
@@ -749,6 +67,24 @@ class BackgroundService {
   private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     try {
       switch (message.action) {
+        // Settings handlers
+        case 'GET_SETTINGS':
+          await this.handleGetSettings(message as SettingsMessage, sendResponse);
+          break;
+
+        case 'UPDATE_SETTINGS':
+          await this.handleUpdateSettings(message as SettingsMessage, sendResponse);
+          break;
+
+        case 'GET_SECTION':
+          await this.handleGetSection(message as SettingsMessage, sendResponse);
+          break;
+
+        case 'UPDATE_SECTION':
+          await this.handleUpdateSection(message as SettingsMessage, sendResponse);
+          break;
+
+        // Existing handlers
         case 'analyzeTicket':
           await this.handleTicketAnalysis(message.data, sendResponse);
           break;
@@ -832,10 +168,10 @@ class BackgroundService {
 
       console.log('🔍 [Background] handleUserMessage attachments:', attachments?.length || 0, attachments);
 
-      // Get current AI service, but override aiModel with currentModel if provided
+      // Get current AI service, but override preferredModel with currentModel if provided
       const settings = await this.getSettings();
       if (currentModel) {
-        settings.aiModel = currentModel;
+        settings.aiModels.preferredModel = currentModel;
       }
 
       const aiService = await this.getCurrentAIService();
@@ -1041,7 +377,7 @@ class BackgroundService {
     }
   }
 
-  private async extractSpaceInfoFromTab(tabId: number): Promise<{ spaceName: string; domain: string } | null> {
+  private async extractSpaceInfoFromTab(tabId: number): Promise<{ spaceName: string; domain: string, fullDomain: string } | null> {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId },
@@ -1052,7 +388,8 @@ class BackgroundService {
           if (match) {
             return {
               spaceName: match[1],
-              domain: match[2]
+              domain: match[2],
+              fullDomain: `${match[1]}.${match[2]}`
             };
           }
 
@@ -1162,8 +499,8 @@ class BackgroundService {
   }
 
   private buildTicketSummaryPrompt(ticketData: TicketData, settings?: Settings): string {
-    const roleContext = settings?.userRole ? this.getRoleContext(settings.userRole) : '';
-    const languagePrompt = settings?.language ? this.getLanguagePrompt(settings.language) : this.getLanguagePrompt('vi');
+    const roleContext = settings?.general.userRole ? this.getRoleContext(settings.general.userRole) : '';
+    const languagePrompt = settings?.general.language ? this.getLanguagePrompt(settings.general.language) : this.getLanguagePrompt('vi');
 
     return `${languagePrompt}
 
@@ -1209,50 +546,6 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
         const timeB = new Date(b.timestamp || b.created || 0).getTime();
         return timeA - timeB;
       });
-  }
-
-  private buildSummaryPrompt(ticketData: any): string {
-    if (!ticketData) {
-      return 'Hãy tóm tắt nội dung của ticket này một cách ngắn gọn và súc tích.';
-    }
-
-    const commentsSection = ticketData.comments && ticketData.comments.length > 0
-      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
-          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
-          .join('\n')}`
-      : '';
-
-    return `Hãy tóm tắt nội dung của ticket sau một cách ngắn gọn và súc tích:
-
-**Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
-**Mô tả**: ${ticketData.description || 'Không có mô tả'}
-**Trạng thái**: ${ticketData.status || 'Không rõ'}
-**Độ ưu tiên**: ${ticketData.priority || 'Không rõ'}
-**Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
-
-Bao gồm: mục tiêu chính, yêu cầu chức năng, và những điểm quan trọng cần lưu ý.`;
-  }
-
-  private buildExplainPrompt(ticketData: any): string {
-    if (!ticketData) {
-      return 'Hãy giải thích chi tiết yêu cầu và mục tiêu của ticket này.';
-    }
-
-    const commentsSection = ticketData.comments && ticketData.comments.length > 0
-      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
-          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
-          .join('\n')}`
-      : '';
-
-    return `Hãy giải thích chi tiết yêu cầu và mục tiêu của ticket sau:
-
-**Tiêu đề**: ${ticketData.title || 'Không có tiêu đề'}
-**Mô tả**: ${ticketData.description || 'Không có mô tả'}
-**Trạng thái**: ${ticketData.status || 'Không rõ'}
-**Độ ưu tiên**: ${ticketData.priority || 'Không rõ'}
-**Người được gán**: ${ticketData.assignee || 'Chưa gán'}${commentsSection}
-
-Phân tích các tác vụ cần thực hiện, dependencies, và impact của thay đổi này.`;
   }
 
   private buildTranslatePrompt(ticketData: any, sourceLanguage?: string, targetLanguage?: string): string {
@@ -1387,109 +680,43 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 - Mô tả: ${ticketData.description || 'Không có mô tả'}${commentsSection}`;
   }
 
-  private async callOpenAISummary(prompt: string, settings?: Settings): Promise<string> {
-    try {
-      const apiKey = settings?.apiKey;
-      if (!apiKey) {
-        return 'API key chưa được cấu hình. Vui lòng vào popup để cài đặt.';
-      }
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.getOpenAIModelName(settings),
-          messages: [
-            {
-              role: 'system',
-              content: 'Bạn là một AI assistant giúp summarize ticket một cách chính xác và hữu ích.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 500,
-          temperature: 0.3
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Background] API Error Response:', errorText);
-        throw new Error(`API Error ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(`OpenAI API Error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-
-      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-        const summary = data.choices[0].message.content;
-        return summary;
-      } else {
-        console.error('❌ [Background] Invalid API response structure:', data);
-        throw new Error('Invalid API response - no content in choices');
-      }
-    } catch (error) {
-      console.error('❌ [Background] Error calling OpenAI API for summary:', error);
-      return `Lỗi khi gọi AI API: ${error}`;
-    }
-  }
-
   private async getSettings(): Promise<Settings> {
     try {
-      // Use SettingsAdapter to get settings in legacy format
-      return await this.settingsAdapter.getLegacySettings();
+      // Use SettingsService to get all settings
+      return await this.settingsService.getAllSettings();
     } catch (error) {
       console.error('Error getting settings:', error);
+      // Return default settings
       return {
-        apiKey: '',
-        geminiApiKey: '',
-        userRole: 'developer',
-        language: 'vi',
-        aiModel: defaultModelId,
-        preferredProvider: 'openai'
+        general: { language: 'vi', userRole: 'developer' },
+        features: { rememberChatboxSize: true, autoOpenChatbox: false, enterToSend: true },
+        aiModels: { selectedModels: [defaultModelId], preferredModel: defaultModelId, aiProviderKeys: { openAi: '', gemini: '' } },
+        backlog: [],
+        sidebarWidth: 400
       };
     }
   }
 
   private async saveSettings(settings: Settings) {
     try {
-      // Use SettingsAdapter to save settings in new format
-      await this.settingsAdapter.updateLegacySettings(settings);
+      // Use SettingsService to save settings
+      await this.settingsService.saveAllSettings(settings);
       console.log('✅ Settings saved successfully');
     } catch (error) {
       console.error('❌ Settings save failed:', error);
     }
   }
 
-  private async getBacklogSettings(): Promise<BacklogSettings> {
+  private async getBacklogMultiSettings(): Promise<{configs: any[]}> {
     try {
-      const result = await chrome.storage.sync.get(['backlogApiKey', 'backlogSpaceName']);
+      const backlogs = await this.settingsService.getBacklogs();
       return {
-        backlogApiKey: result.backlogApiKey || '',
-        backlogSpaceName: result.backlogSpaceName || ''
-      };
-    } catch (error) {
-      console.error('Error getting Backlog settings:', error);
-      return {
-        backlogApiKey: '',
-        backlogSpaceName: ''
-      };
-    }
-  }
-
-  private async getBacklogMultiSettings(): Promise<BacklogMultiSettings> {
-    try {
-      const result = await chrome.storage.sync.get(['backlogConfigs']);
-      return {
-        configs: result.backlogConfigs || []
+        configs: backlogs.map(backlog => ({
+          id: backlog.id,
+          domain: backlog.domain,
+          spaceName: backlog.namespace,
+          apiKey: backlog.apiKey
+        }))
       };
     } catch (error) {
       console.error('Error getting Backlog multi settings:', error);
@@ -1499,19 +726,7 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
     }
   }
 
-  private async saveBacklogSettings(settings: BacklogSettings) {
-    try {
-      await chrome.storage.sync.set({
-        backlogApiKey: settings.backlogApiKey,
-        backlogSpaceName: settings.backlogSpaceName
-      });
-    } catch (error) {
-      console.error('Error saving Backlog settings:', error);
-      throw error;
-    }
-  }
-
-  private async saveBacklogMultiSettings(settings: BacklogMultiSettings) {
+  private async saveBacklogMultiSettings(settings: {configs: any[]}) {
     try {
       await chrome.storage.sync.set({
         backlogConfigs: settings.configs
@@ -1522,7 +737,7 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
     }
   }
 
-  private async testBacklogConnection(config: BacklogApiConfig): Promise<{success: boolean, message: string, data?: any}> {
+  private async testBacklogConnection(config: {id: string, domain: string, spaceName: string, apiKey: string}): Promise<{success: boolean, message: string, data?: any}> {
     try {
       // Handle both old format (spaceName + domain) and new format (full domain)
       let baseUrl: string;
@@ -1585,24 +800,28 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
     }
   }
 
+  private async getCurrentBacklogConfig() {
+    // Get space info from current tab
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs[0]?.id || !tabs[0]?.url) {
+      throw new Error('No active tab found');
+    }
+
+    const spaceInfo = await this.extractSpaceInfoFromTab(tabs[0].id);
+    if (!spaceInfo) {
+      throw new Error('Could not extract space information from URL');
+    }
+
+    // Get Backlog API configuration
+    const backlogSettings = await this.settingsService.getBacklogs();
+    return backlogSettings.find(({ domain }) => domain === spaceInfo.fullDomain);
+  }
+
   private async getCurrentUser(): Promise<{success: boolean, data?: any, error?: string}> {
     try {
-      // Get space info from current tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tabs[0]?.id || !tabs[0]?.url) {
-        throw new Error('No active tab found');
-      }
+      const backlogConfig = await this.getCurrentBacklogConfig();
 
-      const spaceInfo = await this.extractSpaceInfoFromTab(tabs[0].id);
-      if (!spaceInfo) {
-        throw new Error('Could not extract space information from URL');
-      }
-
-      // Get Backlog API configuration
-      const backlogSettings = await this.getBacklogMultiSettings();
-      const config = this.findMatchingBacklogConfig(backlogSettings.configs, spaceInfo);
-
-      if (!config) {
+      if (!backlogConfig) {
         return {
           success: false,
           error: 'No matching Backlog API config found'
@@ -1610,10 +829,10 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
       }
 
       // Call Backlog API to get current user
-      const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
-      const apiUrl = `${baseUrl}/users/myself?apiKey=${encodeURIComponent(config.apiKey)}`;
+      const baseUrl = `https://${backlogConfig.domain}/api/v2`;
+      const apiUrl = `${baseUrl}/users/myself?apiKey=${encodeURIComponent(backlogConfig.apiKey)}`;
 
-      console.log('Getting current user from Backlog API:', apiUrl.replace(config.apiKey, '***'));
+      console.log('Getting current user from Backlog API:', apiUrl.replace(backlogConfig.apiKey, '***'));
 
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -1737,6 +956,122 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       });
     } catch (error) {
       console.error('❌ [Background] Error opening options page:', error);
+    }
+  }
+
+  // ===========================================
+  // Settings Message Handlers
+  // ===========================================
+
+  private async handleGetSettings(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+    try {
+      const settings = await this.settingsService.getAllSettings();
+      const response: SettingsResponse = {
+        success: true,
+        data: settings
+      };
+      sendResponse(response);
+    } catch (error) {
+      console.error('❌ [Settings] Failed to get settings:', error);
+      const response: SettingsResponse = {
+        success: false,
+        error: 'Failed to load settings'
+      };
+      sendResponse(response);
+    }
+  }
+
+  private async handleUpdateSettings(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+    try {
+      if (message.data) {
+        await this.settingsService.saveAllSettings(message.data);
+        const response: SettingsResponse = {
+          success: true
+        };
+        sendResponse(response);
+      } else {
+        throw new Error('No settings data provided');
+      }
+    } catch (error) {
+      console.error('❌ [Settings] Failed to update settings:', error);
+      const response: SettingsResponse = {
+        success: false,
+        error: 'Failed to save settings'
+      };
+      sendResponse(response);
+    }
+  }
+
+  private async handleGetSection(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+    try {
+      let sectionData: any;
+
+      switch (message.section) {
+        case 'general':
+          sectionData = await this.settingsService.getGeneralSettings();
+          break;
+        case 'features':
+          sectionData = await this.settingsService.getFeatureFlags();
+          break;
+        case 'aiModels':
+          sectionData = await this.settingsService.getAiModelSettings();
+          break;
+        case 'backlog':
+          sectionData = await this.settingsService.getBacklogs();
+          break;
+        default:
+          throw new Error(`Unknown section: ${message.section}`);
+      }
+
+      const response: SettingsResponse = {
+        success: true,
+        data: sectionData
+      };
+      sendResponse(response);
+    } catch (error) {
+      console.error(`❌ [Settings] Failed to get section ${message.section}:`, error);
+      const response: SettingsResponse = {
+        success: false,
+        error: `Failed to load ${message.section} settings`
+      };
+      sendResponse(response);
+    }
+  }
+
+  private async handleUpdateSection(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+    try {
+      if (!message.data) {
+        throw new Error('No section data provided');
+      }
+
+      switch (message.section) {
+        case 'general':
+          await this.settingsService.updateGeneralSettings(message.data);
+          break;
+        case 'features':
+          await this.settingsService.updateFeatureFlags(message.data);
+          break;
+        case 'aiModels':
+          await this.settingsService.updateAiModelSettings(message.data);
+          break;
+        case 'backlog':
+          await this.settingsService.updateBacklogs(message.data);
+          break;
+        default:
+          throw new Error(`Unknown section: ${message.section}`);
+      }
+
+      const response: SettingsResponse = {
+        success: true
+      };
+      sendResponse(response);
+    } catch (error) {
+      console.error(`❌ [Settings] Failed to update section ${message.section}:`, error);
+      const response: SettingsResponse = {
+        success: false,
+        error: `Failed to save ${message.section} settings`
+      };
+      sendResponse(response);
     }
   }
 }

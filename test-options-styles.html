@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Options Styles</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4CAF50; background-color: #f9fff9; }
+        .error { border-color: #f44336; background-color: #fff9f9; }
+    </style>
+</head>
+<body>
+    <h1>Options Page Styles Test</h1>
+
+    <div class="test-section">
+        <h3>🔧 Test Setup</h3>
+        <p>This page tests whether the options page CSS is loading correctly.</p>
+    </div>
+
+    <div class="test-section" id="optionsPageTest">
+        <h3>📄 Options Page Test</h3>
+        <p>Status: <span id="optionsStatus">Testing...</span></p>
+        <div id="optionsFrame"></div>
+    </div>
+
+    <script>
+        // Test if options page loads without CSS errors
+        function testOptionsPage() {
+            const iframe = document.createElement('iframe');
+            iframe.src = 'dev-build/optionsNew.html';
+            iframe.style.width = '100%';
+            iframe.style.height = '600px';
+            iframe.style.border = '1px solid #ccc';
+
+            iframe.onload = function() {
+                const status = document.getElementById('optionsStatus');
+                const testSection = document.getElementById('optionsPageTest');
+
+                try {
+                    // Check if iframe loaded successfully
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc.body && iframeDoc.body.children.length > 0) {
+                        status.textContent = '✅ Options page loaded successfully!';
+                        testSection.className = 'test-section success';
+                    } else {
+                        status.textContent = '❌ Options page loaded but appears empty';
+                        testSection.className = 'test-section error';
+                    }
+                } catch (e) {
+                    status.textContent = '❌ Cannot access iframe content (security restriction)';
+                    testSection.className = 'test-section error';
+                }
+            };
+
+            iframe.onerror = function() {
+                const status = document.getElementById('optionsStatus');
+                const testSection = document.getElementById('optionsPageTest');
+                status.textContent = '❌ Failed to load options page';
+                testSection.className = 'test-section error';
+            };
+
+            document.getElementById('optionsFrame').appendChild(iframe);
+        }
+
+        // Run test after page loads
+        window.addEventListener('load', testOptionsPage);
+    </script>
+</body>
+</html>

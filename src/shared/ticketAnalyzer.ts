@@ -1,33 +1,6 @@
 // Utility để phân tích và extract thông tin ticket từ Backlog API
-import { BacklogApiService, BacklogTicketData, BacklogComment } from './backlogApi';
-
-export interface TicketData {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  assignee: string;
-  reporter: string;
-  dueDate: string;
-  labels: string[];
-  comments: CommentData[];
-  // Extended fields from Backlog API
-  issueType?: string;
-  created?: string;
-  updated?: string;
-  estimatedHours?: number | null;
-  actualHours?: number | null;
-  parentIssueId?: number | null;
-  customFields?: any[];
-  attachments?: any[];
-}
-
-export interface CommentData {
-  author: string;
-  content: string;
-  timestamp: string;
-}
+import { CommentData, TicketData } from '../types/backlog';
+import { BacklogApiService } from './backlogApi';
 
 export class TicketAnalyzer {
   private backlogApi: BacklogApiService;
@@ -100,15 +73,9 @@ export class TicketAnalyzer {
   /**
    * Update Backlog API settings
    */
-  public updateBacklogSettings(settings: { configs: any[] } | { apiKey: string; spaceName: string }) {
-    if ('configs' in settings) {
-      // New multi-config format
-      this.backlogApi.updateSettings(settings);
-    } else {
-      // Legacy format
-      this.backlogApi.updateSettingsLegacy(settings);
-    }
-  }
+  // public updateBacklogSettings(settings: { configs: any[] } | { apiKey: string; spaceName: string }) {
+  //   this.backlogApi.updateSettings(settings);
+  // }
 
   private extractTicketId(): string {
     // Extract từ URL hoặc page title

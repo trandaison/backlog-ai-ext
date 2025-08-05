@@ -44,6 +44,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "defu": "^6.1.4",
     "github-markdown-css": "^5.8.1",
     "marked": "^16.1.1",
     "react": "^19.1.0",

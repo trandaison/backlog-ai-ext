@@ -1,7 +1,6 @@
 // Content script chính để inject chatbot aside panel vào trang Backlog
 import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
-import { ChatMessage } from '../shared/chatStorageService';
 import { TicketURLMonitor, TicketChangeEvent } from '../shared/ticketURLMonitor';
 import { availableModels } from '../configs';
 
@@ -262,9 +261,9 @@ class BacklogAIInjector {
     try {
       // Load Backlog settings first
       const backlogSettings = await this.getBacklogSettings();
-      if (backlogSettings.configs && backlogSettings.configs.length > 0) {
-        this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
-      }
+      // if (backlogSettings.configs && backlogSettings.configs.length > 0) {
+      //   this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
+      // }
 
       // Load React and ChatbotAsidePanel from main world
       await this.loadChatbotAsidePanelScript();
@@ -833,9 +832,9 @@ class BacklogAIInjector {
     try {
       // Load Backlog settings first
       const backlogSettings = await this.getBacklogSettings();
-      if (backlogSettings.configs && backlogSettings.configs.length > 0) {
-        this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
-      }
+      // if (backlogSettings.configs && backlogSettings.configs.length > 0) {
+      //   this.ticketAnalyzer.updateBacklogSettings(backlogSettings);
+      // }
 
       const ticketData = await this.ticketAnalyzer.extractTicketData();
 

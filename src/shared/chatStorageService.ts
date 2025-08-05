@@ -1,69 +1,7 @@
-import { TicketData } from './ticketAnalyzer';
 import { safeTimestampToDate } from './timeUtils';
 import { FileAttachment } from '../types/attachment.d';
-
-export type ChatMessage = {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: string | Date; // Allow both string and Date for storage/runtime compatibility
-  responseId?: string; // Store Gemini responseId for reference
-  tokenCount?: number; // Track token usage per message
-  compressed?: boolean; // Flag if this message was summarized
-  attachments?: FileAttachment[]; // Array of file attachments
-};
-
-export interface UserInfo {
-  id: number;
-  name: string;
-  avatar: string;
-  mailAddress: string;
-  userId: string;
-  nulabAccount?: {
-    nulabId: string;
-    name: string;
-    uniqueId: string;
-    iconUrl: string;
-  };
-}
-
-export interface ChatHistoryData {
-  ticketId: string;
-  ticketUrl: string;
-  messages: Array<{
-    id: string;
-    content: string;
-    sender: 'user' | 'ai';
-    timestamp: string | Date; // Allow both string and Date for storage/runtime compatibility
-    responseId?: string; // Store Gemini responseId for reference
-    tokenCount?: number; // Track token usage per message
-    compressed?: boolean; // Flag if this message was summarized
-  }>;
-  lastUpdated: string;
-  userInfo: UserInfo;
-  ticketInfo: {
-    title: string;
-    status: string;
-    assignee?: string;
-  };
-  // Add optimization fields:
-  contextSummary?: string; // Compressed summary of older messages
-  lastSummaryIndex?: number; // Index of last message included in summary
-  totalTokensUsed?: number; // Track cumulative token usage
-}
-
-interface StorageMetadata {
-  ticketIds: string[];
-  lastAccess: Record<string, number>;
-  lastCleanup: string;
-}
-
-export interface SaveResult {
-  success: boolean;
-  error?: string;
-  cleaned?: boolean;
-  usage?: number;
-}
+import { TicketData, UserInfo } from '../types/backlog';
+import { ChatHistoryData, ChatMessage, SaveResult, StorageMetadata } from '../types/chat';
 
 export class ChatStorageService {
   private static readonly STORAGE_KEY_PREFIX = 'chat-history-';

@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './options.scss';
-import { EncryptionService } from '../shared/encryption';
 import { availableModels, defaultModelId } from '../configs';
+import { settingsClient } from '../shared/settingsClient';
+import type { BacklogIntegration } from '../configs/settingsTypes';
+import { APIKeyInput } from "./components/APIKeyInput";
+import InputPassword from "./components/InputPassword";
+import { downloadJson, generateDownloadFilename } from "../shared/downloadUtils";
 
 // Inline component để tránh module import issues
 type SettingsSection =
@@ -18,251 +22,8 @@ interface SidebarItem {
   icon: string;
 }
 
-interface BacklogAPIKey {
-  id: string;
-  domain: string;
-  apiKey: string;
-  note: string;
-  namespace?: string; // Will be populated after successful test
-}
-
-interface APIKeyInputProps {
-  label: string;
-  placeholder: string;
-  hint: string;
-  providerKey: string;
-  onVerify: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
-}
-
-const APIKeyInput: React.FC<APIKeyInputProps> = ({
-  label,
-  placeholder,
-  hint,
-  providerKey,
-  onVerify,
-}) => {
-  const [apiKey, setApiKey] = useState('');
-  const [storedKey, setStoredKey] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationState, setVerificationState] = useState<
-    'idle' | 'success' | 'error'
-  >('idle');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isLoadingKey, setIsLoadingKey] = useState(true);
-
-  React.useEffect(() => {
-    const loadStoredKey = async () => {
-      setIsLoadingKey(true);
-      try {
-        // Load từ popup storage format (encrypted)
-        let storageKey;
-        if (providerKey === 'openai') {
-          storageKey = 'encryptedApiKey';
-        } else if (providerKey === 'gemini') {
-          storageKey = 'encryptedGeminiApiKey';
-        } else {
-          // Fallback cho providers khác
-          storageKey = `apiKey_${providerKey}`;
-        }
-
-        const result = await chrome.storage.sync.get([storageKey]);
-        const encryptedKey = result[storageKey] || '';
-
-        let stored = '';
-
-        if (
-          encryptedKey &&
-          (providerKey === 'openai' || providerKey === 'gemini')
-        ) {
-          try {
-            // Decrypt key từ popup format
-            stored = await EncryptionService.decryptApiKey(encryptedKey);
-          } catch (error) {
-            console.error(`Failed to decrypt ${providerKey} API key:`, error);
-            stored = '';
-          }
-        } else if (encryptedKey) {
-          stored = encryptedKey; // Plain text cho providers khác
-        }
-
-        setStoredKey(stored);
-        setApiKey(stored);
-      } catch (error) {
-        console.error('Failed to load stored API key:', error);
-      } finally {
-        setIsLoadingKey(false);
-      }
-    };
-
-    loadStoredKey();
-  }, [providerKey]);
-
-  const handleVerify = async () => {
-    if (!apiKey.trim()) {
-      setVerificationState('error');
-      setErrorMessage('Please enter an API key');
-      return;
-    }
-
-    setIsVerifying(true);
-    setVerificationState('idle');
-    setErrorMessage('');
-
-    try {
-      const result = await onVerify(apiKey);
-
-      if (result.success) {
-        setVerificationState('success');
-
-        // Save key using popup storage format (encrypted)
-        try {
-          let storageKey;
-          let valueToStore;
-
-          if (providerKey === 'openai') {
-            storageKey = 'encryptedApiKey';
-            valueToStore = await EncryptionService.encryptApiKey(apiKey);
-          } else if (providerKey === 'gemini') {
-            storageKey = 'encryptedGeminiApiKey';
-            valueToStore = await EncryptionService.encryptApiKey(apiKey);
-          } else {
-            // Fallback cho providers khác
-            storageKey = `apiKey_${providerKey}`;
-            valueToStore = apiKey; // Plain text
-          }
-
-          await chrome.storage.sync.set({
-            [storageKey]: valueToStore,
-          });
-          setStoredKey(apiKey);
-        } catch (error) {
-          console.error('Failed to save API key:', error);
-        }
-
-        setTimeout(() => {
-          setVerificationState('idle');
-        }, 2000);
-      } else {
-        setVerificationState('error');
-        setErrorMessage(result.error || 'Verification failed');
-      }
-    } catch (error) {
-      setVerificationState('error');
-      setErrorMessage('Network error occurred');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const resetToStoredKey = () => {
-    setApiKey(storedKey);
-    setVerificationState('idle');
-    setErrorMessage('');
-  };
-
-  const handleClear = async () => {
-    setApiKey('');
-    setVerificationState('idle');
-    setErrorMessage('');
-
-    // Clear from storage
-    try {
-      let storageKey;
-      if (providerKey === 'openai') {
-        storageKey = 'encryptedApiKey';
-      } else if (providerKey === 'gemini') {
-        storageKey = 'encryptedGeminiApiKey';
-      } else {
-        storageKey = `apiKey_${providerKey}`;
-      }
-
-      await chrome.storage.sync.remove([storageKey]);
-      setStoredKey('');
-    } catch (error) {
-      console.error('Failed to clear API key:', error);
-    }
-  };
-
-  const getSaveButtonContent = () => {
-    if (isVerifying) return 'Saving...';
-    if (verificationState === 'success') return 'Saved';
-    return 'Save';
-  };
-
-  return (
-    <div className='api-key-input-group'>
-      <label className='setting-label'>{label}</label>
-      <div className='api-key-input-container'>
-        <div className='input-with-controls'>
-          <div className='input-wrapper'>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              className='setting-input api-key-input'
-              placeholder={isLoadingKey ? 'Loading...' : placeholder}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              disabled={isLoadingKey}
-            />
-            <button
-              type='button'
-              className='input-toggle-button-inside'
-              onClick={() => setShowPassword(!showPassword)}
-              title={showPassword ? 'Hide API key' : 'Show API key'}
-              disabled={isLoadingKey}
-            >
-              {showPassword ? '🙈' : '👁️'}
-            </button>
-          </div>
-          <button
-            type='button'
-            className={`verify-button ${verificationState}`}
-            onClick={handleVerify}
-            disabled={isVerifying || isLoadingKey}
-          >
-            {getSaveButtonContent()}
-          </button>
-          <button
-            type='button'
-            className='clear-button'
-            onClick={handleClear}
-            disabled={isVerifying || isLoadingKey}
-            title='Clear API key'
-          >
-            Clear
-          </button>
-          {apiKey !== storedKey && !isLoadingKey && (
-            <button
-              type='button'
-              className='reset-button'
-              onClick={resetToStoredKey}
-              title='Reset to saved key'
-            >
-              ↶
-            </button>
-          )}
-        </div>
-      </div>
-      {errorMessage && <div className='error-message'>{errorMessage}</div>}
-      <div className='hint-text'>
-        {hint.includes('http') ? (
-          <span>
-            {hint.split('https://')[0]}
-            <a
-              href={`https://${hint.split('https://')[1]}`}
-              target='_blank'
-              rel='noopener noreferrer'
-            >
-              https://{hint.split('https://')[1]}
-            </a>
-          </span>
-        ) : (
-          hint
-        )}
-      </div>
-    </div>
-  );
-};
+// Use BacklogIntegration from settingsTypes instead of local interface
+type BacklogAPIKey = BacklogIntegration;
 
 const sidebarItems: SidebarItem[] = [
   { id: 'general', label: 'General Settings', icon: '⚙️' },
@@ -275,10 +36,11 @@ const sidebarItems: SidebarItem[] = [
 const OptionsPage: React.FC = () => {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>('general');
-  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [preferredModel, setPreferredModel] = useState<string>(defaultModelId);
+  const [openAIApiKey, setOpenAIApiKey] = useState<string>('');
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [backlogAPIKeys, setBacklogAPIKeys] = useState<BacklogAPIKey[]>([]);
   const [isLoadingBacklogKeys, setIsLoadingBacklogKeys] = useState(true);
   const [testingStates, setTestingStates] = useState<
@@ -289,9 +51,6 @@ const OptionsPage: React.FC = () => {
         result?: { success: boolean; namespace?: string; error?: string };
       }
     >
-  >({});
-  const [showPasswordStates, setShowPasswordStates] = useState<
-    Record<string, boolean>
   >({});
   const [language, setLanguage] = useState<string>('vi');
   const [userRole, setUserRole] = useState<string>('developer');
@@ -352,36 +111,28 @@ const OptionsPage: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Load preferred model từ storage
+  // Load preferred model from settings service
   React.useEffect(() => {
     const loadPreferredModel = async () => {
       try {
-        const result = await chrome.storage.sync.get(['preferredModel']);
-        const model = result.preferredModel || defaultModelId;
+        const aiSettings = await settingsClient.getAiModelSettings();
+        const model = aiSettings.preferredModel || defaultModelId;
         setPreferredModel(model);
-
-        // Also set the preferred provider based on the model
-        const selectedModel = availableModels.find(m => m.id === model);
-        if (selectedModel) {
-          await chrome.storage.sync.set({
-            preferredProvider: selectedModel.provider
-          });
-        }
+        setOpenAIApiKey(aiSettings.aiProviderKeys.openAi);
+        setGeminiApiKey(aiSettings.aiProviderKeys.gemini);
       } catch (error) {
         console.error('Failed to load preferred model:', error);
-      } finally {
-        setIsLoadingProvider(false);
       }
     };
 
     loadPreferredModel();
   }, []);
 
-  // Load selected models từ storage
+  // Load selected models from settings service
   React.useEffect(() => {
     const loadSelectedModels = async () => {
       try {
-        const result = await chrome.storage.sync.get(['selectedModels']);
+        const aiSettings = await settingsClient.getAiModelSettings();
         // Default models: Mới, tối ưu chi phí, thông minh, nhanh
         const defaultModels = [
           defaultModelId, // Primary default model
@@ -390,7 +141,7 @@ const OptionsPage: React.FC = () => {
           'gemini-2.5-pro', // Most advanced Gemini model with enhanced reasoning
           'gemini-2.5-flash-lite', // Lightweight version optimized for speed and cost
         ];
-        const models = result.selectedModels || defaultModels;
+        const models = aiSettings.selectedModels.length > 0 ? aiSettings.selectedModels : defaultModels;
         setSelectedModels(models);
       } catch (error) {
         console.error('Failed to load selected models:', error);
@@ -402,15 +153,13 @@ const OptionsPage: React.FC = () => {
     loadSelectedModels();
   }, []);
 
-  // Load general settings (language and userRole) từ storage
+  // Load general settings from settings service
   React.useEffect(() => {
     const loadGeneralSettings = async () => {
       try {
-        const result = await chrome.storage.sync.get(['language', 'userRole']);
-        const lang = result.language || 'vi';
-        const role = result.userRole || 'developer';
-        setLanguage(lang);
-        setUserRole(role);
+        const generalSettings = await settingsClient.getGeneralSettings();
+        setLanguage(generalSettings.language);
+        setUserRole(generalSettings.userRole);
       } catch (error) {
         console.error('Failed to load general settings:', error);
       } finally {
@@ -421,28 +170,16 @@ const OptionsPage: React.FC = () => {
     loadGeneralSettings();
   }, []);
 
-  // Load feature settings từ storage
+  // Load feature settings from settings service
   React.useEffect(() => {
     const loadFeatureSettings = async () => {
       setIsLoadingFeatures(true);
       try {
-        const result = await chrome.storage.sync.get([
-          'rememberChatboxSize',
-          'autoOpenChatbox',
-          'enterToSend',
-        ]);
+        const featureSettings = await settingsClient.getFeatureFlags();
 
-        setRememberChatboxSize(
-          result.rememberChatboxSize !== undefined
-            ? result.rememberChatboxSize
-            : true
-        );
-        setAutoOpenChatbox(
-          result.autoOpenChatbox !== undefined ? result.autoOpenChatbox : false
-        );
-        setEnterToSend(
-          result.enterToSend !== undefined ? result.enterToSend : true
-        );
+        setRememberChatboxSize(featureSettings.rememberChatboxSize ?? true);
+        setAutoOpenChatbox(featureSettings.autoOpenChatbox);
+        setEnterToSend(featureSettings.enterToSend);
       } catch (error) {
         console.error('Failed to load feature settings:', error);
       } finally {
@@ -456,55 +193,10 @@ const OptionsPage: React.FC = () => {
   // Load Backlog API keys từ storage
   React.useEffect(() => {
     const loadBacklogAPIKeys = async () => {
+      setIsLoadingBacklogKeys(true);
       try {
-        const result = await chrome.storage.sync.get([
-          'backlogAPIKeys',
-          'backlogDomain',
-          'backlogAPIKey',
-        ]);
-
-        // Migration từ popup settings cũ
-        let keys: BacklogAPIKey[] = [];
-
-        if (result.backlogAPIKeys) {
-          // Nếu đã có format mới
-          keys = result.backlogAPIKeys;
-        } else if (result.backlogDomain && result.backlogAPIKey) {
-          // Migration từ format cũ
-          keys = [
-            {
-              id: 'migrated-' + Date.now(),
-              domain: result.backlogDomain,
-              apiKey: result.backlogAPIKey,
-              note: 'Migrated from popup settings',
-            },
-          ];
-
-          // Save format mới và xóa keys cũ
-          await chrome.storage.sync.set({ backlogAPIKeys: keys });
-          await chrome.storage.sync.remove(['backlogDomain', 'backlogAPIKey']);
-        }
-
-        // Nếu không có keys nào, tạo một entry trống
-        if (keys.length === 0) {
-          keys = [
-            {
-              id: 'default-' + Date.now(),
-              domain: '',
-              apiKey: '',
-              note: '',
-            },
-          ];
-        }
-
-        setBacklogAPIKeys(keys);
-
-        // Initialize password visibility states for all keys
-        const initialShowStates: Record<string, boolean> = {};
-        keys.forEach((key) => {
-          initialShowStates[key.id] = false;
-        });
-        setShowPasswordStates(initialShowStates);
+        const backlogKeys = await settingsClient.getBacklogs();
+        setBacklogAPIKeys(backlogKeys);
       } catch (error) {
         console.error('Failed to load Backlog API keys:', error);
       } finally {
@@ -514,10 +206,6 @@ const OptionsPage: React.FC = () => {
 
     loadBacklogAPIKeys();
   }, []);
-
-  const handleProviderChange = async (provider: 'openai' | 'gemini') => {
-    // This function is no longer needed, but keeping for compatibility
-  };
 
   const handleSectionChange = (section: SettingsSection) => {
     // Add animation class to trigger re-animation
@@ -538,13 +226,8 @@ const OptionsPage: React.FC = () => {
   const handlePreferredModelChange = async (modelId: string) => {
     setPreferredModel(modelId);
     try {
-      // Determine provider based on selected model
-      const selectedModel = availableModels.find(model => model.id === modelId);
-      const preferredProvider = selectedModel?.provider || 'openai';
-
-      await chrome.storage.sync.set({
-        preferredModel: modelId,
-        preferredProvider: preferredProvider
+      await settingsClient.updateAiModelSettings({
+        preferredModel: modelId
       });
     } catch (error) {
       console.error('Failed to save preferred model:', error);
@@ -554,7 +237,7 @@ const OptionsPage: React.FC = () => {
   const handleLanguageChange = async (newLanguage: string) => {
     setLanguage(newLanguage);
     try {
-      await chrome.storage.sync.set({ language: newLanguage });
+      await settingsClient.updateGeneralSettings({ language: newLanguage });
     } catch (error) {
       console.error('Failed to save language:', error);
     }
@@ -563,7 +246,7 @@ const OptionsPage: React.FC = () => {
   const handleUserRoleChange = async (newRole: string) => {
     setUserRole(newRole);
     try {
-      await chrome.storage.sync.set({ userRole: newRole });
+      await settingsClient.updateGeneralSettings({ userRole: newRole });
     } catch (error) {
       console.error('Failed to save user role:', error);
     }
@@ -573,7 +256,7 @@ const OptionsPage: React.FC = () => {
   const handleRememberChatboxSizeChange = async (enabled: boolean) => {
     setRememberChatboxSize(enabled);
     try {
-      await chrome.storage.sync.set({ rememberChatboxSize: enabled });
+      await settingsClient.updateFeatureFlags({ rememberChatboxSize: enabled });
     } catch (error) {
       console.error('Failed to save rememberChatboxSize setting:', error);
     }
@@ -582,7 +265,7 @@ const OptionsPage: React.FC = () => {
   const handleAutoOpenChatboxChange = async (enabled: boolean) => {
     setAutoOpenChatbox(enabled);
     try {
-      await chrome.storage.sync.set({ autoOpenChatbox: enabled });
+      await settingsClient.updateFeatureFlags({ autoOpenChatbox: enabled });
     } catch (error) {
       console.error('Failed to save autoOpenChatbox setting:', error);
     }
@@ -591,7 +274,7 @@ const OptionsPage: React.FC = () => {
   const handleEnterToSendChange = async (enabled: boolean) => {
     setEnterToSend(enabled);
     try {
-      await chrome.storage.sync.set({ enterToSend: enabled });
+      await settingsClient.updateFeatureFlags({ enterToSend: enabled });
     } catch (error) {
       console.error('Failed to save enterToSend setting:', error);
     }
@@ -605,7 +288,7 @@ const OptionsPage: React.FC = () => {
     setSelectedModels(newSelectedModels);
 
     try {
-      await chrome.storage.sync.set({ selectedModels: newSelectedModels });
+      await settingsClient.updateAiModelSettings({ selectedModels: newSelectedModels });
     } catch (error) {
       console.error('Failed to save selected models:', error);
     }
@@ -619,74 +302,11 @@ const OptionsPage: React.FC = () => {
     try {
       const exportData: any = {
         exportedAt: new Date().toISOString(),
-        extensionVersion: '1.0.0', // Get from manifest
+        extensionVersion: __APP_VERSION__,
       };
 
       if (exportConfigs) {
-        // Export specific configuration data instead of all sync storage
-        const configKeys = [
-          'language',
-          'userRole',
-          'rememberChatboxSize',
-          'autoOpenChatbox',
-          'enterToSend',
-          'selectedModels',
-          'preferredModel',
-          'encryptedApiKey',
-          'encryptedGeminiApiKey',
-          'backlogAPIKeys',
-        ];
-        const configData = await chrome.storage.sync.get(configKeys);
-
-        // Get sidebar width from local storage
-        const localData = await chrome.storage.local.get([
-          'ai-ext-sidebar-width',
-        ]);
-
-        // Process selected models - use current UI state for most accurate data
-        const selectedModelIds = selectedModels; // Use current UI state instead of storage
-        console.log('🔍 [Export] Selected models to export:', selectedModelIds);
-        console.log(
-          '🔍 [Export] Total selected models count:',
-          selectedModelIds.length
-        );
-        console.log(
-          '🔍 [Export] Storage selectedModels:',
-          configData.selectedModels
-        );
-
-        // Encrypt API keys in backlog data
-        const backlogData = configData.backlogAPIKeys
-          ? await Promise.all(
-              configData.backlogAPIKeys.map(async (key: any) => ({
-                id: key.id,
-                domain: key.domain,
-                apiKey: await EncryptionService.encryptApiKey(key.apiKey),
-                note: key.note,
-                namespace: key.namespace,
-              }))
-            )
-          : [];
-
-        exportData.configs = {
-          general: {
-            language: configData.language,
-            userRole: configData.userRole,
-          },
-          features: {
-            rememberChatboxSize: configData.rememberChatboxSize,
-            autoOpenChatbox: configData.autoOpenChatbox,
-            enterToSend: configData.enterToSend,
-          },
-          aiModels: {
-            selectedModels: selectedModelIds, // Export as ID array only
-            preferredModel: configData.preferredModel,
-            encryptedApiKey: configData.encryptedApiKey,
-            encryptedGeminiApiKey: configData.encryptedGeminiApiKey,
-          },
-          backlog: backlogData,
-          sidebarWidth: localData['ai-ext-sidebar-width'],
-        };
+        exportData.configs = await settingsClient.getAllSettings();
       }
 
       if (exportChatHistory) {
@@ -702,33 +322,8 @@ const OptionsPage: React.FC = () => {
           value === undefined ? null : value
         )
       );
-
-      // Generate filename with timestamp
-      const now = new Date();
-      const timestamp =
-        now.getFullYear().toString() +
-        (now.getMonth() + 1).toString().padStart(2, '0') +
-        now.getDate().toString().padStart(2, '0') +
-        '_' +
-        now.getHours().toString().padStart(2, '0') +
-        now.getMinutes().toString().padStart(2, '0');
-
-      const filename = `backlog-ai-ext_data_v1.0.0_${timestamp}.json`;
-
-      // Create and download file
-      const blob = new Blob([JSON.stringify(cleanedData, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('Data exported successfully:', filename);
+      const filename = generateDownloadFilename(`backlog-ai-ext_data_${__APP_VERSION__}`, 'json');
+      downloadJson(cleanedData, filename);
     } catch (error) {
       console.error('Export failed:', error);
     } finally {
@@ -769,85 +364,19 @@ const OptionsPage: React.FC = () => {
     if (!confirmed) return;
 
     setIsImporting(true);
-    let backup: any = null;
-
     try {
-      // Create backup of current data
-      backup = {
-        sync: await chrome.storage.sync.get(),
-        local: await chrome.storage.local.get(),
-      };
-
       // Use cached file content instead of reading again
       const importData = JSON.parse(fileContent);
 
       // Validate import data structure
       if (!importData.exportedAt || !importData.extensionVersion) {
+        // TODO: Verify signature
         throw new Error('Invalid import file format');
       }
 
       // Import configurations if present
       if (importData.configs) {
-        const { configs } = importData;
-        const syncData: any = {};
-        const localData: any = {};
-
-        // Merge general settings
-        if (configs.general) {
-          if (configs.general.language)
-            syncData.language = configs.general.language;
-          if (configs.general.userRole)
-            syncData.userRole = configs.general.userRole;
-        }
-
-        // Merge feature settings
-        if (configs.features) {
-          if (configs.features.rememberChatboxSize !== undefined)
-            syncData.rememberChatboxSize = configs.features.rememberChatboxSize;
-          if (configs.features.autoOpenChatbox !== undefined)
-            syncData.autoOpenChatbox = configs.features.autoOpenChatbox;
-          if (configs.features.enterToSend !== undefined)
-            syncData.enterToSend = configs.features.enterToSend;
-        }
-
-        // Merge AI model settings
-        if (configs.aiModels) {
-          // selectedModels is now already an array of IDs
-          if (configs.aiModels.selectedModels) {
-            syncData.selectedModels = configs.aiModels.selectedModels;
-          }
-          if (configs.aiModels.preferredModel)
-            syncData.preferredModel = configs.aiModels.preferredModel;
-          if (configs.aiModels.encryptedApiKey)
-            syncData.encryptedApiKey = configs.aiModels.encryptedApiKey;
-          if (configs.aiModels.encryptedGeminiApiKey)
-            syncData.encryptedGeminiApiKey =
-              configs.aiModels.encryptedGeminiApiKey;
-        }
-
-        // Merge Backlog settings - decrypt API keys
-        if (configs.backlog && Array.isArray(configs.backlog)) {
-          const decryptedBacklogKeys = await Promise.all(
-            configs.backlog.map(async (key: any) => ({
-              ...key,
-              apiKey: await EncryptionService.decryptApiKey(key.apiKey),
-            }))
-          );
-          syncData.backlogAPIKeys = decryptedBacklogKeys;
-        }
-
-        // Merge sidebar width
-        if (configs.sidebarWidth !== undefined) {
-          localData['ai-ext-sidebar-width'] = configs.sidebarWidth;
-        }
-
-        // Save to storage
-        if (Object.keys(syncData).length > 0) {
-          await chrome.storage.sync.set(syncData);
-        }
-        if (Object.keys(localData).length > 0) {
-          await chrome.storage.local.set(localData);
-        }
+        await settingsClient.saveAllSettings(importData.configs);
       }
 
       // Import chat history if present
@@ -870,24 +399,7 @@ const OptionsPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Import failed:', error);
-
-      // Restore backup if import failed
-      if (backup) {
-        try {
-          await chrome.storage.sync.clear();
-          await chrome.storage.local.clear();
-          await chrome.storage.sync.set(backup.sync);
-          await chrome.storage.local.set(backup.local);
-          alert('Import failed and data has been restored to previous state.');
-        } catch (restoreError) {
-          console.error('Failed to restore backup:', restoreError);
-          alert(
-            'Import failed and backup restoration also failed. Please reload the extension.'
-          );
-        }
-      } else {
-        alert('Import failed: ' + (error as Error).message);
-      }
+      alert('Import failed: ' + (error as Error).message);
 
       // Reset state on error
       setImportFile(null);
@@ -909,29 +421,18 @@ const OptionsPage: React.FC = () => {
       domain: '',
       apiKey: '',
       note: '',
+      namespace: ''
     };
 
     setBacklogAPIKeys([...backlogAPIKeys, newKey]);
-    // Initialize password visibility state for new entry
-    setShowPasswordStates((prev) => ({
-      ...prev,
-      [newKey.id]: false,
-    }));
   };
 
   const removeBacklogAPIKey = async (id: string) => {
     const updatedKeys = backlogAPIKeys.filter((key) => key.id !== id);
     setBacklogAPIKeys(updatedKeys);
 
-    // Remove password visibility state for deleted entry
-    setShowPasswordStates((prev) => {
-      const newStates = { ...prev };
-      delete newStates[id];
-      return newStates;
-    });
-
     try {
-      await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+      await settingsClient.updateBacklogs(updatedKeys);
     } catch (error) {
       console.error('Failed to save Backlog API keys:', error);
     }
@@ -949,7 +450,7 @@ const OptionsPage: React.FC = () => {
     setBacklogAPIKeys(updatedKeys);
 
     try {
-      await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+      await settingsClient.updateBacklogs(updatedKeys);
     } catch (error) {
       console.error('Failed to save Backlog API keys:', error);
     }
@@ -1016,7 +517,7 @@ const OptionsPage: React.FC = () => {
 
         // Save to Chrome storage when connection is successful
         try {
-          await chrome.storage.sync.set({ backlogAPIKeys: updatedKeys });
+          await settingsClient.updateBacklogs(updatedKeys);
           console.log('Backlog API keys saved successfully');
         } catch (storageError) {
           console.error('Failed to save Backlog API keys:', storageError);
@@ -1193,7 +694,7 @@ const OptionsPage: React.FC = () => {
                     label=''
                     placeholder='sk-...'
                     hint='Get your API key from https://platform.openai.com/api-keys'
-                    providerKey='openai'
+                    value={openAIApiKey}
                     onVerify={async (apiKey) => {
                       await new Promise((resolve) => setTimeout(resolve, 1500));
                       if (apiKey.startsWith('sk-') && apiKey.length > 10) {
@@ -1203,6 +704,15 @@ const OptionsPage: React.FC = () => {
                         success: false,
                         error: 'Invalid OpenAI API key format',
                       };
+                    }}
+                    onSave={async (apiKey) => {
+                      try {
+                        await settingsClient.updateAiModelSettings({
+                          aiProviderKeys: { openAi: apiKey }
+                        });
+                      } catch (error) {
+                        console.error('Failed to save OpenAI API key:', error);
+                      }
                     }}
                   />
                 </div>
@@ -1220,7 +730,7 @@ const OptionsPage: React.FC = () => {
                     label=''
                     placeholder='AIza...'
                     hint='Get your API key from https://aistudio.google.com/app/apikey'
-                    providerKey='gemini'
+                    value={geminiApiKey}
                     onVerify={async (apiKey) => {
                       await new Promise((resolve) => setTimeout(resolve, 1500));
                       if (apiKey.startsWith('AIza') && apiKey.length > 10) {
@@ -1230,6 +740,15 @@ const OptionsPage: React.FC = () => {
                         success: false,
                         error: 'Invalid Gemini API key format',
                       };
+                    }}
+                    onSave={async (apiKey) => {
+                      try {
+                        await settingsClient.updateAiModelSettings({
+                          aiProviderKeys: { gemini: apiKey }
+                        });
+                      } catch (error) {
+                        console.error('Failed to save Gemini API key:', error);
+                      }
                     }}
                   />
                 </div>
@@ -1398,42 +917,18 @@ const OptionsPage: React.FC = () => {
                         <label htmlFor={`apikey-${keyEntry.id}`}>
                           API Key:
                         </label>
-                        <div className='input-wrapper'>
-                          <input
-                            id={`apikey-${keyEntry.id}`}
-                            type={
-                              showPasswordStates[keyEntry.id]
-                                ? 'text'
-                                : 'password'
-                            }
-                            placeholder='Your Backlog API key'
-                            value={keyEntry.apiKey}
-                            onChange={(e) =>
-                              updateBacklogAPIKey(
-                                keyEntry.id,
-                                'apiKey',
-                                e.target.value
-                              )
-                            }
-                          />
-                          <button
-                            type='button'
-                            className='input-toggle-button-inside'
-                            onClick={() =>
-                              setShowPasswordStates((prev) => ({
-                                ...prev,
-                                [keyEntry.id]: !prev[keyEntry.id],
-                              }))
-                            }
-                            title={
-                              showPasswordStates[keyEntry.id]
-                                ? 'Hide API key'
-                                : 'Show API key'
-                            }
-                          >
-                            {showPasswordStates[keyEntry.id] ? '🙈' : '👁️'}
-                          </button>
-                        </div>
+
+                        <InputPassword
+                          placeholder='Your Backlog API key'
+                          value={keyEntry.apiKey}
+                          onChange={(e) =>
+                            updateBacklogAPIKey(
+                              keyEntry.id,
+                              'apiKey',
+                              e.target.value
+                            )
+                          }
+                        />
                       </div>
                     </div>
 
@@ -1472,7 +967,7 @@ const OptionsPage: React.FC = () => {
                       >
                         {testingStates[keyEntry.id]?.testing
                           ? 'Testing...'
-                          : 'Test Connection'}
+                          : 'Save'}
                       </button>
 
                       {testingStates[keyEntry.id]?.result && (

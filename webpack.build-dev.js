@@ -55,8 +55,17 @@ module.exports = {
       },
       {
         test: /\.scss$/,
+        exclude: /options\.scss$/,
         use: [
           MiniCssExtractPlugin.loader,
+          'css-loader',
+          'sass-loader'
+        ]
+      },
+      {
+        test: /options\.scss$/,
+        use: [
+          'style-loader',
           'css-loader',
           'sass-loader'
         ]

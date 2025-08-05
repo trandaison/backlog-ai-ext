@@ -9,7 +9,7 @@ This document outlines the strategy for refactoring the extension's settings sto
 - **Centralize** all settings management through a single service
 - **Unify** storage format under one `configs` key
 - **Improve** type safety with strict TypeScript interfaces
-- **Maintain** backward compatibility during migration
+- **Fresh Start**: Clean installation with new settings structure
 - **Enhance** developer experience with clear APIs
 
 ## 📊 Current State Analysis
@@ -127,9 +127,23 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 ```
 
-## 🔧 SettingsService API Design
+## 🔧 Data Flow Architecture
 
-### Core Methods
+### Communication Pattern
+```
+Content Scripts ←→ Background Script ←→ SettingsService ←→ Chrome Storage
+Options Page   ←→ Background Script ←→ SettingsService ←→ Chrome Storage
+```
+
+### Centralized Settings Management
+- **Background Script**: Central hub for all settings operations
+- **SettingsService**: Only accessible from background script
+- **Message Passing**: Content scripts and options page communicate with background via Chrome messages
+- **Single Source of Truth**: Background script maintains settings cache and handles all storage operations
+
+### SettingsService API Design
+
+#### Core Methods (Background Script Only)
 ```typescript
 class SettingsService {
   // Core operations
@@ -155,44 +169,67 @@ class SettingsService {
   async removeBacklog(id: string): Promise<void>
   async clearCache(): Promise<void>
 
-  // Migration and cleanup methods
-  async performMigrationIfNeeded(): Promise<boolean>  // Returns true if migration occurred
-  async cleanupOldSettings(): Promise<void>           // Remove old storage keys
-  async getMigrationStatus(): Promise<MigrationStatus>
+  // Initialization methods
+  async initializeSettings(): Promise<void>  // Initialize with default settings if none exist
+  async resetAllSettings(): Promise<void>    // Reset to default settings
 }
 ```
 
+#### Background Script Message Handlers
+```typescript
+// Background script will handle these message types
+interface SettingsMessage {
+  type: 'GET_SETTINGS' | 'UPDATE_SETTINGS' | 'GET_SECTION' | 'UPDATE_SECTION';
+  section?: 'general' | 'features' | 'aiModels' | 'backlog' | 'sidebarWidth';
+  data?: any;
+}
+
+// Message handlers in background script
+chrome.runtime.onMessage.addListener((message: SettingsMessage, sender, sendResponse) => {
+  if (message.type === 'GET_SETTINGS') {
+    settingsService.getAllSettings().then(sendResponse);
+  } else if (message.type === 'UPDATE_SETTINGS') {
+    settingsService.saveAllSettings(message.data).then(() => sendResponse({ success: true }));
+  }
+  // ... other handlers
+});
+```
+
 ### Key Features
+- **Centralized Access**: Only background script can access SettingsService directly
+- **Message-Based Communication**: Content scripts and options page use Chrome messaging
 - **Automatic Encryption/Decryption**: API keys are encrypted when saved, decrypted when retrieved
-- **Caching**: Settings cached in memory for performance
+- **Caching**: Settings cached in background script for performance
 - **Type Safety**: Full TypeScript support with strict typing
 - **Partial Updates**: Update only specific sections without affecting others
-- **Migration Support**: Automatic migration from old format with cleanup
-- **One-time Migration**: Migration runs once per extension update, then cleans old data
+- **Fresh Installation**: Clean start with default settings, no legacy data migration
+- **Simple Initialization**: Initialize with defaults if no settings exist
 
-## 📈 Migration Strategy
+## 📈 Implementation Strategy
 
 ### Phase 1: Foundation Setup (Week 1)
 #### Tasks:
 1. Create `src/configs/settingsTypes.ts` with all type definitions
 2. Create `src/shared/settingsService.ts` with full service implementation
-3. Add migration logic for all existing data formats
+3. Add initialization logic for fresh installations
 4. Write comprehensive unit tests for SettingsService
 
 #### Success Criteria:
 - [ ] All types defined and exported
-- [ ] SettingsService fully implemented with migration logic
-- [ ] Tests pass for migration scenarios
-- [ ] Service can read existing data without breaking
+- [ ] SettingsService fully implemented with initialization logic
+- [ ] Tests pass for all scenarios
+- [ ] Service can initialize with default settings
 
-### Phase 2: Background Service Migration (Week 1-2)
+### Phase 2: Background Service Implementation (Week 1-2)
 #### Tasks:
 1. ✅ Create `SettingsService` and integrate with background service
 2. ❌ Remove old inline `Settings` interfaces and replace with unified types
 3. ❌ Update AI service classes to use SettingsService instead of direct storage access
 4. ❌ Replace legacy settings properties with new unified structure
 5. ❌ Update all `chrome.storage` calls to use SettingsService methods
-6. ❌ Test background script functionality with new settings system
+6. ❌ Add message handlers for settings operations from content scripts and options page
+7. ❌ Add cleanup logic to remove old storage keys on startup
+8. ❌ Test background script functionality with new settings system
 
 #### Specific Implementation Steps:
 1. **Remove Legacy Interfaces** (❌ TODO):
@@ -207,171 +244,170 @@ class SettingsService {
    - Use decrypted API keys from unified settings
 
 3. **Update Settings Access Patterns** (❌ TODO):
-   - `settings?.geminiApiKey` → `settings.aiModels.aiProviderKeys.gemini` (decrypted)
-   - `settings?.apiKey` → `settings.aiModels.aiProviderKeys.openAi` (decrypted)
-   - `settings?.aiModel` → `settings.aiModels.preferredModel`
-   - `settings?.language` → `settings.general.language`
-   - `settings?.userRole` → `settings.general.userRole`
+   - Replace all legacy property access with new unified structure
+   - Use `settings.aiModels.aiProviderKeys.gemini` instead of old keys
+   - Use `settings.aiModels.aiProviderKeys.openAi` instead of old keys
+   - Use `settings.aiModels.preferredModel` for AI model selection
+   - Use `settings.general.language` and `settings.general.userRole`
 
-4. **Update Storage Operations** (❌ TODO):
-   - `getSettings()` → Use `settingsService.getAllSettings()` directly
-   - `saveSettings()` → Use section-specific update methods
-   - Remove legacy backlog settings conversion logic
+4. **Replace Storage Operations** (❌ TODO):
+   - Replace all `chrome.storage` calls with `SettingsService` methods
+   - Use section-specific update methods for better performance
    - Use unified backlog format from `settings.backlog[]`
 
+5. **Add Message Handlers** (❌ TODO):
+   - Implement `chrome.runtime.onMessage` listeners for settings operations
+   - Handle `GET_SETTINGS`, `UPDATE_SETTINGS`, `GET_SECTION`, `UPDATE_SECTION` message types
+   - Ensure proper error handling and response formatting
+   - Add message type definitions for TypeScript support
+
+6. **Add Cleanup Logic** (❌ TODO):
+   - Remove old storage keys on extension startup
+   - Clean up legacy settings format
+   - Ensure fresh start for all users
+
 #### Files to Update:
-- `src/background/background.ts` (main migration target)
+- `src/background/background.ts` (main implementation target)
+- `src/types/messages.d.ts` (new - message type definitions)
 
 #### Success Criteria:
 - [ ] No inline interface definitions (use unified types)
 - [ ] All `chrome.storage` calls replaced with SettingsService
 - [ ] AI service classes use SettingsService for API key management
-- [ ] Legacy settings conversion removed
+- [ ] Legacy settings completely removed
 - [ ] Background service works with unified settings structure
+- [ ] Message handlers implemented for external communication
+- [ ] Content scripts and options page can communicate with background for settings
+- [ ] Old storage keys are cleaned up automatically
 
 ### Phase 3: Options Page Migration (Week 2)
 #### Tasks:
-1. Update `options.tsx` to use SettingsService
-2. Refactor form state management
-3. Update save/load operations
-4. Test all options functionality
+1. Remove direct SettingsService usage from options page
+2. Implement message-based communication with background script
+3. Refactor form state management to use message passing
+4. Update save/load operations to use Chrome messaging
+5. Test all options functionality with new communication pattern
+
+#### Specific Implementation Steps:
+1. **Remove Direct SettingsService Access** (❌ TODO):
+   - Remove `import { SettingsService }` from options page
+   - Remove direct calls to `settingsService.getAllSettings()`
+   - Remove direct calls to `settingsService.updateXXX()` methods
+
+2. **Implement Message Communication** (❌ TODO):
+   - Create helper functions for sending messages to background
+   - Add `sendMessage` wrapper functions for each settings operation
+   - Handle async responses from background script
+   - Add proper error handling for failed messages
+
+3. **Update Data Flow** (❌ TODO):
+   - `settingsService.getAllSettings()` → `chrome.runtime.sendMessage({ type: 'GET_SETTINGS' })`
+   - `settingsService.updateGeneralSettings()` → `chrome.runtime.sendMessage({ type: 'UPDATE_SECTION', section: 'general', data })`
+   - `settingsService.updateBacklogs()` → `chrome.runtime.sendMessage({ type: 'UPDATE_SECTION', section: 'backlog', data })`
 
 #### Files to Update:
 - `src/options/options.tsx`
+- `src/shared/settingsHelpers.ts` (new - message communication helpers)
 - Related option components
 
 #### Success Criteria:
-- [ ] Options page loads settings correctly
-- [ ] All settings can be updated and saved
-- [ ] Form validation works with new structure
-- [ ] Migration happens transparently for users
+- [ ] Options page no longer imports SettingsService directly
+- [ ] All settings operations use Chrome messaging
+- [ ] Form validation works with new message-based structure
+- [ ] Settings changes are properly communicated to background
+- [ ] Users can reconfigure settings from scratch with new interface
 
 ### Phase 4: Content Scripts & Components (Week 2-3)
 #### Tasks:
-1. Update ChatbotAsidePanel to use SettingsService
-2. Update modal components for consistency
-3. Update any other components accessing settings
-4. Test all UI interactions
+1. Remove direct SettingsService usage from content scripts
+2. Implement message-based communication with background script
+3. Update modal components to use message passing
+4. Update ChatbotAsidePanel to use Chrome messaging
+5. Test all UI interactions with new communication pattern
+
+#### Specific Implementation Steps:
+1. **Remove Direct SettingsService Access** (❌ TODO):
+   - Remove `import { SettingsService }` from content scripts
+   - Remove direct calls to `settingsService` methods
+   - Update all components accessing settings directly
+
+2. **Implement Message Communication** (❌ TODO):
+   - Create content script message helpers
+   - Add Chrome messaging for settings operations
+   - Handle async communication with background
+   - Add proper error handling and fallbacks
+
+3. **Update Component Data Flow** (❌ TODO):
+   - `settingsService.getGeneralSettings()` → `chrome.runtime.sendMessage({ type: 'GET_SECTION', section: 'general' })`
+   - `settingsService.updateFeatureFlags()` → `chrome.runtime.sendMessage({ type: 'UPDATE_SECTION', section: 'features', data })`
+   - `settingsService.getSidebarWidth()` → `chrome.runtime.sendMessage({ type: 'GET_SECTION', section: 'sidebarWidth' })`
 
 #### Files to Update:
 - `src/content/ChatbotAsidePanel.tsx`
 - `src/shared/CreateTicketModal.tsx`
 - `src/shared/TranslateModal.tsx`
+- `src/content/content.ts`
+- `src/shared/contentScriptHelpers.ts` (new - message communication helpers)
 - Other components as needed
 
 #### Success Criteria:
-- [ ] All components use SettingsService
-- [ ] Settings changes reflect immediately in UI
+- [ ] All content scripts use Chrome messaging instead of direct SettingsService
+- [ ] Components communicate properly with background for settings
+- [ ] Settings changes reflect immediately in UI through message updates
 - [ ] No breaking changes for end users
+- [ ] Real-time settings sync between components and background
 
-### Phase 5: Testing & Cleanup (Week 3)
+### Phase 5: Testing & Documentation (Week 3)
 #### Tasks:
 1. Comprehensive testing across all scenarios
-2. Remove old storage access code
+2. Remove old storage access code completely
 3. Update documentation
 4. Performance testing and optimization
+5. User guide for reconfiguration
 
 #### Success Criteria:
 - [ ] Full functionality verified
-- [ ] Old code removed
+- [ ] Old code completely removed
 - [ ] Documentation updated
 - [ ] Performance acceptable
+- [ ] User guide available for setting up extension from scratch
 
-## 🔄 Automatic Migration & Cleanup Strategy
+## 🔄 Fresh Start Strategy
 
-### Migration Triggers
-The migration process will be triggered automatically in these scenarios:
-1. **Extension Installation**: First-time installation (no existing data)
-2. **Extension Update**: Version update that includes new settings structure
-3. **Service Initialization**: Every time SettingsService is instantiated
-4. **Recovery Mode**: When corrupted settings are detected
+### Extension Initialization
+The new version will perform a clean initialization instead of attempting to migrate old data:
 
-### Migration Status Tracking
-```typescript
-interface MigrationStatus {
-  isCompleted: boolean;
-  version: string;
-  timestamp: number;
-  migratedKeys: string[];
-  errors: string[];
-}
+1. **Clean Slate Approach**: Remove all existing settings on startup
+2. **Default Settings**: Initialize with default values defined in `DEFAULT_SETTINGS`
+3. **User Reconfiguration**: Users will need to set up their preferences again
+4. **Improved UX**: New settings interface with better organization and validation
 
-// Migration status will be stored separately
-const MIGRATION_STATUS_KEY = 'migration_status';
-```
-
-### Migration Process Flow
+### Initialization Process
 ```typescript
 class SettingsService {
-  private async performMigrationIfNeeded(): Promise<boolean> {
+  private async initializeSettings(): Promise<void> {
     try {
-      // Check if migration already completed for current version
-      const migrationStatus = await this.getMigrationStatus();
-      const currentVersion = chrome.runtime.getManifest().version;
+      // Check if new settings format exists
+      const result = await chrome.storage.sync.get('configs');
 
-      if (migrationStatus.isCompleted && migrationStatus.version === currentVersion) {
-        console.log('Migration already completed for version:', currentVersion);
-        return false;
+      if (!result.configs) {
+        // Clean up any old storage keys
+        await this.cleanupOldStorage();
+
+        // Initialize with default settings
+        await this.saveAllSettings(DEFAULT_SETTINGS);
+
+        console.log('✅ Settings initialized with defaults');
       }
-
-      // Check if old settings exist
-      const oldSettings = await this.getAllOldFormatSettings();
-      if (!this.hasOldSettings(oldSettings)) {
-        // No old settings found, mark migration as completed
-        await this.markMigrationCompleted(currentVersion, []);
-        return false;
-      }
-
-      console.log('Starting automatic migration for version:', currentVersion);
-
-      // Backup old settings before migration (safety measure)
-      await this.createBackup(oldSettings);
-
-      // Perform migration
-      const newSettings = await this.migrateAndMergeSettings(oldSettings);
-
-      // Save new settings
-      await this.saveAllSettings(newSettings);
-
-      // Cleanup old settings
-      const cleanedKeys = await this.cleanupOldSettings();
-
-      // Mark migration as completed
-      await this.markMigrationCompleted(currentVersion, cleanedKeys);
-
-      console.log('✅ Migration completed successfully');
-      return true;
-
     } catch (error) {
-      console.error('❌ Migration failed:', error);
-      await this.recordMigrationError(error);
-      throw error;
+      console.error('❌ Settings initialization failed:', error);
+      // Fallback to defaults
+      await this.saveAllSettings(DEFAULT_SETTINGS);
     }
   }
 
-  private async getAllOldFormatSettings(): Promise<any> {
-    // Get all potential old setting keys
+  private async cleanupOldStorage(): Promise<void> {
     const oldKeys = [
-      'encryptedApiKey', 'encryptedGeminiApiKey', 'selectedModels', 'preferredModel',
-      'language', 'userRole', 'rememberChatboxSize', 'autoOpenChatbox', 'enterToSend',
-      'backlogAPIKeys', 'backlogDomain', 'backlogAPIKey', 'sidebarWidth'
-    ];
-
-    return await chrome.storage.sync.get(oldKeys);
-  }
-
-  private hasOldSettings(settings: any): boolean {
-    // Check if any old format keys exist
-    const oldKeys = [
-      'encryptedApiKey', 'language', 'userRole', 'selectedModels',
-      'backlogAPIKeys', 'backlogDomain'
-    ];
-
-    return oldKeys.some(key => settings[key] !== undefined);
-  }
-
-  private async cleanupOldSettings(): Promise<string[]> {
-    const keysToRemove = [
       // AI Settings
       'encryptedApiKey',
       'encryptedGeminiApiKey',
@@ -395,55 +431,14 @@ class SettingsService {
       'backlogSpaceName',
 
       // Other legacy keys
-      'aiModel', // Very old format
-      'sidebarWidth' // Now part of configs
+      'aiModel',
+      'sidebarWidth'
     ];
 
-    // Remove old keys from chrome storage
-    await chrome.storage.sync.remove(keysToRemove);
+    // Remove all old keys
+    await chrome.storage.sync.remove(oldKeys);
 
-    console.log('🧹 Cleaned up old settings:', keysToRemove);
-    return keysToRemove;
-  }
-
-  private async createBackup(oldSettings: any): Promise<void> {
-    const backup = {
-      timestamp: Date.now(),
-      version: chrome.runtime.getManifest().version,
-      data: oldSettings
-    };
-
-    // Store backup in local storage (not synced)
-    await chrome.storage.local.set({
-      'settings_backup': backup
-    });
-
-    console.log('💾 Created settings backup');
-  }
-
-  private async markMigrationCompleted(version: string, cleanedKeys: string[]): Promise<void> {
-    const migrationStatus: MigrationStatus = {
-      isCompleted: true,
-      version,
-      timestamp: Date.now(),
-      migratedKeys: cleanedKeys,
-      errors: []
-    };
-
-    await chrome.storage.sync.set({
-      [MIGRATION_STATUS_KEY]: migrationStatus
-    });
-  }
-
-  async getMigrationStatus(): Promise<MigrationStatus> {
-    const result = await chrome.storage.sync.get(MIGRATION_STATUS_KEY);
-    return result[MIGRATION_STATUS_KEY] || {
-      isCompleted: false,
-      version: '',
-      timestamp: 0,
-      migratedKeys: [],
-      errors: []
-    };
+    console.log('🧹 Cleaned up old storage keys');
   }
 }
 ```
@@ -458,23 +453,21 @@ class BackgroundService {
 
   constructor() {
     this.settingsService = SettingsService.getInstance();
-    this.initializeWithMigration();
+    this.initializeWithFreshStart();
   }
 
-  private async initializeWithMigration(): Promise<void> {
+  private async initializeWithFreshStart(): Promise<void> {
     try {
-      // Perform migration if needed (runs once per version)
-      const migrationOccurred = await this.settingsService.performMigrationIfNeeded();
+      // Initialize settings (clean up old data if needed)
+      await this.settingsService.initializeSettings();
 
-      if (migrationOccurred) {
-        console.log('🔄 Settings migrated to new format');
-      }
+      console.log('✅ Settings initialized successfully');
 
       // Continue with normal initialization
       await this.initializeServices();
 
     } catch (error) {
-      console.error('❌ Migration failed, using default settings:', error);
+      console.error('❌ Settings initialization failed, using defaults:', error);
       // Fallback to default settings
       await this.initializeWithDefaults();
     }
@@ -482,8 +475,8 @@ class BackgroundService {
 
   private async initializeWithDefaults(): Promise<void> {
     try {
-      // Initialize services with default settings
-      const defaultSettings = await this.settingsService.getDefaultSettings();
+      // Force initialize with default settings
+      await this.settingsService.resetAllSettings();
       await this.initializeServices();
       console.log('✅ Initialized with default settings');
     } catch (error) {
@@ -497,19 +490,22 @@ class BackgroundService {
 ```typescript
 // src/options/options.tsx
 const OptionsPage: React.FC = () => {
-  const settingsService = SettingsService.getInstance();
-
   useEffect(() => {
     const initializeOptions = async () => {
       try {
-        // Migration will be handled automatically by service
-        const settings = await settingsService.getAllSettings();
-        // Load settings into form...
+        // Communicate with background script for settings
+        const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
+        if (response.success) {
+          // Load settings into form...
+          const settings = response.data;
+        } else {
+          throw new Error(response.error);
+        }
 
       } catch (error) {
         console.error('❌ Failed to load settings, using defaults:', error);
-        // Load default settings into form
-        const defaultSettings = await settingsService.getDefaultSettings();
+        // Request default settings from background
+        const defaultResponse = await chrome.runtime.sendMessage({ type: 'GET_DEFAULT_SETTINGS' });
         // Load defaultSettings into form...
       }
     };
@@ -517,54 +513,41 @@ const OptionsPage: React.FC = () => {
     initializeOptions();
   }, []);
 
+  const handleSaveSettings = async (updatedSettings: Partial<Settings>) => {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'UPDATE_SETTINGS',
+        data: updatedSettings
+      });
+
+      if (response.success) {
+        console.log('✅ Settings saved successfully');
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save settings:', error);
+    }
+  };
+
   // Rest of options page logic...
 };
 ```
 
-### Migration Safety Measures
+### Error Handling & Recovery
 
-#### 1. Backup Strategy
-- **Automatic Backup**: Create backup before migration
-- **Backup Location**: chrome.storage.local (device-specific)
-- **Backup Retention**: Keep for 30 days or until next successful migration
-- **Recovery**: Manual recovery option in options page
-
-#### 2. Error Handling
-```typescript
-private async recordMigrationError(error: any): Promise<void> {
-  const migrationStatus: MigrationStatus = {
-    isCompleted: false,
-    version: chrome.runtime.getManifest().version,
-    timestamp: Date.now(),
-    migratedKeys: [],
-    errors: [error.message || String(error)]
-  };
-
-  await chrome.storage.sync.set({
-    [MIGRATION_STATUS_KEY]: migrationStatus
-  });
-
-  console.error('❌ Migration error recorded:', error.message || String(error));
-}
-```
-
-#### 3. Graceful Fallback
+#### 1. Initialization Error Handling
 ```typescript
 async getAllSettings(): Promise<Settings> {
   try {
-    // Attempt to get migrated settings
+    // Try to get current settings
     const result = await chrome.storage.sync.get('configs');
     if (result.configs) {
       return result.configs;
     }
 
-    // Attempt migration if old format exists
-    const migrationOccurred = await this.performMigrationIfNeeded();
-    if (migrationOccurred) {
-      const migratedResult = await chrome.storage.sync.get('configs');
-      return migratedResult.configs || DEFAULT_SETTINGS;
-    }
-
+    // No settings found, initialize with defaults
+    await this.initializeSettings();
     return DEFAULT_SETTINGS;
 
   } catch (error) {
@@ -574,168 +557,115 @@ async getAllSettings(): Promise<Settings> {
 }
 ```
 
-#### 3. Rollback Plan
+#### 2. Reset Functionality
 ```typescript
-async rollbackMigration(): Promise<void> {
+async resetAllSettings(): Promise<void> {
   try {
-    const backup = await chrome.storage.local.get('settings_backup');
-    if (backup.settings_backup) {
-      // Restore old format settings
-      await chrome.storage.sync.set(backup.settings_backup.data);
+    // Clear all storage
+    await chrome.storage.sync.clear();
+    await chrome.storage.local.clear();
 
-      // Remove new format
-      await chrome.storage.sync.remove('configs');
+    // Reinitialize with defaults
+    await this.saveAllSettings(DEFAULT_SETTINGS);
 
-      // Reset migration status
-      await chrome.storage.sync.remove(MIGRATION_STATUS_KEY);
+    // Clear cache
+    await this.clearCache();
 
-      console.log('🔄 Migration rolled back successfully');
-    } else {
-      console.warn('⚠️ No backup found for rollback');
-    }
+    console.log('✅ All settings reset to defaults');
   } catch (error) {
-    console.error('❌ Rollback failed:', error);
+    console.error('❌ Settings reset failed:', error);
+    throw error;
   }
 }
 ```
 
-### Migration Testing Strategy
+### User Experience Strategy
 
-#### Test Scenarios
-1. **Fresh Installation**: No existing settings
-2. **Legacy Single Backlog**: Old single backlog format
-3. **Current Multi-Backlog**: Current multi-backlog format
-4. **Partial Settings**: Some settings missing
-5. **Corrupted Data**: Invalid/corrupted settings
-6. **Failed Migration Recovery**: Migration fails mid-process
-7. **Multiple Updates**: Sequential version updates
+#### 1. First-Time Setup Experience
+- **Welcome Screen**: Guide users through initial configuration
+- **Setup Wizard**: Step-by-step setup for AI providers and Backlog integration
+- **Import Helper**: Optional import from export files (if users exported from old version)
+- **Quick Setup**: Preset configurations for common use cases
 
-#### Test Data Preparation
+#### 2. Upgrade Communication
+- **Version Notes**: Clear communication about the need to reconfigure
+- **Setup Guide**: Documentation for reconfiguring the extension
+- **Support**: Help resources for users transitioning to new version
+
+#### 3. Fallback Strategy
+- **Graceful Degradation**: Extension works with minimal configuration
+- **Progressive Setup**: Users can configure features as needed
+- **Default Behavior**: Sensible defaults for all settings
+
+## 🔄 Implementation Logic
+
+### Settings Initialization Process
 ```typescript
-// Test data for different migration scenarios
-const TEST_SCENARIOS = {
-  legacySingle: {
-    encryptedApiKey: 'encrypted_openai_key',
-    language: 'vi',
-    userRole: 'developer',
-    backlogDomain: 'nals.backlogtool.com',
-    backlogAPIKey: 'encrypted_backlog_key'
-  },
+class SettingsService {
+  private async initializeSettings(): Promise<void> {
+    try {
+      // Check if new settings format exists
+      const result = await chrome.storage.sync.get('configs');
 
-  currentMulti: {
-    selectedModels: ['gpt-4o-mini', 'gemini-2.5-pro'],
-    preferredModel: 'gpt-4o-mini',
-    backlogAPIKeys: [
-      { id: '1', domain: 'nals.backlogtool.com', apiKey: 'key1' }
-    ]
-  },
+      if (!result.configs) {
+        // Clean up any old storage keys
+        await this.cleanupOldStorage();
 
-  corrupted: {
-    language: null,
-    backlogAPIKeys: 'invalid_format',
-    selectedModels: 123
-  }
-};
-```
+        // Initialize with default settings
+        await this.saveAllSettings(DEFAULT_SETTINGS);
 
-## 🔄 Migration Logic Details
-
-### Data Migration Process
-```typescript
-private async migrateAndMergeSettings(oldConfigs: any): Promise<Settings> {
-  const settings: Settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-
-  // General Settings Migration
-  if (oldConfigs.language) settings.general.language = oldConfigs.language;
-  if (oldConfigs.userRole) settings.general.userRole = oldConfigs.userRole;
-
-  // Feature Flags Migration
-  if (oldConfigs.rememberChatboxSize !== undefined) {
-    settings.features.rememberChatboxSize = oldConfigs.rememberChatboxSize;
-  }
-  if (oldConfigs.autoOpenChatbox !== undefined) {
-    settings.features.autoOpenChatbox = oldConfigs.autoOpenChatbox;
-  }
-  if (oldConfigs.enterToSend !== undefined) {
-    settings.features.enterToSend = oldConfigs.enterToSend;
+        console.log('✅ Fresh settings initialized');
+      } else {
+        console.log('✅ Existing settings found');
+      }
+    } catch (error) {
+      console.error('❌ Settings initialization failed:', error);
+      // Fallback to defaults
+      await this.saveAllSettings(DEFAULT_SETTINGS);
+    }
   }
 
-  // AI Models Migration
-  if (oldConfigs.selectedModels) {
-    settings.aiModels.selectedModels = oldConfigs.selectedModels;
-  }
-  if (oldConfigs.preferredModel) {
-    settings.aiModels.preferredModel = oldConfigs.preferredModel;
-  }
-  if (oldConfigs.encryptedApiKey) {
-    settings.aiModels.aiProviderKeys.openAi = oldConfigs.encryptedApiKey;
-  }
-  if (oldConfigs.encryptedGeminiApiKey) {
-    settings.aiModels.aiProviderKeys.gemini = oldConfigs.encryptedGeminiApiKey;
-  }
+  private async cleanupOldStorage(): Promise<void> {
+    const oldKeys = [
+      // All legacy keys to be removed
+      'encryptedApiKey', 'encryptedGeminiApiKey', 'selectedModels', 'preferredModel',
+      'language', 'userRole', 'rememberChatboxSize', 'autoOpenChatbox', 'enterToSend',
+      'backlogAPIKeys', 'backlogDomain', 'backlogAPIKey', 'backlogSpaceName',
+      'aiModel', 'sidebarWidth', 'preferredProvider'
+    ];
 
-  // Backlog Migration (multiple legacy formats)
-  if (oldConfigs.backlogAPIKeys && Array.isArray(oldConfigs.backlogAPIKeys)) {
-    // New multi-config format
-    settings.backlog = oldConfigs.backlogAPIKeys;
-  } else if (oldConfigs.backlogDomain && oldConfigs.backlogAPIKey) {
-    // Single legacy format
-    settings.backlog = [{
-      id: `migrated-${Date.now()}`,
-      domain: oldConfigs.backlogDomain,
-      apiKey: oldConfigs.backlogAPIKey,
-      note: 'Migrated from legacy format',
-      namespace: ''
-    }];
+    // Remove all old keys
+    await chrome.storage.sync.remove(oldKeys);
+    console.log('🧹 Old storage cleaned up');
   }
-
-  // Sidebar Width Migration
-  if (oldConfigs.sidebarWidth) {
-    settings.sidebarWidth = oldConfigs.sidebarWidth;
-  }
-
-  return settings;
 }
 ```
-
-### Migration Testing Matrix
-| Scenario | Old Format | New Format | Cleanup Keys | Test Case |
-|----------|------------|------------|--------------|-----------|
-| Fresh Install | No data | DEFAULT_SETTINGS | None | New installation |
-| Legacy Single | backlogDomain + backlogAPIKey | BacklogIntegration[] | backlogDomain, backlogAPIKey | Legacy single config |
-| Current Multi | backlogAPIKeys[] | BacklogIntegration[] | backlogAPIKeys | Current multi-config |
-| AI Keys Only | encryptedApiKey + encryptedGeminiApiKey | aiProviderKeys | encryptedApiKey, encryptedGeminiApiKey | API keys migration |
-| Mixed Config | Partial old + partial current | Merged Settings | All old keys | Partial configuration |
-| Corrupted | Invalid/null values | DEFAULT_SETTINGS + valid data | Corrupted keys | Data corruption recovery |
-| Failed Migration | Migration error mid-process | Rollback to backup | No cleanup | Error recovery |
-| Sequential Updates | Version N → N+1 → N+2 | Progressive migration | Cumulative cleanup | Multiple updates |
 
 ## 🧪 Testing Strategy
 
 ### Unit Tests
 - [ ] SettingsService methods (get/set/update)
-- [ ] Migration logic for all scenarios
+- [ ] Initialization logic for fresh installations
+- [ ] Cleanup logic for old storage keys
 - [ ] Encryption/decryption workflows
 - [ ] Error handling and edge cases
 
 ### Integration Tests
 - [ ] Background service integration
-- [ ] Options page integration
-- [ ] Content script integration
-- [ ] Cross-component communication
+- [ ] Options page message communication with background
+- [ ] Content script message communication with background
+- [ ] Cross-component settings synchronization via background
+- [ ] Message passing error handling and fallbacks
 
-### Migration Tests
+### Fresh Installation Tests
 - [ ] Fresh installation (no existing data)
-- [ ] Legacy single backlog migration
-- [ ] Current multi-backlog migration
-- [ ] Partial configuration migration
-- [ ] Corrupted data handling
-- [ ] **Migration cleanup verification** (old keys removed)
-- [ ] **Sequential migration** (version N → N+1 → N+2)
-- [ ] **Migration status tracking** (prevents duplicate migration)
-- [ ] **Backup creation and restoration**
-- [ ] **Rollback functionality** (restore from backup)
-- [ ] **Migration failure recovery** (graceful degradation)
+- [ ] Settings initialization with defaults
+- [ ] Old storage cleanup verification
+- [ ] Settings persistence across sessions
+- [ ] **Complete removal of old storage keys**
+- [ ] **Default settings validation**
+- [ ] **First-time setup experience**
+- [ ] **Error recovery with defaults**
 
 ### Performance Tests
 - [ ] Settings load time
@@ -745,11 +675,11 @@ private async migrateAndMergeSettings(oldConfigs: any): Promise<Settings> {
 
 ### Risk Mitigation
 
-### Data Loss Prevention
-1. **Backup Strategy**: Create backup of old settings before migration
-2. **Rollback Plan**: Ability to restore from backup if migration fails
-3. **Validation**: Verify migrated data integrity
-4. **Graceful Degradation**: Continue functioning with default settings if migration fails
+### Data Management
+1. **Clean Slate Approach**: No dependency on old data formats
+2. **Robust Defaults**: Comprehensive default settings for all scenarios
+3. **Validation**: Strict validation of all settings data
+4. **Graceful Degradation**: Extension works even with minimal configuration
 
 ### Error Handling
 ```typescript
@@ -767,37 +697,41 @@ async getAllSettings(): Promise<Settings> {
 ```
 
 ### Silent Operation
-- **No User Notifications**: Migration happens silently in background
+- **No User Notifications**: Initialization happens silently in background
 - **Console Logging**: All success/error messages logged to console only
 - **Graceful Fallback**: Use default settings if any step fails
-- **No User Interruption**: Extension continues working regardless of migration outcome
+- **No User Interruption**: Extension continues working regardless of initialization outcome
 
-### Backward Compatibility
-- Keep old storage keys during transition period
-- Provide fallbacks for missing data
-- Gradual migration rather than hard cutover
-- Version tracking for future migrations
+### Fresh Start Benefits
+- **Simplified Logic**: No complex migration or compatibility code
+- **Cleaner Codebase**: Remove all legacy handling code
+- **Better Testing**: Fewer edge cases to test and maintain
+- **Improved Performance**: No migration overhead
 
 ## 📊 Success Metrics
 
 ### Technical Metrics
 - [ ] Storage API calls reduced by >50%
 - [ ] Settings load time < 100ms
-- [ ] Zero data loss during migration
+- [ ] Zero data corruption issues
 - [ ] Code coverage > 90% for settings code
-- [ ] **Migration success rate > 99.5%**
+- [ ] **Initialization success rate > 99.9%**
 - [ ] **Complete cleanup of old storage keys**
-- [ ] **Migration time < 500ms for typical dataset**
-- [ ] **Backup creation success rate 100%**
+- [ ] **Initialization time < 200ms**
+- [ ] **Default settings validation 100%**
+- [ ] **Message passing reliability > 99.9%**
+- [ ] **Background script performance with message handling**
 
 ### User Experience Metrics
-- [ ] No user-visible disruption during migration
+- [ ] No user-visible disruption during initialization
 - [ ] Settings persist correctly across sessions
-- [ ] All features continue working
-- [ ] No increase in support tickets
-- [ ] **Migration happens transparently (no user action required)**
-- [ ] **Extension works immediately after update**
-- [ ] **No performance degradation after migration**
+- [ ] All features work with default configuration
+- [ ] Clear setup guidance for users
+- [ ] **Fresh installation experience is smooth**
+- [ ] **Extension works immediately after installation**
+- [ ] **No performance degradation with new settings system**
+- [ ] **Seamless settings synchronization across all components**
+- [ ] **User-friendly reconfiguration process**
 
 ## 🔮 Future Considerations
 
@@ -821,26 +755,28 @@ async getAllSettings(): Promise<Settings> {
 
 ## 📝 Implementation Checklist
 
-### Pre-Migration
-- [ ] Create backup of current settings structure
+### Pre-Implementation
+- [ ] Create backup documentation of current settings structure
 - [ ] Set up development environment
-- [ ] Create test data scenarios
+- [ ] Create default settings validation
 - [ ] Review existing code dependencies
 
-### During Migration
+### During Implementation
 - [ ] Follow phase-by-phase approach
 - [ ] Test each component thoroughly
 - [ ] Monitor for any breaking changes
 - [ ] Keep documentation updated
+- [ ] Prepare user guidance materials
 
-### Post-Migration
-- [ ] Remove deprecated code
+### Post-Implementation
+- [ ] Remove all deprecated code
 - [ ] Update all documentation
 - [ ] Performance monitoring
 - [ ] User acceptance testing
+- [ ] Prepare migration guide for users
 
 ---
 
 **Last Updated**: August 5, 2025
-**Version**: 1.0
-**Status**: Planning Phase
+**Version**: 2.0
+**Status**: Planning Phase - Fresh Start Strategy

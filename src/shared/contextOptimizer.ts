@@ -1,4 +1,4 @@
-import { ChatMessage, ChatHistoryData } from './chatStorageService';
+import { ChatHistoryData, ChatMessage } from '../types/chat';
 
 interface OptimizationOptions {
   maxMessages?: number; // Keep only recent N messages
