@@ -1,6 +1,6 @@
 import { TicketData } from './ticketAnalyzer';
 import { safeTimestampToDate } from './timeUtils';
-import { FileAttachment } from '../types/attachment';
+import { FileAttachment } from '../types/attachment.d';
 
 export type ChatMessage = {
   id: string;

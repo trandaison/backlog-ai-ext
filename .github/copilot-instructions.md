@@ -36,15 +36,35 @@ This is a Chrome extension project that integrates AI assistance into Backlog ti
 
 ### Configuration Management:
 - **Centralized Constants**: All reusable constants, configurations, and common values should be defined in `src/configs/` directory
-- Use `src/configs/index.ts` as the main export point for all configuration modules
-- Split large configuration files into smaller, focused modules (e.g., `aiModels.ts`, `uiConstants.ts`, `apiEndpoints.ts`) and re-export through the index file
+- **General Constants**: Common constants should be placed in `src/configs/index.ts` as the main export point
+- **Feature-Specific Constants**: Constants related to specific feature groups can be split into separate files (e.g., `aiModels.ts`, `uiConstants.ts`, `apiEndpoints.ts`) and stored in `src/configs/` directory
+- **Import Strategy**: For feature-specific config files, import directly from the specific file instead of re-exporting through index.ts
+- **Configs Directory Rules**:
+  - Only contain constants and configuration values
+  - NO functions or logic code allowed in this directory
+  - NO imports from other directories except `src/types/`
+  - Only define reusable constants that may change over time
+- **UI Constants Guidelines**:
+  - Avoid creating constants for UI values (class names, animations, colors) unless truly necessary
+  - Use direct values in components for better readability and simplicity
+  - Only create UI constants when values are reused across multiple components or likely to change
 - Always import configurations from `src/configs` instead of hardcoding values throughout the codebase
 - Common configuration patterns:
   - AI model definitions and defaults (`availableModels`, `defaultModelId`)
-  - UI constants (colors, sizes, timeouts)
   - API endpoints and configuration
   - Feature flags and settings defaults
 - When adding new constants that may change over time, create them in the configs directory first
+
+### Type Definitions Management:
+- **Type Location**: All type definitions and interfaces should be placed in `src/types/` directory
+- **File Naming**: Type definition files must have `.d.ts` suffix (e.g., `ticketData.d.ts`, `chatMessage.d.ts`)
+- **Type vs Interface**: Prefer using `type` over `interface` for type definitions unless you specifically need interface features like declaration merging or extending classes
+- **Type Files Rules**:
+  - Only contain type definitions, interfaces, and type aliases
+  - NO logic code, functions, or implementations allowed
+  - Keep types separate from business logic
+- **Separation Principle**: Prioritize separating logic and type definitions - write logic in separate files, define types in dedicated type files
+- Import types using TypeScript's `import type` syntax when possible for better tree-shaking
 
 ### Webpack Bundle Splitting & Dynamic Imports:
 **CRITICAL**: Avoid dynamic imports in Chrome extensions - they cause webpack bundle splitting issues that are difficult to debug and resolve.
@@ -113,6 +133,7 @@ This pattern was developed after multiple incidents where dynamic imports caused
 - Verify extension permissions and security
 - Test AI API integration with various scenarios
 - Ensure responsive design for different screen sizes
+- **Build Validation**: Use `./dev.sh build` to validate code changes and always check the build output log for TypeScript errors, not just exit status - the build command logs results and stops immediately
 
 ## File Structure Guidelines:
 - Keep components small and focused
@@ -136,6 +157,15 @@ This pattern was developed after multiple incidents where dynamic imports caused
 - **Get help**: Use `./dev.sh help` for Chrome extension loading instructions
 
 The `dev.sh` script provides a standardized development workflow and should be used for all build operations.
+
+### Testing and Validation:
+- **Build Validation**: Use `./dev.sh build` to check for compilation errors and validate changes
+- **Error Checking**: Always check the build output log for errors, not just the exit status - build command will log results and stop immediately, so examine the output directly
+- **Avoid Shell Type Check**: Do NOT use VS Code's "Type Check" task as it may hang - use build command instead
+- Test on multiple Backlog domains and page types
+- Verify extension permissions and security
+- Test AI API integration with various scenarios
+- Ensure responsive design for different screen sizes
 
 ## Release Management:
 

@@ -1,62 +1,6 @@
+/**
+ * Main configs export - only exports commonly used configs
+ * For specific feature configs, import directly from their respective files
+ */
+
 export * from './aiModels';
-
-// Command related constants
-export interface CommandConfig {
-  command: string;
-  pattern: RegExp;
-  description: string;
-  example: string;
-  requiresModal?: boolean;
-}
-
-export const availableCommands: CommandConfig[] = [
-  {
-    command: 'translate',
-    pattern: /^\/translate\s+([a-z]{2})\s*->\s*([a-z]{2})$/i,
-    description: 'Translate ticket content from one language to another',
-    example: '/translate ja -> vi',
-    requiresModal: true
-  }
-];
-
-export const COMMAND_PREFIX = '/';
-
-// Language related constants
-export interface LanguageOption {
-  code: string;
-  name: string;
-  nativeName: string;
-}
-
-export const availableLanguages: LanguageOption[] = [
-  { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt' },
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
-  { code: 'ko', name: 'Korean', nativeName: '한국어' },
-  { code: 'zh', name: 'Chinese', nativeName: '中文' },
-  { code: 'th', name: 'Thai', nativeName: 'ไทย' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
-  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu' },
-  { code: 'tl', name: 'Filipino', nativeName: 'Filipino' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
-  { code: 'it', name: 'Italian', nativeName: 'Italiano' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский' }
-];
-
-// UI Constants for modal and components
-export const UI_CONSTANTS = {
-  MODAL_Z_INDEX: 10000,
-  ANIMATION_DURATION: 200,
-  MODAL_BACKDROP_CLASS: 'ai-ext-modal-backdrop',
-  MODAL_CONTENT_CLASS: 'ai-ext-modal-content'
-} as const;
-
-// Form constants
-export const FORM_CONSTANTS = {
-  SELECT_CLASS: 'ai-ext-form-select-compact',
-  BUTTON_PRIMARY_CLASS: 'ai-ext-button ai-ext-button-primary',
-  BUTTON_SECONDARY_CLASS: 'ai-ext-button ai-ext-button-secondary'
-} as const;

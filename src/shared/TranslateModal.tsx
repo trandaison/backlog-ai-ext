@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { availableLanguages, UI_CONSTANTS, FORM_CONSTANTS, type LanguageOption } from '../configs';
-import { getLanguageDisplayName } from './languageUtils';
+import { availableLanguages } from '../configs/commands';
 
 export interface ModalComponentProps {
   isOpen: boolean;
@@ -72,10 +71,10 @@ const DefaultModal: React.FC<ModalComponentProps> = ({
 
   return (
     <div
-      className={`${UI_CONSTANTS.MODAL_BACKDROP_CLASS} ai-ext-chatbox-modal ai-ext-modal-${animationState} ${className}`}
+      className={`ai-ext-modal-backdrop ai-ext-chatbox-modal ai-ext-modal-${animationState} ${className}`}
       onClick={handleBackdropClick}
       style={{
-        zIndex: UI_CONSTANTS.MODAL_Z_INDEX,
+        zIndex: 10000,
         position: 'absolute',
         top: 0,
         left: 0,
@@ -84,7 +83,7 @@ const DefaultModal: React.FC<ModalComponentProps> = ({
       }}
     >
       <div
-        className={UI_CONSTANTS.MODAL_CONTENT_CLASS}
+        className="ai-ext-modal-content"
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
@@ -142,7 +141,7 @@ const TranslateModal: React.FC<TranslateModalProps> = ({
             </label>
             <select
               id="source-language"
-              className={FORM_CONSTANTS.SELECT_CLASS}
+              className="ai-ext-form-select-compact"
               value={sourceLanguage}
               onChange={(e) => setSourceLanguage(e.target.value)}
             >
@@ -164,7 +163,7 @@ const TranslateModal: React.FC<TranslateModalProps> = ({
             </label>
             <select
               id="target-language"
-              className={FORM_CONSTANTS.SELECT_CLASS}
+              className="ai-ext-form-select-compact"
               value={targetLanguage}
               onChange={(e) => setTargetLanguage(e.target.value)}
             >
@@ -195,14 +194,14 @@ const TranslateModal: React.FC<TranslateModalProps> = ({
 
         <div className="ai-ext-form-actions">
           <button
-            className={FORM_CONSTANTS.BUTTON_SECONDARY_CLASS}
+            className="ai-ext-button ai-ext-button-secondary"
             onClick={onClose}
             type="button"
           >
             Cancel
           </button>
           <button
-            className={FORM_CONSTANTS.BUTTON_PRIMARY_CLASS}
+            className="ai-ext-button ai-ext-button-primary"
             onClick={handleConfirm}
             disabled={!isValid}
             type="button"

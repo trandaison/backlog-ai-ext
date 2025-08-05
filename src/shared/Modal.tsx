@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { UI_CONSTANTS } from '../configs';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -68,13 +67,13 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className={`${UI_CONSTANTS.MODAL_BACKDROP_CLASS} ai-ext-modal-${animationState} ${className}`}
+      className={`ai-ext-modal-backdrop ai-ext-modal-${animationState} ${className}`}
       onClick={handleBackdropClick}
-      style={{ zIndex: UI_CONSTANTS.MODAL_Z_INDEX }}
+      style={{ zIndex: 10000 }}
     >
       <div
         ref={modalRef}
-        className={UI_CONSTANTS.MODAL_CONTENT_CLASS}
+        className="ai-ext-modal-content"
         onClick={(e) => e.stopPropagation()}
       >
         {(title || showCloseButton) && (

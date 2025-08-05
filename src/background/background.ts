@@ -4,9 +4,9 @@ import { EncryptionService } from '../shared/encryption';
 import ContextOptimizer from '../shared/contextOptimizer';
 import { availableModels, defaultModelId } from '../configs';
 import { parseCommand } from '../shared/commandUtils';
-import { getLanguageDisplayName } from '../shared/languageUtils';
+import { getLanguageDisplayName } from '../shared/commandUtils';
 import type { ChatHistoryData } from '../shared/chatStorageService';
-import { FileAttachment } from '../types/attachment';
+import { FileAttachment } from '../types/attachment.d';
 
 interface Settings {
   apiKey: string;

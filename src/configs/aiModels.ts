@@ -1,9 +1,4 @@
-export interface ModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  provider: 'openai' | 'gemini';
-}
+import type { ModelInfo } from '../types/aiModels.d';
 
 export const availableModels: ModelInfo[] = [
   // OpenAI Models (Latest 2025)

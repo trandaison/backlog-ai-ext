@@ -3,14 +3,10 @@ import { TicketAnalyzer, TicketData } from '../shared/ticketAnalyzer';
 import { ChatStorageService, ChatMessage, UserInfo, SaveResult } from '../shared/chatStorageService';
 import { formatRelativeTime, formatFullTimestamp, safeTimestampToDate } from '../shared/timeUtils';
 import { MarkdownRenderer } from '../shared/MarkdownRenderer';
-import { availableModels, defaultModelId, type ModelInfo } from '../configs';
+import { availableModels, defaultModelId } from '../configs';
 import { parseCommand } from '../shared/commandUtils';
-import {
-  FileAttachment,
-  AttachmentPreview,
-  ChatMessageWithAttachments,
-  AttachmentUtils
-} from '../types/attachment';
+import { FileAttachment } from '../types/attachment.d';
+import { AttachmentUtils } from '../shared/attachmentUtils';
 import TranslateModal from '../shared/TranslateModal';
 import Modal from '../shared/Modal';
 

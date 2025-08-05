@@ -1,15 +1,9 @@
 /**
- * Command definitions for the AI extension
+ * Command-related constants and configurations
  * Commands are special instructions that users can type directly or use through UI
  */
 
-export interface CommandConfig {
-  command: string;
-  pattern: RegExp;
-  description: string;
-  example: string;
-  requiresModal?: boolean;
-}
+import type { CommandConfig, LanguageOption } from '../types/commands.d';
 
 export const availableCommands: CommandConfig[] = [
   {
@@ -22,41 +16,6 @@ export const availableCommands: CommandConfig[] = [
 ];
 
 export const COMMAND_PREFIX = '/';
-
-/**
- * Parse a message to check if it matches any command pattern
- * @param message The message to parse
- * @returns Command match result or null
- */
-export function parseCommand(message: string): {
-  command: string;
-  matches: RegExpMatchArray;
-  config: CommandConfig;
-} | null {
-  const trimmedMessage = message.trim();
-
-  for (const config of availableCommands) {
-    const matches = trimmedMessage.match(config.pattern);
-    if (matches) {
-      return {
-        command: config.command,
-        matches,
-        config
-      };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Common language codes and their display names
- */
-export interface LanguageOption {
-  code: string;
-  name: string;
-  nativeName: string;
-}
 
 export const availableLanguages: LanguageOption[] = [
   { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt' },
@@ -75,20 +34,3 @@ export const availableLanguages: LanguageOption[] = [
   { code: 'it', name: 'Italian', nativeName: 'Italiano' },
   { code: 'ru', name: 'Russian', nativeName: 'Русский' }
 ];
-
-/**
- * Get language display name from code
- */
-export function getLanguageDisplayName(code: string): string {
-  const lang = availableLanguages.find(l => l.code === code);
-  return lang ? `${lang.name} (${lang.nativeName})` : code.toUpperCase();
-}
-
-// Default export for module recognition
-export default {
-  availableCommands,
-  COMMAND_PREFIX,
-  parseCommand,
-  availableLanguages,
-  getLanguageDisplayName
-};
