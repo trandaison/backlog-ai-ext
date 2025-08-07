@@ -119,12 +119,19 @@ module.exports = {
     ],
     splitChunks: {
       chunks: 'all',
+      maxInitialRequests: 1,
+      maxAsyncRequests: 1,
       cacheGroups: {
         vendor: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
           chunks: 'all',
+          enforce: true,
+          priority: 10
         },
+        // Disable all other splitting
+        default: false,
+        defaultVendors: false
       },
     },
   }

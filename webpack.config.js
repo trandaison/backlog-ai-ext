@@ -95,6 +95,22 @@ module.exports = {
           name: 'vendors',
           chunks: 'all',
         },
+        // PREVENT config splitting - force into main bundle
+        configs: {
+          test: /[\\/]src[\\/]configs[\\/]/,
+          name: false, // Don't create separate chunk for configs
+          chunks: 'all',
+          enforce: false, // Don't enforce separate chunk
+          priority: -10, // Lower priority than vendor
+          reuseExistingChunk: true
+        },
+        // Force everything else into main bundles
+        default: {
+          minChunks: 1,
+          priority: -20,
+          reuseExistingChunk: true,
+          name: false // Don't create separate chunks
+        }
       },
     },
   }

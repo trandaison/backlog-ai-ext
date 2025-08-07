@@ -11,6 +11,8 @@ import { GeminiService } from '../services/GeminiService';
 import { TicketData } from '../types/backlog';
 import { AIService } from '../types';
 import { ChatHistoryData } from '../types/chat';
+import { BacklogApiService } from '../services/backlogApi';
+import { TicketCreationService } from '../services/ticketCreation';
 
 class BackgroundService {
   private openaiService: OpenAIService;
@@ -65,6 +67,7 @@ class BackgroundService {
   }
 
   private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+    console.log('🔎 ~ BackgroundService ~ handleMessage ~ message:', message);
     try {
       switch (message.action) {
         // Settings handlers
@@ -141,6 +144,14 @@ class BackgroundService {
           sendResponse({ success: true });
           break;
 
+        case 'fetchBacklogProjects':
+          await this.handleFetchBacklogProjects(message.data, sendResponse);
+          break;
+
+        case 'fetchIssueTypes':
+          await this.handleFetchIssueTypes(message.data, sendResponse);
+          break;
+
         default:
           sendResponse({ error: 'Unknown action' });
       }
@@ -189,6 +200,20 @@ class BackgroundService {
         // Extract source and target languages from the command
         const [, sourceLanguage, targetLanguage] = commandResult.matches;
         processedMessage = this.buildTranslatePrompt(ticketData, sourceLanguage, targetLanguage);
+      } else if (commandResult && commandResult.command === 'create-ticket') {
+        // Handle create-ticket command
+        // Pattern: /^\/create-ticket\s+(\S+)\/(\S+)\s+([a-z]{2})\sissueType:(\d+)\spriority:(\d+)$/i
+        // Captures: [fullMatch, backlogDomain, projectKey, language, issueTypeId, priorityId]
+        const [, backlogDomain, projectKey, language, issueTypeId, priorityId] = commandResult.matches;
+        await this.handleCreateTicketCommand({
+          backlogDomain,
+          projectKey,
+          language,
+          issueTypeId: parseInt(issueTypeId, 10),
+          priorityId: parseInt(priorityId, 10),
+          ticketData
+        }, sendResponse);
+        return; // Early return to avoid normal message processing
       } else if (messageType === 'suggestion') {
         // Build context-aware prompt based on message type
         processedMessage = this.buildSuggestionPrompt(message, ticketData);
@@ -426,7 +451,7 @@ class BackgroundService {
     try {
       // Get Backlog API configuration
       const backlogSettings = await this.getBacklogMultiSettings();
-      const config = this.findMatchingBacklogConfig(backlogSettings.configs, spaceInfo);
+      const config = this.findMatchingBacklogConfig(backlogSettings.data, spaceInfo);
 
       if (!config) {
         console.log('No matching Backlog API config found, using DOM extraction');
@@ -707,21 +732,18 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
     }
   }
 
-  private async getBacklogMultiSettings(): Promise<{configs: any[]}> {
+  private async getBacklogMultiSettings(): Promise<SettingsResponse> {
     try {
-      const backlogs = await this.settingsService.getBacklogs();
+      const data = await this.settingsService.getBacklogs();
       return {
-        configs: backlogs.map(backlog => ({
-          id: backlog.id,
-          domain: backlog.domain,
-          spaceName: backlog.namespace,
-          apiKey: backlog.apiKey
-        }))
-      };
+        data,
+        success: true
+      }
     } catch (error) {
       console.error('Error getting Backlog multi settings:', error);
       return {
-        configs: []
+        success: false,
+        error: 'Failed to get Backlog settings'
       };
     }
   }
@@ -1073,6 +1095,230 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       };
       sendResponse(response);
     }
+  }
+
+  // ===========================================
+  // Create Ticket Feature Handlers
+  // ===========================================
+
+  private async handleFetchBacklogProjects(data: any, sendResponse: (response?: any) => void) {
+    console.log('🔎 ~ BackgroundService ~ handleFetchBacklogProjects ~ data:', data);
+    try {
+      const { domain, apiKey } = data;
+
+      if (!domain || !apiKey) {
+        throw new Error('Missing domain or API key');
+      }
+
+      console.log('📋 [Background] Fetching projects for domain:', domain);
+
+      const projects = await BacklogApiService.fetchProjects(domain, apiKey);
+
+      console.log('✅ [Background] Fetched projects:', projects.length);
+
+      sendResponse({
+        success: true,
+        data: projects
+      });
+    } catch (error) {
+      console.error('❌ [Background] Failed to fetch projects:', error);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  private async handleFetchIssueTypes(data: any, sendResponse: (response?: any) => void) {
+    console.log('🔎 ~ BackgroundService ~ handleFetchIssueTypes ~ data:', data);
+    try {
+      const { domain, apiKey, projectKey } = data;
+
+      if (!domain || !apiKey || !projectKey) {
+        throw new Error('Missing domain, API key, or project key');
+      }
+
+      console.log('📋 [Background] Fetching issue types for project:', projectKey);
+
+      const issueTypes = await BacklogApiService.fetchIssueTypes(domain, apiKey, projectKey);
+
+      console.log('✅ [Background] Fetched issue types:', issueTypes.length);
+
+      sendResponse({
+        success: true,
+        data: issueTypes
+      });
+    } catch (error) {
+      console.error('❌ [Background] Failed to fetch issue types:', error);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  private async handleCreateTicketCommand({
+    backlogDomain,
+    projectKey,
+    language,
+    issueTypeId,
+    priorityId,
+    ticketData
+  }: {
+    backlogDomain: string;
+    projectKey: string;
+    language: string;
+    issueTypeId: number | string;
+    priorityId: number | string;
+    ticketData: any;
+  },
+    sendResponse: (response?: any) => void
+  ) {
+    try {
+      console.log('🎫 [Background] Processing create-ticket command:', { backlogDomain, projectKey, language });
+
+      // Get AI service for generating ticket content
+      const aiService = await this.getCurrentAIService();
+      if (!aiService) {
+        throw new Error('AI service not configured');
+      }
+
+      // Build AI prompt for ticket creation
+      const prompt = this.buildCreateTicketPrompt(ticketData, language);
+      console.log('🔎 ~ BackgroundService ~ handleCreateTicketCommand ~ prompt:', prompt);
+
+      // Get AI-generated ticket data
+      const settings = await this.settingsService.getAllSettings();
+      const aiResult = await aiService.processUserMessage(prompt, ticketData, settings);
+      const aiResponse = aiResult.response;
+
+      // Parse AI response as JSON
+      let aiTicketData;
+      try {
+        // Try to extract JSON from AI response
+        const jsonMatch = aiResponse.replace('```json\n', '')
+          .replace('\n```', '')
+          .match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          aiTicketData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('No JSON found in AI response');
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI response as JSON:', aiResponse);
+        throw new Error('AI response is not valid JSON format');
+      }
+
+      // Get backlogs to find the appropriate one for the project
+      const backlogs = await this.settingsService.getBacklogs();
+      if (backlogs.length === 0) {
+        throw new Error('No backlog configurations found. Please configure backlogs in settings.');
+      }
+
+      const selectedBacklog = backlogs.find(b => b.domain === backlogDomain);
+
+      if (!selectedBacklog) {
+        throw new Error(`Backlog not found for domain: ${backlogDomain}`);
+      }
+
+      // Verify project exists
+      const project = await BacklogApiService.getProjectByKey(
+        selectedBacklog.domain,
+        selectedBacklog.apiKey,
+        projectKey
+      );
+
+      if (!project) {
+        throw new Error(`Project "${projectKey}" not found in backlog "${selectedBacklog.domain}"`);
+      }
+
+      // Create the ticket
+      const result = await TicketCreationService.createTicketFromAI(
+        selectedBacklog,
+        projectKey,
+        {
+          ...aiTicketData,
+          issueTypeId,
+          priorityId,
+        }
+      );
+
+      // Generate success message
+      const successMessage = TicketCreationService.generateSuccessMessage(
+        result.ticket,
+        result.ticketUrl
+      );
+
+      // Send success response with the created ticket info
+      sendResponse({
+        success: true,
+        response: successMessage,
+        tokensUsed: aiResult.tokensUsed,
+        responseId: aiResult.responseId
+      });
+
+    } catch (error) {
+      console.error('❌ [Background] Failed to create ticket:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      sendResponse({
+        success: false,
+        response: {
+          message: `❌ Lỗi tạo ticket: ${errorMessage}`,
+          sender: 'ai'
+        }
+      });
+    }
+  }
+
+  private buildCreateTicketPrompt(ticketData: any, targetLanguage: string): string {
+    const languageMap: Record<string, string> = {
+      'vi': 'tiếng Việt',
+      'en': 'English',
+      'ja': '日本語',
+      'ko': '한국어',
+      'zh': '中文',
+      'th': 'ไทย',
+      'id': 'Bahasa Indonesia',
+      'ms': 'Bahasa Melayu',
+      'tl': 'Filipino',
+      'fr': 'Français',
+      'de': 'Deutsch',
+      'es': 'Español',
+      'pt': 'Português',
+      'it': 'Italiano',
+      'ru': 'Русский'
+    };
+
+    const languageName = languageMap[targetLanguage] || 'English';
+
+    return `Dựa trên thông tin ticket sau, hãy tạo nội dung cho một ticket mới bằng ${languageName}.
+
+**Thông tin ticket gốc:**
+- ID: ${ticketData.id}
+- Tiêu đề: ${ticketData.title}
+- Mô tả: ${ticketData.description}
+- Trạng thái: ${ticketData.status}
+- Ưu tiên: ${ticketData.priority}
+
+**Yêu cầu:**
+1. Phân tích nội dung ticket gốc
+2. Tạo summary (tiêu đề) ngắn gọn và rõ ràng bằng ${languageName}
+3. Tạo description (mô tả) chi tiết bằng ${languageName}
+4. Đề xuất thông tin bổ sung phù hợp
+
+**Phản hồi dưới dạng JSON với format:**
+{
+  "summary": "Tiêu đề ticket bằng ${languageName}",
+  "description": "Mô tả chi tiết bằng ${languageName}",
+  "issueTypeId": 1,
+  "priorityId": 3,
+  "estimatedHours": 8,
+  "dueDate": "2025-08-15"
+}
+
+Chỉ trả về JSON, không thêm text khác.`;
   }
 }
 
