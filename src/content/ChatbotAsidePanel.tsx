@@ -8,6 +8,7 @@ import { parseCommand } from '../shared/commandUtils';
 import { FileAttachment } from '../types/attachment.d';
 import { AttachmentUtils } from '../shared/attachmentUtils';
 import TranslateModal from '../shared/TranslateModal';
+import CreateTicketModal from '../chatbot/components/CreateTicketModal';
 import Modal from '../shared/Modal';
 import { TicketData, UserInfo } from "../types/backlog";
 import { ChatMessage } from "../types/chat";
@@ -58,6 +59,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   // Modal states
   const [isTranslateModalOpen, setIsTranslateModalOpen] = useState(false);
+  const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -563,6 +565,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       if (value === 'translate') {
         // Open translate modal instead of sending message directly
         setIsTranslateModalOpen(true);
+      } else if (value === 'create-ticket') {
+        // Open create ticket modal
+        setIsCreateTicketModalOpen(true);
       } else {
         // Execute other actions normally
         handleSuggestionClick(value as 'summary' | 'explain' | 'translate');
@@ -582,6 +587,16 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     // Send the translate command as a user message
     handleSendMessage(command, 'user');
     setIsTranslateModalOpen(false);
+  };
+
+  const handleCreateTicketModalClose = () => {
+    setIsCreateTicketModalOpen(false);
+  };
+
+  const handleCreateTicketCommand = (command: string) => {
+    // Send the create ticket command as a user message
+    handleSendMessage(command, 'user');
+    setIsCreateTicketModalOpen(false);
   };
 
   const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
@@ -1126,6 +1141,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
               <option value="summary">📝 Tóm tắt nội dung</option>
               <option value="explain">💡 Giải thích yêu cầu</option>
               <option value="translate">🌍 Dịch nội dung</option>
+              <option value="create-ticket">📋 Tạo Backlog ticket</option>
             </select>
 
             {/* Model Selector */}
@@ -1252,6 +1268,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         isOpen={isTranslateModalOpen}
         onClose={handleTranslateModalClose}
         onConfirm={handleTranslateCommand}
+        ModalComponent={Modal}
+      />
+
+      {/* Create Ticket Modal */}
+      <CreateTicketModal
+        isOpen={isCreateTicketModalOpen}
+        onClose={handleCreateTicketModalClose}
+        onSubmit={handleCreateTicketCommand}
         ModalComponent={Modal}
       />
     </div>

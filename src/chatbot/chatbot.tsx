@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import Modal from '../shared/Modal';
+import CreateTicketModal from './components/CreateTicketModal';
 
 interface ChatMessage {
   id: string;
@@ -439,6 +441,7 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateTicket, setShowCreateTicket] = useState(false);
   const [backlogSettings, setBacklogSettings] = useState<BacklogMultiSettings>({
     configs: []
   });
@@ -539,6 +542,15 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
     } catch (error) {
       console.error('Error requesting ticket summary:', error);
     }
+  };
+
+  const handleCreateTicket = () => {
+    setShowCreateTicket(true);
+  };
+
+  const handleCreateTicketSubmit = (command: string) => {
+    // Send the command as a regular message
+    onSendMessage(command);
   };
 
   return (
@@ -704,6 +716,27 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
             <span>📋</span>
             Summary nội dung ticket
           </button>
+          <button
+            onClick={handleCreateTicket}
+            disabled={actualIsTyping}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#17a2b8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '16px',
+              fontSize: '12px',
+              cursor: actualIsTyping ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              opacity: actualIsTyping ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>📋</span>
+            Tạo Backlog ticket
+          </button>
         </div>
 
         <div style={{
@@ -753,6 +786,14 @@ const ChatbotComponent: React.FC<ChatbotProps> = ({ onSendMessage, messages, isT
         onClose={() => setShowSettings(false)}
         settings={backlogSettings}
         onSave={saveBacklogSettings}
+      />
+
+      {/* Create Ticket Modal */}
+      <CreateTicketModal
+        isOpen={showCreateTicket}
+        onClose={() => setShowCreateTicket(false)}
+        onSubmit={handleCreateTicketSubmit}
+        ModalComponent={Modal}
       />
 
       <style>

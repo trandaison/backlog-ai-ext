@@ -12,6 +12,13 @@ export const availableCommands: CommandConfig[] = [
     description: 'Translate ticket content from one language to another',
     example: '/translate ja -> vi',
     requiresModal: true
+  },
+  {
+    command: 'create-ticket',
+    pattern: /^\/create-ticket\s+(\S+)\/(\S+)\s+([a-z]{2})\sissueType:(\d+)\spriority:(\d+)$/i,
+    description: 'Create a backlog ticket with AI-generated content',
+    example: '/create-ticket example.backlogtool.com/TEST vi',
+    requiresModal: false
   }
 ];
 

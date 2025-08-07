@@ -446,9 +446,13 @@ class BacklogAIInjector {
   }
 
   private setupComponentMessageHandlers(): void {
+    console.log('🔧 [Content] Setting up component message handlers');
+
     // Listen for component events
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
+
+      console.log('🔔 [Content] Received message:', event.data.type, event.data);
 
       switch (event.data.type) {
         case 'CHATBOT_CLOSE':
@@ -502,6 +506,18 @@ class BacklogAIInjector {
 
         case 'UPDATE_PREFERRED_MODEL':
           this.handleUpdatePreferredModel(event.data.modelId);
+          break;
+
+        case 'GET_BACKLOGS':
+          this.handleGetBacklogs(event.data.id);
+          break;
+
+        case 'FETCH_BACKLOG_PROJECTS':
+          this.handleFetchBacklogProjects(event.data.backlog, event.data.id);
+          break;
+
+        case 'FETCH_ISSUE_TYPES_REQUEST':
+          this.handleFetchIssueTypes(event.data.backlog, event.data.projectKey, event.data.id);
           break;
       }
     });
@@ -624,6 +640,82 @@ class BacklogAIInjector {
       console.error('Error getting user info:', error);
       window.postMessage({
         type: 'USER_INFO_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleGetBacklogs(messageId: string): Promise<void> {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getBacklogSettings'
+      });
+
+      window.postMessage({
+        type: 'GET_BACKLOGS_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.data : [],
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      console.error('❌ [Content] Error getting backlogs:', error);
+      window.postMessage({
+        type: 'GET_BACKLOGS_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleFetchBacklogProjects(backlog: any, messageId: string): Promise<void> {
+    console.log('🔎 ~ BacklogAIInjector ~ handleFetchBacklogProjects ~ backlog:', {backlog, messageId});
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'fetchBacklogProjects',
+        data: backlog
+      });
+
+      window.postMessage({
+        type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.data : [],
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      console.error('❌ [Content] Error fetching backlog projects:', error);
+      window.postMessage({
+        type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
+    }
+  }
+
+  private async handleFetchIssueTypes(backlog: any, projectKey: string, messageId: string): Promise<void> {
+    console.log('🔎 ~ BacklogAIInjector ~ handleFetchIssueTypes ~ backlog:', {backlog, projectKey, messageId});
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'fetchIssueTypes',
+        data: { ...backlog, projectKey }
+      });
+
+      window.postMessage({
+        type: 'FETCH_ISSUE_TYPES_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.data : [],
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      console.error('❌ [Content] Error fetching issue types:', error);
+      window.postMessage({
+        type: 'FETCH_ISSUE_TYPES_RESPONSE',
         id: messageId,
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
