@@ -904,6 +904,7 @@ class BacklogAIInjector {
 
       // Prepare full context for background script
       const fullContextData = {
+        currentUrl: window.location.href,
         message: contextData.message,
         messageType: contextData.messageType || 'user',
         ticketData: finalTicketData,
@@ -919,6 +920,7 @@ class BacklogAIInjector {
 
       console.log('📤 [Content] Sending to background:', {
         action: 'processUserMessage',
+        currentUrl: window.location.href,
         messageType: fullContextData.messageType,
         hasTicketData: !!fullContextData.ticketData,
         chatHistoryLength: fullContextData.chatHistory.length,
