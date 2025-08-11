@@ -141,7 +141,23 @@ const OptionsPage: React.FC = () => {
           'gemini-2.5-pro', // Most advanced Gemini model with enhanced reasoning
           'gemini-2.5-flash-lite', // Lightweight version optimized for speed and cost
         ];
-        const models = aiSettings.selectedModels.length > 0 ? aiSettings.selectedModels : defaultModels;
+
+        let models = aiSettings.selectedModels;
+
+        // If no models are selected, use defaults and save them to storage
+        if (models.length === 0) {
+          models = defaultModels;
+          try {
+            // Save default models to storage for consistency across the app
+            await settingsClient.updateAiModelSettings({
+              selectedModels: defaultModels
+            });
+            console.log('✅ [Options] Saved default models to storage:', defaultModels);
+          } catch (error) {
+            console.error('❌ [Options] Failed to save default models:', error);
+          }
+        }
+
         setSelectedModels(models);
       } catch (error) {
         console.error('Failed to load selected models:', error);

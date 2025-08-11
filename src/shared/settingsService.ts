@@ -7,13 +7,13 @@ import type {
   GeneralSettings,
   FeatureFlags,
   AiModelSettings,
-  BacklogIntegration
+  BacklogIntegration,
 } from '../configs/settingsTypes';
 import { DEFAULT_SETTINGS } from '../configs/settingsTypes';
 import { EncryptionService } from './encryption';
 
 const STORAGE_KEYS = {
-  CONFIGS: 'configs'
+  CONFIGS: 'configs',
 } as const;
 
 export class SettingsService {
@@ -54,7 +54,6 @@ export class SettingsService {
       await this.initializeSettings();
       this.settingsCache = DEFAULT_SETTINGS;
       return DEFAULT_SETTINGS;
-
     } catch (error) {
       console.error('❌ Settings load failed, using defaults:', error);
       return DEFAULT_SETTINGS;
@@ -64,7 +63,7 @@ export class SettingsService {
   async saveAllSettings(settings: Settings): Promise<void> {
     try {
       await chrome.storage.sync.set({
-        [STORAGE_KEYS.CONFIGS]: settings
+        [STORAGE_KEYS.CONFIGS]: settings,
       });
 
       // Update cache
@@ -72,7 +71,6 @@ export class SettingsService {
 
       const allSettings = await this.getAllSettings();
       console.log('✅ Settings saved successfully', allSettings);
-
     } catch (error) {
       console.error('❌ Settings save failed:', error);
       throw error;
@@ -100,11 +98,17 @@ export class SettingsService {
     const decryptedSettings: AiModelSettings = {
       ...settings.aiModels,
       aiProviderKeys: {
-        openAi: settings.aiModels.aiProviderKeys.openAi ?
-          await EncryptionService.decryptApiKey(settings.aiModels.aiProviderKeys.openAi) : '',
-        gemini: settings.aiModels.aiProviderKeys.gemini ?
-          await EncryptionService.decryptApiKey(settings.aiModels.aiProviderKeys.gemini) : ''
-      }
+        openAi: settings.aiModels.aiProviderKeys.openAi
+          ? await EncryptionService.decryptApiKey(
+              settings.aiModels.aiProviderKeys.openAi
+            )
+          : '',
+        gemini: settings.aiModels.aiProviderKeys.gemini
+          ? await EncryptionService.decryptApiKey(
+              settings.aiModels.aiProviderKeys.gemini
+            )
+          : '',
+      },
     };
 
     return decryptedSettings;
@@ -115,9 +119,11 @@ export class SettingsService {
 
     // Decrypt API keys for all backlog integrations
     const decryptedBacklogs = await Promise.all(
-      settings.backlog.map(async config => ({
+      settings.backlog.map(async (config) => ({
         ...config,
-        apiKey: config.apiKey ? await EncryptionService.decryptApiKey(config.apiKey) : ''
+        apiKey: config.apiKey
+          ? await EncryptionService.decryptApiKey(config.apiKey)
+          : '',
       }))
     );
 
@@ -133,7 +139,9 @@ export class SettingsService {
   // Section-specific updaters (with encryption)
   // ===========================================
 
-  async updateGeneralSettings(partial: Partial<GeneralSettings>): Promise<void> {
+  async updateGeneralSettings(
+    partial: Partial<GeneralSettings>
+  ): Promise<void> {
     const settings = await this.getAllSettings();
     settings.general = { ...settings.general, ...partial };
     await this.saveAllSettings(settings);
@@ -145,12 +153,18 @@ export class SettingsService {
     await this.saveAllSettings(settings);
   }
 
-  async updateAiModelSettings(partial: Partial<AiModelSettings>): Promise<void> {
+  async updateAiModelSettings(
+    partial: Partial<AiModelSettings>
+  ): Promise<void> {
     const settings = await this.getAllSettings();
 
     if (partial.aiProviderKeys?.openAi) {
-      partial.aiProviderKeys.openAi = await EncryptionService.encryptApiKey(partial.aiProviderKeys.openAi);
-      partial.aiProviderKeys.gemini = await EncryptionService.encryptApiKey(partial.aiProviderKeys.gemini);
+      partial.aiProviderKeys.openAi = await EncryptionService.encryptApiKey(
+        partial.aiProviderKeys.openAi
+      );
+      partial.aiProviderKeys.gemini = await EncryptionService.encryptApiKey(
+        partial.aiProviderKeys.gemini
+      );
     }
 
     // Deep merge the partial settings
@@ -161,7 +175,7 @@ export class SettingsService {
         ...settings.aiModels.aiProviderKeys,
         ...partial.aiProviderKeys,
       },
-    }
+    };
 
     await this.saveAllSettings(settings);
   }
@@ -172,18 +186,39 @@ export class SettingsService {
 
     // Encrypt API keys for all backlog integrations
     const encryptedBacklogs = await Promise.all(
-      backlog.map(async config => {
-        const updatedConfig = configs.find(c => c.domain === config.domain);
-        if (!updatedConfig) return config;
+      configs.map(async (newConfig) => {
+        // Find existing config with same domain
+        const existingConfig = backlog.find(
+          (c) => c.domain === newConfig.domain
+        );
 
-        return {
-          ...config,
-          apiKey: updatedConfig.apiKey ? await EncryptionService.encryptApiKey(updatedConfig.apiKey) : ''
-        };
+        if (existingConfig) {
+          // Update existing config
+          return {
+            ...existingConfig,
+            ...newConfig,
+            apiKey: newConfig.apiKey
+              ? await EncryptionService.encryptApiKey(newConfig.apiKey)
+              : existingConfig.apiKey,
+          };
+        } else {
+          // Add new config
+          return {
+            ...newConfig,
+            apiKey: newConfig.apiKey
+              ? await EncryptionService.encryptApiKey(newConfig.apiKey)
+              : '',
+          };
+        }
       })
     );
 
     settings.backlog = encryptedBacklogs;
+    console.log('🔎 ~ SettingsService ~ updateBacklogs ~ settings:', {
+      settings,
+      configs,
+      encryptedBacklogs,
+    });
     await this.saveAllSettings(settings);
   }
 
@@ -203,7 +238,9 @@ export class SettingsService {
     const newConfig: BacklogIntegration = {
       ...config,
       id: `backlog-${Date.now()}`,
-      apiKey: config.apiKey ? await EncryptionService.encryptApiKey(config.apiKey) : ''
+      apiKey: config.apiKey
+        ? await EncryptionService.encryptApiKey(config.apiKey)
+        : '',
     };
 
     settings.backlog.push(newConfig);
@@ -214,7 +251,7 @@ export class SettingsService {
 
   async removeBacklog(id: string): Promise<void> {
     const settings = await this.getAllSettings();
-    settings.backlog = settings.backlog.filter(config => config.id !== id);
+    settings.backlog = settings.backlog.filter((config) => config.id !== id);
     await this.saveAllSettings(settings);
   }
 
@@ -293,7 +330,7 @@ export class SettingsService {
 
       // Other legacy keys
       'aiModel',
-      'sidebarWidth'
+      'sidebarWidth',
     ];
 
     // Remove all old keys

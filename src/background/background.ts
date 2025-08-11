@@ -77,7 +77,6 @@ class BackgroundService {
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
   ) {
-    console.log('🔎 ~ BackgroundService ~ handleMessage ~ message:', message);
     try {
       switch (message.action) {
         // Settings handlers
@@ -1422,10 +1421,6 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
     data: any,
     sendResponse: (response?: any) => void
   ) {
-    console.log(
-      '🔎 ~ BackgroundService ~ handleFetchBacklogProjects ~ data:',
-      data
-    );
     try {
       const { domain, apiKey } = data;
 

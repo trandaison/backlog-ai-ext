@@ -332,20 +332,37 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
   // Load saved width from storage
   const loadSavedWidth = async () => {
     try {
-      // Don't attempt chrome.storage.local if we're in main world without access
-      if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log(
-          '⚠️ [ChatbotAsidePanel] Chrome storage not available in main world'
-        );
-        return;
-      }
+      // Use postMessage to communicate with content script
+      const response = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
 
-      const result = await chrome.storage.local.get([STORAGE_KEY]);
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
 
-      if (result[STORAGE_KEY]) {
+          if (event.data.type === 'SAVED_WIDTH_RESPONSE' && event.data.id === messageId) {
+            window.removeEventListener('message', responseHandler);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage({
+          type: 'GET_SAVED_WIDTH',
+          id: messageId
+        }, '*');
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          resolve({ width: null }); // Default if timeout
+        }, 5000);
+      });
+
+      if (response.width) {
         const savedWidth = Math.max(
           MIN_WIDTH,
-          Math.min(getMaxAllowedWidth(), result[STORAGE_KEY])
+          Math.min(getMaxAllowedWidth(), response.width)
         );
         setSidebarWidth(savedWidth);
       } else {
@@ -364,34 +381,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     try {
       console.log('💾 [ChatbotAsidePanel] Saving width to storage:', width);
 
-      // If chrome.storage not available (main world), send message to content script
-      if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log(
-          '📤 [ChatbotAsidePanel] Sending width save request to content script'
-        );
-        window.postMessage(
-          {
-            type: 'SAVE_SIDEBAR_WIDTH',
-            width: width,
-          },
-          '*'
-        );
-        return;
-      }
-
-      await chrome.storage.local.set({ [STORAGE_KEY]: width });
-      // Broadcast width change to other tabs
-      chrome.runtime
-        .sendMessage({
-          action: 'sidebarWidthChanged',
-          width: width,
-        })
-        .catch(() => {
-          // Ignore errors if background script is not available
-        });
-    } catch (error) {
-      console.log('❌ [ChatbotAsidePanel] Could not save width:', error);
-      // Fallback: send message to content script
+      // Send message to content script to save width
       window.postMessage(
         {
           type: 'SAVE_SIDEBAR_WIDTH',
@@ -399,6 +389,8 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         },
         '*'
       );
+    } catch (error) {
+      console.log('❌ [ChatbotAsidePanel] Could not save width:', error);
     }
   };
 
@@ -407,42 +399,63 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     try {
       setIsLoadingModels(true);
 
-      // If chrome.storage not available (main world), use postMessage
-      if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log(
-          '📤 [ChatbotAsidePanel] Requesting model settings from content script'
+      // Use postMessage to communicate with content script
+      const response = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (event.data.type === 'MODEL_SETTINGS_RESPONSE' && event.data.id === messageId) {
+            window.removeEventListener('message', responseHandler);
+
+            if (event.data.success) {
+              resolve({ success: true, data: event.data.data });
+            } else {
+              reject(new Error(event.data.error));
+            }
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage({
+          type: 'GET_MODEL_SETTINGS',
+          id: messageId
+        }, '*');
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          reject(new Error('Timeout waiting for model settings response'));
+        }, 10000);
+      });
+        console.log('🔎 ~ loadModelSettings ~ response:', response);
+
+
+      if (response.success) {
+        // Set selected models (filter to only include available models)
+        const savedSelectedModels = response.data.selectedModels || [];
+        const validSelectedModels = savedSelectedModels.filter(
+          (modelId: string) => availableModels.some((m) => m.id === modelId)
         );
-        window.postMessage(
-          {
-            type: 'GET_MODEL_SETTINGS',
-          },
-          '*'
+        setSelectedModels(
+          validSelectedModels.length > 0
+            ? validSelectedModels.sort()
+            : [defaultModelId]
         );
-        return;
+
+        // Set current model to preferred model if it's in selected models
+        const preferredModel = response.data.preferredModel || defaultModelId;
+        const validCurrentModel = validSelectedModels.includes(preferredModel)
+          ? preferredModel
+          : validSelectedModels.length > 0
+          ? validSelectedModels[0]
+          : defaultModelId;
+        setCurrentModel(validCurrentModel);
+      } else {
+        throw new Error(response.error || 'Failed to load model settings');
       }
-
-      const result = await chrome.storage.sync.get([
-        'selectedModels',
-        'preferredModel',
-      ]);
-
-      // Set selected models (filter to only include available models)
-      const savedSelectedModels = result.selectedModels || [];
-      const validSelectedModels = savedSelectedModels.filter(
-        (modelId: string) => availableModels.some((m) => m.id === modelId)
-      );
-      setSelectedModels(
-        validSelectedModels.length > 0 ? validSelectedModels : [defaultModelId]
-      );
-
-      // Set current model to preferred model if it's in selected models
-      const preferredModel = result.preferredModel || defaultModelId;
-      const validCurrentModel = validSelectedModels.includes(preferredModel)
-        ? preferredModel
-        : validSelectedModels.length > 0
-        ? validSelectedModels[0]
-        : defaultModelId;
-      setCurrentModel(validCurrentModel);
     } catch (error) {
       console.error(
         '❌ [ChatbotAsidePanel] Error loading model settings:',
@@ -459,19 +472,42 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
   // Load feature flags from storage
   const loadFeatureFlags = async () => {
     try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'GET_SECTION',
-        section: 'features',
+      // Use postMessage to communicate with content script
+      const response = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (event.data.type === 'FEATURE_FLAGS_RESPONSE' && event.data.id === messageId) {
+            window.removeEventListener('message', responseHandler);
+
+            if (event.data.success) {
+              resolve({ success: true, data: event.data.data });
+            } else {
+              reject(new Error(event.data.error));
+            }
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage({
+          type: 'GET_FEATURE_FLAGS',
+          id: messageId
+        }, '*');
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          reject(new Error('Timeout waiting for feature flags response'));
+        }, 10000);
       });
 
       if (response.success) {
         setEnterToSend(response.data.enterToSend !== false); // Default to true if undefined
       } else {
-        console.error(
-          '❌ [ChatbotAsidePanel] Failed to load feature flags:',
-          response.error
-        );
-        // Keep default value
+        throw new Error(response.error || 'Failed to load feature flags');
       }
     } catch (error) {
       console.error(
@@ -535,28 +571,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     try {
       setCurrentModel(modelId);
 
-      // Update preferred model in storage
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        // Determine provider based on selected model
-        const selectedModel = availableModels.find(
-          (model) => model.id === modelId
-        );
-        const preferredProvider = selectedModel?.provider || 'openai';
-
-        await chrome.storage.sync.set({
-          preferredModel: modelId,
-          preferredProvider: preferredProvider,
-        });
-      } else {
-        // Send message to content script to update storage
-        window.postMessage(
-          {
-            type: 'UPDATE_PREFERRED_MODEL',
-            modelId: modelId,
-          },
-          '*'
-        );
-      }
+      // Send message to content script to update storage
+      window.postMessage(
+        {
+          type: 'UPDATE_PREFERRED_MODEL',
+          modelId: modelId,
+        },
+        '*'
+      );
     } catch (error) {
       console.error(
         '❌ [ChatbotAsidePanel] Error updating preferred model:',

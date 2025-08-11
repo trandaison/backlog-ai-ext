@@ -813,7 +813,19 @@ class BacklogAIInjector {
           break;
 
         case 'GET_MODEL_SETTINGS':
-          this.handleGetModelSettings();
+          this.handleGetModelSettings(event.data.id);
+          break;
+
+        case 'GET_FEATURE_FLAGS':
+          this.handleGetFeatureFlags(event.data.id);
+          break;
+
+        case 'BROADCAST_WIDTH_CHANGE':
+          this.handleBroadcastWidthChange(event.data.width);
+          break;
+
+        case 'GET_SAVED_WIDTH':
+          this.handleGetSavedWidth(event.data.id);
           break;
 
         case 'UPDATE_PREFERRED_MODEL':
@@ -1246,7 +1258,7 @@ class BacklogAIInjector {
     }
   }
 
-  private async handleGetModelSettings(): Promise<void> {
+  private async handleGetModelSettings(messageId?: string): Promise<void> {
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'GET_SECTION',
@@ -1257,9 +1269,10 @@ class BacklogAIInjector {
         window.postMessage(
           {
             type: 'MODEL_SETTINGS_RESPONSE',
+            id: messageId,
             success: true,
             data: {
-              selectedModels: response.data.selectedModels.sort() || [],
+              selectedModels: response.data.selectedModels || [],
               preferredModel:
                 response.data.preferredModel || 'gemini-2.5-flash',
             },
@@ -1274,6 +1287,7 @@ class BacklogAIInjector {
       window.postMessage(
         {
           type: 'MODEL_SETTINGS_RESPONSE',
+          id: messageId,
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
@@ -1620,6 +1634,77 @@ class BacklogAIInjector {
           id: messageId,
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
+    }
+  }
+
+  private async handleGetFeatureFlags(messageId: string): Promise<void> {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'GET_SECTION',
+        section: 'features',
+      });
+
+      window.postMessage(
+        {
+          type: 'FEATURE_FLAGS_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : null,
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
+    } catch (error) {
+      console.error('❌ [Content] Error getting feature flags:', error);
+      window.postMessage(
+        {
+          type: 'FEATURE_FLAGS_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
+    }
+  }
+
+  private async handleBroadcastWidthChange(width: number): Promise<void> {
+    try {
+      // Broadcast width change to other tabs via background script
+      chrome.runtime.sendMessage({
+        action: 'sidebarWidthChanged',
+        width: width,
+      }).catch(() => {
+        // Ignore errors if background script is not available
+      });
+    } catch (error) {
+      console.error('❌ [Content] Error broadcasting width change:', error);
+    }
+  }
+
+  private async handleGetSavedWidth(messageId: string): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+      const savedWidth = result['ai-ext-sidebar-width'] || null;
+
+      window.postMessage(
+        {
+          type: 'SAVED_WIDTH_RESPONSE',
+          id: messageId,
+          width: savedWidth,
+        },
+        '*'
+      );
+    } catch (error) {
+      console.error('❌ [Content] Error getting saved width:', error);
+      window.postMessage(
+        {
+          type: 'SAVED_WIDTH_RESPONSE',
+          id: messageId,
+          width: null,
         },
         '*'
       );
