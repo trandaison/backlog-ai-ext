@@ -1057,16 +1057,23 @@ class BacklogAIInjector {
 
   private async handleGetModelSettings(): Promise<void> {
     try {
-      const result = await chrome.storage.sync.get(['selectedModels', 'preferredModel']);
+      const response = await chrome.runtime.sendMessage({
+        action: 'GET_SECTION',
+        section: 'aiModels'
+      });
 
-      window.postMessage({
-        type: 'MODEL_SETTINGS_RESPONSE',
-        success: true,
-        data: {
-          selectedModels: result.selectedModels || [],
-          preferredModel: result.preferredModel || 'gemini-2.5-flash'
-        }
-      }, '*');
+      if (response.success) {
+        window.postMessage({
+          type: 'MODEL_SETTINGS_RESPONSE',
+          success: true,
+          data: {
+            selectedModels: response.data.selectedModels.sort() || [],
+            preferredModel: response.data.preferredModel || 'gemini-2.5-flash'
+          }
+        }, '*');
+      } else {
+        throw new Error(response.error || 'Failed to get AI model settings');
+      }
     } catch (error) {
       console.error('Error getting model settings:', error);
       window.postMessage({
