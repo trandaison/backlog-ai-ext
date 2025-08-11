@@ -675,8 +675,6 @@ class BacklogAIInjector {
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
 
-      console.log('🔔 [Content] Received message:', event.data.type, event.data);
-
       switch (event.data.type) {
         case 'CHATBOT_CLOSE':
           this.closeChatbotPanel();

@@ -8,7 +8,8 @@ import { Settings } from '../types/settings';
 
 export class GeminiService implements AIService {
   private apiKey: string = '';
-  private baseApiUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models';
+  private baseApiUrl: string =
+    'https://generativelanguage.googleapis.com/v1beta/models';
 
   constructor() {
     this.loadApiKey();
@@ -29,7 +30,7 @@ export class GeminiService implements AIService {
   private getGeminiModelName(preferredModel?: string): string {
     if (!preferredModel) {
       // Use default model from config and map to actual Gemini model
-      const defaultModel = availableModels.find(m => m.id === defaultModelId);
+      const defaultModel = availableModels.find((m) => m.id === defaultModelId);
       if (defaultModel?.provider === 'gemini') {
         return this.mapToGeminiAPI(defaultModelId);
       }
@@ -51,26 +52,38 @@ export class GeminiService implements AIService {
       'gpt-4o-mini': 'gemini-2.0-flash-exp', // fallback
       'o1-preview': 'gemini-2.0-flash-thinking-exp', // reasoning model
       'o1-mini': 'gemini-2.0-flash-thinking-exp', // reasoning model
-      'o3-mini': 'gemini-2.0-flash-thinking-exp' // reasoning model
+      'o3-mini': 'gemini-2.0-flash-thinking-exp', // reasoning model
     };
 
     return modelMap[modelId] || 'gemini-2.0-flash-exp';
-  }  private getApiUrl(model: string = 'gemini-2.0-flash-exp'): string {
+  }
+  private getApiUrl(model: string = 'gemini-2.0-flash-exp'): string {
     return `${this.baseApiUrl}/${model}:generateContent`;
   }
 
-  async analyzeTicket(ticketData: TicketData, settings?: Settings): Promise<string> {
+  async analyzeTicket(
+    ticketData: TicketData,
+    settings?: Settings
+  ): Promise<string> {
     const prompt = this.buildAnalysisPrompt(ticketData, settings);
     const result = await this.callGeminiAPI(prompt, settings);
     return result.response;
   }
 
-  async processUserMessage(message: string, contextData: any, settings?: Settings, attachments?: FileAttachment[]): Promise<{
+  async processUserMessage(
+    message: string,
+    contextData: any,
+    settings?: Settings,
+    attachments?: FileAttachment[]
+  ): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
   }> {
-    console.log('🔎 ~ GeminiService ~ processUserMessage ~ contextData:', contextData);
+    console.log(
+      '🔎 ~ GeminiService ~ processUserMessage ~ contextData:',
+      contextData
+    );
     // Build prompt based on whether comment context is present
     let finalPrompt: string;
 
@@ -100,22 +113,31 @@ export class GeminiService implements AIService {
     return {
       response: result.response,
       responseId: result.responseId,
-      tokensUsed: result.tokensUsed || ContextOptimizer.estimateTokenCount(result.response)
+      tokensUsed:
+        result.tokensUsed ||
+        ContextOptimizer.estimateTokenCount(result.response),
     };
   }
 
-  private buildMessageWithAttachments(message: string, attachments: FileAttachment[]): string {
+  private buildMessageWithAttachments(
+    message: string,
+    attachments: FileAttachment[]
+  ): string {
     let enhancedMessage = message;
 
     for (const attachment of attachments) {
-      enhancedMessage += `\n\n**File: ${attachment.name}** (${attachment.type}, ${this.formatFileSize(attachment.size)})\n`;
+      enhancedMessage += `\n\n**File: ${attachment.name}** (${
+        attachment.type
+      }, ${this.formatFileSize(attachment.size)})\n`;
 
       // For files that will be sent as inline_data, just mention them
-      if (attachment.type.startsWith('image/') ||
-          attachment.type.startsWith('text/') ||
-          attachment.type.includes('csv') ||
-          attachment.type.includes('json') ||
-          attachment.type.includes('plain')) {
+      if (
+        attachment.type.startsWith('image/') ||
+        attachment.type.startsWith('text/') ||
+        attachment.type.includes('csv') ||
+        attachment.type.includes('json') ||
+        attachment.type.includes('plain')
+      ) {
         enhancedMessage += `[File content will be processed by AI - please analyze this file]\n`;
       } else if (attachment.preview) {
         // For other files with preview, include preview
@@ -136,8 +158,12 @@ export class GeminiService implements AIService {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  private buildAnalysisPrompt(ticketData: TicketData, settings?: Settings): string {
-    const language = settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
+  private buildAnalysisPrompt(
+    ticketData: TicketData,
+    settings?: Settings
+  ): string {
+    const language =
+      settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
     const role = settings?.general.userRole || 'developer';
 
     return `Bạn là một AI assistant chuyên phân tích ticket/issue cho ${role}.
@@ -161,8 +187,13 @@ Hãy cung cấp:
 4. Rủi ro và lưu ý cần chú ý`;
   }
 
-  private buildChatPrompt(message: string, context: any, settings?: Settings): string {
-    const language = settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
+  private buildChatPrompt(
+    message: string,
+    context: any,
+    settings?: Settings
+  ): string {
+    const language =
+      settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
     const role = settings?.general.userRole || 'developer';
 
     let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
@@ -188,8 +219,13 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     return prompt;
   }
 
-  private buildCommentPrompt(message: string, context: any, settings?: Settings): string {
-    const language = settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
+  private buildCommentPrompt(
+    message: string,
+    context: any,
+    settings?: Settings
+  ): string {
+    const language =
+      settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
     const role = settings?.general.userRole || 'developer';
 
     let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
@@ -208,7 +244,9 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     const commentContext = context.commentContext;
     if (commentContext && commentContext.selectedComment) {
       const selectedComment = commentContext.selectedComment;
-      const createdDate = selectedComment.created ? new Date(selectedComment.created).toLocaleString('vi-VN') : 'Không rõ';
+      const createdDate = selectedComment.created
+        ? new Date(selectedComment.created).toLocaleString('vi-VN')
+        : 'Không rõ';
 
       prompt += `Comment cần phân tích (người dùng tập trung vào comment này):
 - Người gửi: ${selectedComment.createdUser?.name || 'Không rõ'}
@@ -217,13 +255,25 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     }
 
     // Add previous comments for context
-    if (commentContext && commentContext.previousComments && commentContext.previousComments.length > 0) {
+    if (
+      commentContext &&
+      commentContext.previousComments &&
+      commentContext.previousComments.length > 0
+    ) {
       prompt += `2 comments gần đó nhất cho việc tham khảo các thông tin liên quan:\n`;
 
-      commentContext.previousComments.slice(0, 2).forEach((comment: any, index: number) => {
-        const createdDate = comment.created ? new Date(comment.created).toLocaleString('vi-VN') : 'Không rõ';
-        prompt += `${index + 1}. ${comment.createdUser?.name || 'Không rõ'} lúc ${createdDate} với nội dung: ${comment.content || 'Không có nội dung'}\n`;
-      });
+      commentContext.previousComments
+        .slice(0, 2)
+        .forEach((comment: any, index: number) => {
+          const createdDate = comment.created
+            ? new Date(comment.created).toLocaleString('vi-VN')
+            : 'Không rõ';
+          prompt += `${index + 1}. ${
+            comment.createdUser?.name || 'Không rõ'
+          } lúc ${createdDate} với nội dung: ${
+            comment.content || 'Không có nội dung'
+          }\n`;
+        });
       prompt += '\n';
     }
 
@@ -232,7 +282,11 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
     return prompt;
   }
 
-  private async callGeminiAPI(prompt: string, settings?: Settings, attachments?: FileAttachment[]): Promise<{
+  private async callGeminiAPI(
+    prompt: string,
+    settings?: Settings,
+    attachments?: FileAttachment[]
+  ): Promise<{
     response: string;
     responseId?: string;
     tokensUsed?: number;
@@ -241,47 +295,66 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       const apiKey = this.apiKey;
       if (!apiKey) {
         return {
-          response: 'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
-          tokensUsed: 0
+          response:
+            'Gemini API key chưa được cấu hình. Vui lòng vào popup để cài đặt.',
+          tokensUsed: 0,
         };
       }
 
       // Get the actual Gemini model name from preferred model
-      const geminiModel = this.getGeminiModelName(settings?.aiModels.preferredModel || undefined);
+      const geminiModel = this.getGeminiModelName(
+        settings?.aiModels.preferredModel || undefined
+      );
       const apiUrl = this.getApiUrl(geminiModel);
 
       // Build parts array for multimodal content
-      const parts: any[] = [{
-        text: prompt
-      }];
+      const parts: any[] = [
+        {
+          text: prompt,
+        },
+      ];
 
       // Add attachments if any
       if (attachments && attachments.length > 0) {
         console.log('📎 [Gemini] Processing attachments:', attachments.length);
         for (const attachment of attachments) {
-          console.log('📎 [Gemini] Attachment:', attachment.name, attachment.type, 'has base64:', !!attachment.base64);
+          console.log(
+            '📎 [Gemini] Attachment:',
+            attachment.name,
+            attachment.type,
+            'has base64:',
+            !!attachment.base64
+          );
           if (attachment.base64) {
             // For images, add as inline_data for vision processing
             if (attachment.type.startsWith('image/')) {
-              console.log('🖼️ [Gemini] Adding image attachment:', attachment.name);
+              console.log(
+                '🖼️ [Gemini] Adding image attachment:',
+                attachment.name
+              );
               parts.push({
                 inline_data: {
                   mime_type: attachment.type,
-                  data: attachment.base64
-                }
+                  data: attachment.base64,
+                },
               });
             }
             // For text files (CSV, TXT, JSON, etc), also add as inline_data for better processing
-            else if (attachment.type.startsWith('text/') ||
-                     attachment.type.includes('csv') ||
-                     attachment.type.includes('json') ||
-                     attachment.type.includes('plain')) {
-              console.log('📄 [Gemini] Adding text file as inline_data:', attachment.name);
+            else if (
+              attachment.type.startsWith('text/') ||
+              attachment.type.includes('csv') ||
+              attachment.type.includes('json') ||
+              attachment.type.includes('plain')
+            ) {
+              console.log(
+                '📄 [Gemini] Adding text file as inline_data:',
+                attachment.name
+              );
               parts.push({
                 inline_data: {
                   mime_type: attachment.type,
-                  data: attachment.base64
-                }
+                  data: attachment.base64,
+                },
               });
             }
             // For other binary files, mention in text (already included in prompt)
@@ -289,7 +362,13 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
         }
       }
 
-      console.log('🚀 [Gemini] Final parts array:', parts.length, parts.map(p => p.inline_data ? `inline_data: ${p.inline_data.mime_type}` : 'text'));
+      console.log(
+        '🚀 [Gemini] Final parts array:',
+        parts.length,
+        parts.map((p) =>
+          p.inline_data ? `inline_data: ${p.inline_data.mime_type}` : 'text'
+        )
+      );
 
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: 'POST',
@@ -297,16 +376,18 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{
-            parts: parts
-          }],
+          contents: [
+            {
+              parts: parts,
+            },
+          ],
           generationConfig: {
             temperature: 0.3,
             topK: 40,
             topP: 0.95,
             maxOutputTokens: 4096, // Increased from 1024 to handle longer responses
-          }
-        })
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -318,22 +399,38 @@ Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
       const data = await response.json();
 
       if (data.error) {
-        throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`);
+        throw new Error(
+          `Gemini API Error: ${
+            data.error.message || JSON.stringify(data.error)
+          }`
+        );
       }
 
-      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+      if (
+        data.candidates &&
+        data.candidates[0] &&
+        data.candidates[0].content &&
+        data.candidates[0].content.parts &&
+        data.candidates[0].content.parts[0]
+      ) {
         const content = data.candidates[0].content.parts[0].text;
-        const responseId = data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() || undefined;
-        const tokensUsed = data.usageMetadata?.totalTokenCount || ContextOptimizer.estimateTokenCount(content);
+        const responseId =
+          data.candidates[0].citationMetadata?.citationSources?.[0]?.endIndex?.toString() ||
+          undefined;
+        const tokensUsed =
+          data.usageMetadata?.totalTokenCount ||
+          ContextOptimizer.estimateTokenCount(content);
 
         return {
           response: content,
           responseId,
-          tokensUsed
+          tokensUsed,
         };
       } else {
         console.error('❌ [Gemini] Invalid API response structure:', data);
-        throw new Error('Invalid Gemini API response - no content in candidates');
+        throw new Error(
+          'Invalid Gemini API response - no content in candidates'
+        );
       }
     } catch (error) {
       console.error('❌ [Gemini] Error calling API:', error);

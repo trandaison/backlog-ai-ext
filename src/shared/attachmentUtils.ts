@@ -2,7 +2,11 @@
  * File attachment processing utilities
  */
 
-import type { FileAttachment, AttachmentPreview, FileProcessingResult } from '../types/attachment.d';
+import type {
+  FileAttachment,
+  AttachmentPreview,
+  FileProcessingResult,
+} from '../types/attachment.d';
 
 export class AttachmentUtils {
   // Maximum file size in bytes (10MB)
@@ -26,7 +30,7 @@ export class AttachmentUtils {
     'image/png',
     'image/gif',
     'image/webp',
-    'image/svg+xml'
+    'image/svg+xml',
   ];
 
   static formatFileSize(bytes: number): string {
@@ -39,8 +43,39 @@ export class AttachmentUtils {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  static isAllowedFileType(type: string): boolean {
-    return this.ALLOWED_TYPES.includes(type);
+  static isAllowedFileType(file: File): boolean {
+    // Check MIME type first
+    if (this.ALLOWED_TYPES.includes(file.type)) {
+      return true;
+    }
+
+    // If MIME type is empty or not recognized, check file extension
+    const fileName = file.name.toLowerCase();
+    const extension = fileName.substring(fileName.lastIndexOf('.'));
+
+    // Map file extensions to allowed types
+    const extensionMap: { [key: string]: boolean } = {
+      '.txt': true,
+      '.md': true,
+      '.markdown': true,
+      '.csv': true,
+      '.json': true,
+      '.xml': true,
+      '.js': true,
+      '.ts': true,
+      '.css': true,
+      '.html': true,
+      '.htm': true,
+      '.pdf': true,
+      '.jpg': true,
+      '.jpeg': true,
+      '.png': true,
+      '.gif': true,
+      '.webp': true,
+      '.svg': true,
+    };
+
+    return extensionMap[extension] || false;
   }
 
   static isWithinSizeLimit(size: number): boolean {
@@ -48,7 +83,7 @@ export class AttachmentUtils {
   }
 
   static generateAttachmentId(): string {
-    return `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `att_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   static async fileToBase64(file: File): Promise<string> {
@@ -71,7 +106,8 @@ export class AttachmentUtils {
       reader.onload = () => {
         const text = reader.result as string;
         // Limit preview to first 200 characters
-        const preview = text.length > 200 ? text.substring(0, 200) + '...' : text;
+        const preview =
+          text.length > 200 ? text.substring(0, 200) + '...' : text;
         resolve(preview);
       };
       reader.onerror = reject;
@@ -80,13 +116,14 @@ export class AttachmentUtils {
   }
 
   static async processFile(file: File): Promise<FileProcessingResult> {
-    console.log('🔎 ~ AttachmentUtils ~ processFile ~ file:', file);
     try {
       // Validate file type
-      if (!this.isAllowedFileType(file.type)) {
+      if (!this.isAllowedFileType(file)) {
         return {
           success: false,
-          error: `File type "${file.type}" is not supported. Allowed types: ${this.ALLOWED_TYPES.join(', ')}`
+          error: `File type "${
+            file.type || 'unknown'
+          }" is not supported. Allowed types: ${this.ALLOWED_TYPES.join(', ')}`,
         };
       }
 
@@ -94,7 +131,9 @@ export class AttachmentUtils {
       if (!this.isWithinSizeLimit(file.size)) {
         return {
           success: false,
-          error: `File size exceeds limit. Maximum size: ${this.formatFileSize(this.MAX_FILE_SIZE)}`
+          error: `File size exceeds limit. Maximum size: ${this.formatFileSize(
+            this.MAX_FILE_SIZE
+          )}`,
         };
       }
 
@@ -118,29 +157,32 @@ export class AttachmentUtils {
         size: file.size,
         type: file.type,
         base64,
-        preview
+        preview,
       };
 
       return {
         success: true,
-        attachment
+        attachment,
       };
-
     } catch (error) {
       return {
         success: false,
-        error: `Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Failed to process file: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       };
     }
   }
 
-  static createAttachmentPreview(attachment: FileAttachment): AttachmentPreview {
+  static createAttachmentPreview(
+    attachment: FileAttachment
+  ): AttachmentPreview {
     return {
       id: attachment.id,
       name: attachment.name,
       size: attachment.size,
       type: attachment.type,
-      displaySize: this.formatFileSize(attachment.size)
+      displaySize: this.formatFileSize(attachment.size),
     };
   }
 }
