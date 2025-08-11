@@ -1,4 +1,5 @@
 // Utility để phân tích và extract thông tin ticket từ Backlog API
+import { ISSUE_URL_REGEX } from '../configs/backlog';
 import { CommentData, TicketData } from '../types/backlog';
 import { BacklogApiService } from './backlogApi';
 
@@ -80,7 +81,7 @@ export class TicketAnalyzer {
   private extractTicketId(): string {
     // Extract từ URL hoặc page title
     const url = window.location.href;
-    const match = url.match(/\/view\/([A-Z]+-\d+)/);
+    const match = url.match(ISSUE_URL_REGEX);
     if (match) {
       return match[1];
     }

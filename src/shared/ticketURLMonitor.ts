@@ -2,6 +2,8 @@
  * URL monitoring utility for detecting ticket changes in Backlog
  */
 
+import { ISSUE_URL_REGEX } from '../configs/backlog';
+
 export interface TicketChangeEvent {
   oldTicketId: string | null;
   newTicketId: string | null;
@@ -196,7 +198,7 @@ export class TicketURLMonitor {
   private async extractTicketIdFromPage(): Promise<string | null> {
     // Method 1: From URL pattern
     const urlPatterns = [
-      /\/view\/([A-Z]+-\d+)/,
+      ISSUE_URL_REGEX,
       /\/issues\/([A-Z]+-\d+)/,
       /\/ticket\/([A-Z]+-\d+)/,
       /[?&]id=([A-Z]+-\d+)/

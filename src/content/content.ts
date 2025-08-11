@@ -3,6 +3,219 @@ import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
 import { TicketURLMonitor, TicketChangeEvent } from '../shared/ticketURLMonitor';
 import { availableModels } from '../configs';
+import { ISSUE_URL_REGEX } from '../configs/backlog';
+
+// Class quản lý comment enhancer
+class CommentEnhancer {
+  private observer: MutationObserver | null = null;
+  private isInitialized: boolean = false;
+  private initTimeout: number | null = null;
+
+  constructor() {
+    this.init();
+  }
+
+  private init(): void {
+    if (this.isInitialized) return;
+
+    // Inject buttons cho comments hiện tại với delay
+    this.scheduleInitialInjection();
+
+    // Theo dõi comments mới
+    this.observeCommentList();
+
+    this.isInitialized = true;
+    console.log('✅ [CommentEnhancer] Initialized');
+  }
+
+  private scheduleInitialInjection(): void {
+    // Clear any existing timeout
+    if (this.initTimeout) {
+      clearTimeout(this.initTimeout);
+    }
+
+    // Schedule initial injection with delay to ensure comments are loaded
+    this.initTimeout = window.setTimeout(() => {
+      this.injectAllCommentButtons();
+
+      // If no comments found, try again after a longer delay
+      const commentItems = document.querySelectorAll('.comment-item');
+      if (commentItems.length === 0) {
+        console.log('⚠️ [CommentEnhancer] No comments found, retrying in 2 seconds...');
+        setTimeout(() => {
+          this.injectAllCommentButtons();
+        }, 2000);
+      }
+    }, 1000); // Wait 1 second for initial load
+  }
+
+  private injectChatButton(commentItem: HTMLElement): void {
+    // Tránh inject trùng lặp
+    if (commentItem.querySelector('.ai-ext-comment-chat-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'ai-ext-comment-chat-btn';
+    btn.title = 'Chat với AI về comment này';
+
+    // Tạo icon
+    const iconImg = document.createElement('img');
+    iconImg.src = chrome.runtime.getURL('icons/icon.svg');
+    iconImg.alt = 'AI Chat';
+
+    btn.appendChild(iconImg);
+
+    // Thêm event listeners
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.openAIChatboxWithContext(commentItem);
+    });
+
+    // Thêm hover events để highlight comment container
+    btn.addEventListener('mouseenter', (event) => {
+      this.highlightCommentContainer(commentItem);
+    });
+
+    btn.addEventListener('mouseleave', (event) => {
+      this.unhighlightCommentContainer(commentItem);
+    });
+
+    commentItem.appendChild(btn);
+  }
+
+  private highlightCommentContainer(commentItem: HTMLElement): void {
+    // Tìm comment container (có thể là commentItem hoặc parent element)
+    const commentContainer = commentItem.closest('.js_comment-container') || commentItem;
+    if (commentContainer) {
+      commentContainer.classList.add('ai-ext-highlight-comment-container');
+    }
+  }
+
+  private unhighlightCommentContainer(commentItem: HTMLElement): void {
+    // Tìm comment container và xóa class highlight
+    const commentContainer = commentItem.closest('.js_comment-container') || commentItem;
+    if (commentContainer) {
+      commentContainer.classList.remove('ai-ext-highlight-comment-container');
+    }
+  }
+
+  private injectAllCommentButtons(): void {
+    const commentItems = document.querySelectorAll('.comment-item');
+    commentItems.forEach(item => {
+      this.injectChatButton(item as HTMLElement);
+    });
+    console.log(`✅ [CommentEnhancer] Injected buttons for ${commentItems.length} comments`);
+  }
+
+  private observeCommentList(): void {
+    const commentList = document.querySelector('.comment-list__items');
+    if (!commentList) {
+      console.warn('⚠️ [CommentEnhancer] Comment list not found, will retry later');
+      // Retry after a delay
+      setTimeout(() => this.observeCommentList(), 2000);
+      return;
+    }
+
+    this.observer = new MutationObserver((mutations) => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node instanceof HTMLElement && node.matches('.comment-item')) {
+            this.injectChatButton(node);
+          }
+        });
+      });
+    });
+
+    this.observer.observe(commentList, {
+      childList: true,
+      subtree: false
+    });
+
+    console.log('✅ [CommentEnhancer] Observer started');
+  }
+
+  private openAIChatboxWithContext(commentItem: HTMLElement): void {
+    try {
+      // Extract comment data
+      const commentData = this.extractCommentData(commentItem);
+
+      if (!commentData) {
+        console.warn('⚠️ [CommentEnhancer] Could not extract comment data');
+        return;
+      }
+
+      console.log('📝 [CommentEnhancer] Opening chatbox with comment:', commentData);
+
+      // Mở chatbot panel trước
+      window.postMessage({
+        type: 'OPEN_CHATBOT_PANEL'
+      }, '*');
+
+      // Gửi message để load comment context và focus textarea
+      window.postMessage({
+        type: 'LOAD_COMMENT_CONTEXT',
+        data: commentData
+      }, '*');
+
+    } catch (error) {
+      console.error('❌ [CommentEnhancer] Error opening chatbox:', error);
+    }
+  }
+
+  private extractCommentData(commentItem: HTMLElement): any {
+    try {
+      // Extract comment text
+      const commentText = commentItem.querySelector('.comment-item__text')?.textContent?.trim() || '';
+
+      // Extract comment author
+      const authorElement = commentItem.querySelector('.comment-item__author');
+      const author = authorElement?.textContent?.trim() || '';
+
+      // Extract comment date
+      const dateElement = commentItem.querySelector('.comment-item__date');
+      const date = dateElement?.textContent?.trim() || '';
+
+      // Extract comment ID (if available)
+      const commentId = commentItem.dataset.id || commentItem.getAttribute('data-id') || '';
+
+      // Extract comment URL (if available)
+      const commentLink = commentItem.querySelector('a[href*="/view/"]') as HTMLAnchorElement;
+      const commentUrl = commentLink?.href || '';
+
+      return {
+        id: commentId,
+        text: commentText,
+        author: author,
+        date: date,
+        url: commentUrl,
+        element: commentItem.outerHTML // Include HTML for context
+      };
+    } catch (error) {
+      console.error('❌ [CommentEnhancer] Error extracting comment data:', error);
+      return null;
+    }
+  }
+
+  public destroy(): void {
+    // Clear timeout
+    if (this.initTimeout) {
+      clearTimeout(this.initTimeout);
+      this.initTimeout = null;
+    }
+
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
+
+    // Remove injected buttons
+    const buttons = document.querySelectorAll('.ai-ext-comment-chat-btn');
+    buttons.forEach(btn => btn.remove());
+
+    this.isInitialized = false;
+    console.log('✅ [CommentEnhancer] Destroyed');
+  }
+}
 
 class BacklogAIInjector {
   private ticketAnalyzer: TicketAnalyzer;
@@ -13,6 +226,7 @@ class BacklogAIInjector {
   private reactRoot: any = null; // React root for cleanup
   private ticketMonitor: TicketURLMonitor | null = null;
   private currentTicketId: string | null = null;
+  private commentEnhancer: CommentEnhancer | null = null;
 
   constructor() {
     this.ticketAnalyzer = new TicketAnalyzer();
@@ -33,6 +247,7 @@ class BacklogAIInjector {
     // Kiểm tra xem có phải là trang ticket không
     if (this.isTicketPage()) {
       this.setupChatbot();
+      this.setupCommentEnhancer();
     }
   }
 
@@ -47,6 +262,14 @@ class BacklogAIInjector {
       }
       return true;
     });
+  }
+
+  private setupCommentEnhancer(): void {
+    try {
+      this.commentEnhancer = new CommentEnhancer();
+    } catch (error) {
+      console.error('❌ [Content] Error setting up comment enhancer:', error);
+    }
   }
 
   private handleSidebarWidthUpdate(width: number): void {
@@ -189,7 +412,7 @@ class BacklogAIInjector {
   private isTicketPage(): boolean {
     // Kiểm tra URL có chứa pattern của ticket page
     const url = window.location.href;
-    return /\/view\/[A-Z]+-\d+/.test(url) || url.includes('/view/');
+    return ISSUE_URL_REGEX.test(url) || url.includes('/view/');
   }
 
   private injectChatbotAsidePanel() {
@@ -519,6 +742,22 @@ class BacklogAIInjector {
         case 'FETCH_ISSUE_TYPES_REQUEST':
           this.handleFetchIssueTypes(event.data.backlog, event.data.projectKey, event.data.id);
           break;
+
+        case 'OPEN_CHATBOX_WITH_COMMENT':
+          this.handleOpenChatboxWithComment(event.data.data);
+          break;
+
+        case 'OPEN_CHATBOT_PANEL':
+          this.openChatbotPanel();
+          break;
+
+        case 'LOAD_COMMENT_CONTEXT':
+          this.handleLoadCommentContext(event.data.data);
+          break;
+
+        case 'GET_COMMENT_CONTEXT':
+          this.handleGetCommentContext(event.data.data, event.data.id);
+          break;
       }
     });
   }
@@ -558,14 +797,17 @@ class BacklogAIInjector {
         ticketId: finalTicketData?.id || finalTicketData?.key,
         ticketUrl: window.location.href, // Add current URL for background script
         timestamp: contextData.timestamp || new Date().toISOString(),
-        attachments: contextData.attachments || [] // Include file attachments
+        attachments: contextData.attachments || [], // Include file attachments
+        commentContext: contextData.commentContext // Include comment context
       };
 
       console.log('📤 [Content] Sending to background:', {
         action: 'processUserMessage',
         messageType: fullContextData.messageType,
         hasTicketData: !!fullContextData.ticketData,
-        chatHistoryLength: fullContextData.chatHistory.length
+        chatHistoryLength: fullContextData.chatHistory.length,
+        hasCommentContext: !!fullContextData.commentContext,
+        commentContext: fullContextData.commentContext
       });
 
       // Send to background script with full context
@@ -959,6 +1201,16 @@ class BacklogAIInjector {
 
   // Cleanup method when extension is disabled/removed
   public cleanup() {
+    // Cleanup comment enhancer
+    if (this.commentEnhancer) {
+      try {
+        this.commentEnhancer.destroy();
+        this.commentEnhancer = null;
+      } catch (error) {
+        console.error('Error disposing comment enhancer:', error);
+      }
+    }
+
     // Cleanup ticket monitor
     if (this.ticketMonitor) {
       try {
@@ -1035,6 +1287,21 @@ class BacklogAIInjector {
     }
   }
 
+  private handleOpenChatboxWithComment(commentData: any): void {
+    try {
+      console.log('📝 [Content] Opening chatbox with comment data:', commentData);
+
+      // Gửi comment data đến chatbot component
+      window.postMessage({
+        type: 'COMMENT_CONTEXT_LOADED',
+        data: commentData
+      }, '*');
+
+    } catch (error) {
+      console.error('❌ [Content] Error handling open chatbox with comment:', error);
+    }
+  }
+
   private handleOpenOptionsPage(): void {
     try {
       // Send message to background script to open options page
@@ -1045,6 +1312,51 @@ class BacklogAIInjector {
       });
     } catch (error) {
       console.error('❌ [Content] Error handling open options page:', error);
+    }
+  }
+
+  private handleLoadCommentContext(commentData: any): void {
+    try {
+      console.log('📝 [Content] Loading comment context:', commentData);
+
+      // Gửi comment data đến chatbot component để hiển thị và focus textarea
+      window.postMessage({
+        type: 'COMMENT_CONTEXT_LOADED',
+        data: commentData
+      }, '*');
+
+    } catch (error) {
+      console.error('❌ [Content] Error handling load comment context:', error);
+    }
+  }
+
+  private async handleGetCommentContext(commentData: any, messageId: string): Promise<void> {
+    try {
+      console.log('📝 [Content] Getting comment context:', commentData);
+
+      // Call background script to get comment context from API
+      const response = await chrome.runtime.sendMessage({
+        action: 'getCommentContext',
+        data: commentData
+      });
+
+      console.log('📨 [Content] Background response for comment context:', response);
+
+      window.postMessage({
+        type: 'COMMENT_CONTEXT_RESPONSE',
+        id: messageId,
+        success: response.success,
+        data: response.success ? response.data : null,
+        error: response.success ? null : response.error
+      }, '*');
+    } catch (error) {
+      console.error('❌ [Content] Error handling get comment context:', error);
+      window.postMessage({
+        type: 'COMMENT_CONTEXT_RESPONSE',
+        id: messageId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, '*');
     }
   }
 }

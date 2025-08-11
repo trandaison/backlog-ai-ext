@@ -13,6 +13,7 @@ import { AIService } from '../types';
 import { ChatHistoryData } from '../types/chat';
 import { BacklogApiService } from '../services/backlogApi';
 import { TicketCreationService } from '../services/ticketCreation';
+import { ISSUE_URL_REGEX } from '../configs/backlog';
 
 class BackgroundService {
   private openaiService: OpenAIService;
@@ -36,7 +37,10 @@ class BackgroundService {
       // Setup message listeners after migration is complete
       this.setupMessageListeners();
     } catch (error) {
-      console.error('❌ Settings migration failed, continuing with defaults:', error);
+      console.error(
+        '❌ Settings migration failed, continuing with defaults:',
+        error
+      );
       // Continue with message listeners even if migration fails
       this.setupMessageListeners();
     }
@@ -45,7 +49,9 @@ class BackgroundService {
   // Get the current AI service based on user settings
   private async getCurrentAIService(): Promise<AIService> {
     const aiModelSettings = await this.settingsService.getAiModelSettings();
-    const preferredProvider = aiModelSettings.preferredModel?.includes('gemini') ? 'gemini' : 'openai';
+    const preferredProvider = aiModelSettings.preferredModel?.includes('gemini')
+      ? 'gemini'
+      : 'openai';
 
     if (preferredProvider === 'gemini') {
       return this.geminiService;
@@ -66,17 +72,27 @@ class BackgroundService {
     });
   }
 
-  private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+  private async handleMessage(
+    message: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: any) => void
+  ) {
     console.log('🔎 ~ BackgroundService ~ handleMessage ~ message:', message);
     try {
       switch (message.action) {
         // Settings handlers
         case 'GET_SETTINGS':
-          await this.handleGetSettings(message as SettingsMessage, sendResponse);
+          await this.handleGetSettings(
+            message as SettingsMessage,
+            sendResponse
+          );
           break;
 
         case 'UPDATE_SETTINGS':
-          await this.handleUpdateSettings(message as SettingsMessage, sendResponse);
+          await this.handleUpdateSettings(
+            message as SettingsMessage,
+            sendResponse
+          );
           break;
 
         case 'GET_SECTION':
@@ -84,7 +100,10 @@ class BackgroundService {
           break;
 
         case 'UPDATE_SECTION':
-          await this.handleUpdateSection(message as SettingsMessage, sendResponse);
+          await this.handleUpdateSection(
+            message as SettingsMessage,
+            sendResponse
+          );
           break;
 
         // Existing handlers
@@ -152,6 +171,10 @@ class BackgroundService {
           await this.handleFetchIssueTypes(message.data, sendResponse);
           break;
 
+        case 'getCommentContext':
+          await this.handleGetCommentContext(message.data, sendResponse);
+          break;
+
         default:
           sendResponse({ error: 'Unknown action' });
       }
@@ -161,7 +184,10 @@ class BackgroundService {
     }
   }
 
-  private async handleTicketAnalysis(ticketData: TicketData, sendResponse: (response?: any) => void) {
+  private async handleTicketAnalysis(
+    ticketData: TicketData,
+    sendResponse: (response?: any) => void
+  ) {
     try {
       // Cache ticket data only - no automatic AI analysis
       this.ticketDataCache.set(ticketData.id, ticketData);
@@ -173,11 +199,31 @@ class BackgroundService {
     }
   }
 
-  private async handleUserMessage(data: any, sendResponse: (response?: any) => void) {
+  private async handleUserMessage(
+    data: any,
+    sendResponse: (response?: any) => void
+  ) {
     try {
-      const { message, messageType, ticketData, chatHistory, userInfo, currentModel, attachments } = data;
+      const {
+        message,
+        messageType,
+        ticketData,
+        chatHistory,
+        userInfo,
+        currentModel,
+        attachments,
+        commentContext,
+      } = data;
 
-      console.log('🔍 [Background] handleUserMessage attachments:', attachments?.length || 0, attachments);
+      console.log(
+        '🔍 [Background] handleUserMessage attachments:',
+        attachments?.length || 0,
+        attachments
+      );
+      console.log(
+        '🔍 [Background] handleUserMessage commentContext:',
+        !!commentContext
+      );
 
       // Get current AI service, but override preferredModel with currentModel if provided
       const settings = await this.getSettings();
@@ -192,34 +238,49 @@ class BackgroundService {
       }
 
       let processedMessage = message;
-      let optimizedContext: any = data;
+      let optimizedContext: any = {
+        ...data,
+        commentContext: commentContext, // Pass comment context to AI service
+      };
 
       // Check if this is a command
       const commandResult = parseCommand(message);
       if (commandResult && commandResult.command === 'translate') {
         // Extract source and target languages from the command
         const [, sourceLanguage, targetLanguage] = commandResult.matches;
-        processedMessage = this.buildTranslatePrompt(ticketData, sourceLanguage, targetLanguage);
+        processedMessage = this.buildTranslatePrompt(
+          ticketData,
+          sourceLanguage,
+          targetLanguage
+        );
       } else if (commandResult && commandResult.command === 'create-ticket') {
         // Handle create-ticket command
         // Pattern: /^\/create-ticket\s+(\S+)\/(\S+)\s+([a-z]{2})\sissueType:(\d+)\spriority:(\d+)$/i
         // Captures: [fullMatch, backlogDomain, projectKey, language, issueTypeId, priorityId]
-        const [, backlogDomain, projectKey, language, issueTypeId, priorityId] = commandResult.matches;
-        await this.handleCreateTicketCommand({
-          backlogDomain,
-          projectKey,
-          language,
-          issueTypeId: parseInt(issueTypeId, 10),
-          priorityId: parseInt(priorityId, 10),
-          ticketData
-        }, sendResponse);
+        const [, backlogDomain, projectKey, language, issueTypeId, priorityId] =
+          commandResult.matches;
+        await this.handleCreateTicketCommand(
+          {
+            backlogDomain,
+            projectKey,
+            language,
+            issueTypeId: parseInt(issueTypeId, 10),
+            priorityId: parseInt(priorityId, 10),
+            ticketData,
+          },
+          sendResponse
+        );
         return; // Early return to avoid normal message processing
       } else if (messageType === 'suggestion') {
         // Build context-aware prompt based on message type
         processedMessage = this.buildSuggestionPrompt(message, ticketData);
       } else {
         // For regular chat, use optimized context processing
-        if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
+        if (
+          chatHistory &&
+          Array.isArray(chatHistory) &&
+          chatHistory.length > 0
+        ) {
           // Prepare ChatHistoryData for optimization
           const historyData: ChatHistoryData = {
             ticketId: ticketData?.id || 'current',
@@ -231,7 +292,7 @@ class BackgroundService {
               timestamp: msg.timestamp || new Date().toISOString(),
               tokenCount: msg.tokenCount,
               responseId: msg.responseId,
-              compressed: msg.compressed
+              compressed: msg.compressed,
             })),
             lastUpdated: new Date().toISOString(),
             userInfo: userInfo || {
@@ -239,16 +300,16 @@ class BackgroundService {
               name: 'User',
               avatar: '',
               mailAddress: '',
-              userId: 'current-user'
+              userId: 'current-user',
             },
             ticketInfo: {
               title: ticketData?.title || 'Current Ticket',
               status: ticketData?.status || 'Unknown',
-              assignee: ticketData?.assignee
+              assignee: ticketData?.assignee,
             },
             contextSummary: data.contextSummary,
             lastSummaryIndex: data.lastSummaryIndex,
-            totalTokensUsed: data.totalTokensUsed
+            totalTokensUsed: data.totalTokensUsed,
           };
 
           // Prepare optimized context
@@ -263,30 +324,50 @@ class BackgroundService {
             ...data,
             isOptimized: true,
             estimatedTokens: optimizedResult.estimatedTokens,
-            recentMessages: optimizedResult.recentMessages
+            recentMessages: optimizedResult.recentMessages,
+            commentContext: commentContext, // Keep comment context in optimized flow
           };
         } else {
           // For regular chat without history, include full context
-          processedMessage = this.buildChatPrompt(message, ticketData, chatHistory);
+          processedMessage = this.buildChatPrompt(
+            message,
+            ticketData,
+            chatHistory
+          );
         }
       }
 
       // Process with AI service, including attachments
-      console.log('🚀 [Background] Sending to AI service with attachments:', attachments?.length || 0);
-      const response = await aiService.processUserMessage(processedMessage, optimizedContext, settings, attachments);
+      console.log(
+        '🚀 [Background] Sending to AI service with attachments:',
+        attachments?.length || 0
+      );
+      const response = await aiService.processUserMessage(
+        processedMessage,
+        optimizedContext,
+        settings,
+        attachments
+      );
 
-      sendResponse({ success: true, response: response.response, tokensUsed: response.tokensUsed, responseId: response.responseId });
-
+      sendResponse({
+        success: true,
+        response: response.response,
+        tokensUsed: response.tokensUsed,
+        responseId: response.responseId,
+      });
     } catch (error) {
       console.error('❌ [Background] Error processing message:', error);
       sendResponse({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
 
-  private async handleChatWithAI(data: any, sendResponse: (response?: any) => void) {
+  private async handleChatWithAI(
+    data: any,
+    sendResponse: (response?: any) => void
+  ) {
     try {
       const { message, ticketData, chatHistory } = data;
 
@@ -294,31 +375,41 @@ class BackgroundService {
       const context = {
         conversationHistory: chatHistory || [],
         ticketData: ticketData || null,
-        currentMessage: message
+        currentMessage: message,
       };
 
       // Get user settings for personalized responses
       const settings = await this.getSettings();
       const aiService = await this.getCurrentAIService();
-      const response = await aiService.processUserMessage(message, context, settings);
+      const response = await aiService.processUserMessage(
+        message,
+        context,
+        settings
+      );
 
       sendResponse({ success: true, response });
     } catch (error) {
       console.error('Error in handleChatWithAI:', error);
       sendResponse({
         success: false,
-        error: `Lỗi khi chat với AI: ${error}`
+        error: `Lỗi khi chat với AI: ${error}`,
       });
     }
   }
 
-  private async handleTicketSummary(data: any, sendResponse: (response?: any) => void) {
+  private async handleTicketSummary(
+    data: any,
+    sendResponse: (response?: any) => void
+  ) {
     try {
       let ticketData = data.ticketData;
 
       // If ticket data is not provided, try to extract from active tab
       if (!ticketData) {
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabs = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
         if (!tabs[0]?.id || !tabs[0]?.url) {
           throw new Error('No active tab found');
         }
@@ -339,16 +430,26 @@ class BackgroundService {
       const summaryPrompt = this.buildTicketSummaryPrompt(ticketData, settings);
 
       const aiService = await this.getCurrentAIService();
-      const summary = await aiService.processUserMessage(summaryPrompt, { ticketData }, settings);
+      const summary = await aiService.processUserMessage(
+        summaryPrompt,
+        { ticketData },
+        settings
+      );
 
-      sendResponse({ success: true, summary: summary.response, tokensUsed: summary.tokensUsed });
+      sendResponse({
+        success: true,
+        summary: summary.response,
+        tokensUsed: summary.tokensUsed,
+      });
     } catch (error) {
       console.error('❌ [Background] Error handling ticket summary:', error);
       sendResponse({ success: false, error: String(error) });
     }
   }
 
-  private async extractTicketDataFromActiveTab(tabId: number): Promise<TicketData | null> {
+  private async extractTicketDataFromActiveTab(
+    tabId: number
+  ): Promise<TicketData | null> {
     try {
       // Get space info and issue key from URL first
       const spaceInfo = await this.extractSpaceInfoFromTab(tabId);
@@ -376,23 +477,29 @@ class BackgroundService {
             return (window as any).extractTicketData();
           } else {
             // Fallback: basic DOM extraction
-            const titleElement = document.querySelector('h1.loom-issue-title, .ticket-title, [data-test="issue-title"]');
-            const descriptionElement = document.querySelector('.loom-issue-description, .ticket-description, [data-test="issue-description"]');
+            const titleElement = document.querySelector(
+              'h1.loom-issue-title, .ticket-title, [data-test="issue-title"]'
+            );
+            const descriptionElement = document.querySelector(
+              '.loom-issue-description, .ticket-description, [data-test="issue-description"]'
+            );
 
             return {
               id: window.location.pathname.split('/').pop() || 'unknown',
               title: titleElement?.textContent?.trim() || 'No title found',
-              description: descriptionElement?.textContent?.trim() || 'No description found',
+              description:
+                descriptionElement?.textContent?.trim() ||
+                'No description found',
               status: 'Unknown',
               priority: 'Unknown',
               assignee: 'Unknown',
               reporter: 'Unknown',
               dueDate: 'Unknown',
               labels: [],
-              comments: []
+              comments: [],
             };
           }
-        }
+        },
       });
 
       return results[0]?.result || null;
@@ -402,24 +509,28 @@ class BackgroundService {
     }
   }
 
-  private async extractSpaceInfoFromTab(tabId: number): Promise<{ spaceName: string; domain: string, fullDomain: string } | null> {
+  private async extractSpaceInfoFromTab(
+    tabId: number
+  ): Promise<{ spaceName: string; domain: string; fullDomain: string } | null> {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
           const url = window.location.href;
-          const match = url.match(/https:\/\/([^.]+)\.(backlog\.com|backlog\.jp|backlogtool\.com)/);
+          const match = url.match(
+            /https:\/\/([^.]+)\.(backlog\.com|backlog\.jp|backlogtool\.com)/
+          );
 
           if (match) {
             return {
               spaceName: match[1],
               domain: match[2],
-              fullDomain: `${match[1]}.${match[2]}`
+              fullDomain: `${match[1]}.${match[2]}`,
             };
           }
 
           return null;
-        }
+        },
       });
 
       return results[0]?.result || null;
@@ -435,9 +546,9 @@ class BackgroundService {
         target: { tabId },
         func: () => {
           const url = window.location.href;
-          const match = url.match(/\/view\/([A-Z]+-\d+)/);
+          const match = url.match(ISSUE_URL_REGEX);
           return match ? match[1] : null;
-        }
+        },
       });
 
       return results[0]?.result || null;
@@ -447,52 +558,155 @@ class BackgroundService {
     }
   }
 
-  private async getTicketDataViaAPI(spaceInfo: { spaceName: string; domain: string }, issueKey: string): Promise<TicketData | null> {
+  private async getTicketDataViaAPI(
+    spaceInfo: { spaceName: string; domain: string },
+    issueKey: string
+  ): Promise<TicketData | null> {
     try {
       // Get Backlog API configuration
       const backlogSettings = await this.getBacklogMultiSettings();
-      const config = this.findMatchingBacklogConfig(backlogSettings.data, spaceInfo);
+      const config = this.findMatchingBacklogConfig(
+        backlogSettings.data,
+        spaceInfo
+      );
 
       if (!config) {
-        console.log('No matching Backlog API config found, using DOM extraction');
+        console.log(
+          'No matching Backlog API config found, using DOM extraction'
+        );
         return null;
       }
 
       // Call Backlog API through background script (no CORS issues)
       const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
-      const apiUrl = `${baseUrl}/issues/${issueKey}?apiKey=${encodeURIComponent(config.apiKey)}`;
+      const apiUrl = `${baseUrl}/issues/${issueKey}?apiKey=${encodeURIComponent(
+        config.apiKey
+      )}`;
 
       console.log('Calling Backlog API:', apiUrl.replace(config.apiKey, '***'));
 
       const response = await fetch(apiUrl);
       if (!response.ok) {
-        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `API call failed: ${response.status} ${response.statusText}`
+        );
       }
 
       const issueData = await response.json();
 
       // Get comments separately
-      const commentsUrl = `${baseUrl}/issues/${issueKey}/comments?apiKey=${encodeURIComponent(config.apiKey)}`;
+      const commentsUrl = `${baseUrl}/issues/${issueKey}/comments?order=asc&apiKey=${encodeURIComponent(
+        config.apiKey
+      )}`;
       const commentsResponse = await fetch(commentsUrl);
       const comments = commentsResponse.ok ? await commentsResponse.json() : [];
 
       // Convert to our TicketData format
       return this.convertBacklogDataToTicketData(issueData, comments);
-
     } catch (error) {
       console.error('Error getting ticket data via API:', error);
       return null;
     }
   }
 
-  private findMatchingBacklogConfig(configs: any[], spaceInfo: { spaceName: string; domain: string }): any | null {
-    return configs.find(config =>
-      config.domain === spaceInfo.domain &&
-      config.spaceName === spaceInfo.spaceName
-    ) || null;
+  private async getCommentDetails(
+    spaceInfo: { spaceName: string; domain: string },
+    issueKey: string,
+    commentId: string
+  ): Promise<any | null> {
+    try {
+      // Get Backlog API configuration
+      const backlogConfig = await this.getCurrentBacklogConfig();
+
+      if (!backlogConfig) {
+        console.log('No Backlog API config found');
+        return null;
+      }
+
+      // Call Backlog API to get specific comment
+      const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
+      const commentUrl = `${baseUrl}/issues/${issueKey}/comments/${commentId}?apiKey=${encodeURIComponent(
+        backlogConfig.apiKey
+      )}`;
+
+      console.log(
+        'Calling Backlog API for comment:',
+        commentUrl.replace(backlogConfig.apiKey, '***')
+      );
+
+      const response = await fetch(commentUrl);
+      if (!response.ok) {
+        throw new Error(
+          `API call failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const commentData = await response.json();
+      return commentData;
+    } catch (error) {
+      console.error('Error getting comment details via API:', error);
+      return null;
+    }
   }
 
-  private convertBacklogDataToTicketData(issueData: any, comments: any[]): TicketData {
+  private async getPreviousComments(
+    spaceInfo: { spaceName: string; domain: string },
+    issueKey: string,
+    maxId: string,
+    count: number = 2
+  ): Promise<any[] | null> {
+    try {
+      // Get Backlog API configuration
+      const backlogConfig = await this.getCurrentBacklogConfig();
+
+      if (!backlogConfig) {
+        console.log('No Backlog API config found');
+        return null;
+      }
+
+      // Call Backlog API to get previous comments
+      const baseUrl = `https://${spaceInfo.spaceName}.${spaceInfo.domain}/api/v2`;
+      const commentsUrl = `${baseUrl}/issues/${issueKey}/comments?apiKey=${encodeURIComponent(
+        backlogConfig.apiKey
+      )}&order=desc&count=${count}&maxId=${maxId}`;
+
+      console.log(
+        'Calling Backlog API for previous comments:',
+        commentsUrl.replace(backlogConfig.apiKey, '***')
+      );
+
+      const response = await fetch(commentsUrl);
+      if (!response.ok) {
+        throw new Error(
+          `API call failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const commentsData = await response.json();
+      return commentsData;
+    } catch (error) {
+      console.error('Error getting previous comments via API:', error);
+      return null;
+    }
+  }
+
+  private findMatchingBacklogConfig(
+    configs: any[],
+    spaceInfo: { spaceName: string; domain: string }
+  ): any | null {
+    return (
+      configs.find(
+        (config) =>
+          config.domain === spaceInfo.domain &&
+          config.spaceName === spaceInfo.spaceName
+      ) || null
+    );
+  }
+
+  private convertBacklogDataToTicketData(
+    issueData: any,
+    comments: any[]
+  ): TicketData {
     const convertedTicketData = {
       id: issueData.issueKey || issueData.id,
       title: issueData.summary || 'No title',
@@ -503,11 +717,11 @@ class BackgroundService {
       reporter: issueData.createdUser?.name || 'Unknown',
       dueDate: issueData.dueDate || 'No due date',
       labels: (issueData.category || []).map((cat: any) => cat.name),
-      comments: comments.map(comment => ({
+      comments: comments.map((comment) => ({
         author: comment.createdUser?.name || 'Unknown',
         content: comment.content || '',
         timestamp: comment.created || '', // Map 'created' field to 'timestamp', keep ISO 8601 format
-        created: comment.created || '' // Keep 'created' field as backup
+        created: comment.created || '', // Keep 'created' field as backup
       })),
       // Extended fields
       issueType: issueData.issueType?.name,
@@ -517,15 +731,22 @@ class BackgroundService {
       actualHours: issueData.actualHours,
       parentIssueId: issueData.parentIssueId,
       customFields: issueData.customFields || [],
-      attachments: issueData.attachments || []
+      attachments: issueData.attachments || [],
     };
 
     return convertedTicketData;
   }
 
-  private buildTicketSummaryPrompt(ticketData: TicketData, settings?: Settings): string {
-    const roleContext = settings?.general.userRole ? this.getRoleContext(settings.general.userRole) : '';
-    const languagePrompt = settings?.general.language ? this.getLanguagePrompt(settings.general.language) : this.getLanguagePrompt('vi');
+  private buildTicketSummaryPrompt(
+    ticketData: TicketData,
+    settings?: Settings
+  ): string {
+    const roleContext = settings?.general.userRole
+      ? this.getRoleContext(settings.general.userRole)
+      : '';
+    const languagePrompt = settings?.general.language
+      ? this.getLanguagePrompt(settings.general.language)
+      : this.getLanguagePrompt('vi');
 
     return `${languagePrompt}
 
@@ -541,18 +762,30 @@ Hãy tạo một summary ngắn gọn và súc tích cho ticket Backlog sau:
 **Người được gán**: ${ticketData.assignee || 'Unassigned'}
 **Người báo cáo**: ${ticketData.reporter || 'Unknown'}
 **Hạn**: ${ticketData.dueDate || 'No due date'}
-**Labels**: ${Array.isArray(ticketData.labels) ? ticketData.labels.join(', ') : 'No labels'}
+**Labels**: ${
+      Array.isArray(ticketData.labels)
+        ? ticketData.labels.join(', ')
+        : 'No labels'
+    }
 
-${ticketData.comments && ticketData.comments.length > 0 ? (() => {
-  const sortedComments = this.sortCommentsByTime(ticketData.comments);
+${
+  ticketData.comments && ticketData.comments.length > 0
+    ? (() => {
+        const sortedComments = this.filterEmptyComments(ticketData.comments);
 
-  return `**Comments gần đây**:
-${sortedComments.slice(-3).map(comment => {
-  const content = comment.content || '';
-  const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
-  return `- ${comment.author}: ${truncatedContent}`;
-}).join('\n')}`;
-})() : ''}
+        return `**Comments gần đây**:
+${sortedComments
+  .slice(-3)
+  .map((comment) => {
+    const content = comment.content || '';
+    const truncatedContent =
+      content.length > 100 ? content.substring(0, 100) + '...' : content;
+    return `- ${comment.author}: ${truncatedContent}`;
+  })
+  .join('\n')}`;
+      })()
+    : ''
+}
 
 Hãy tóm tắt trong 3-5 câu ngắn gọn:
 1. Vấn đề chính của ticket
@@ -561,33 +794,45 @@ Hãy tóm tắt trong 3-5 câu ngắn gọn:
 4. Next steps nếu có thể xác định được`;
   }
 
-  private sortCommentsByTime(comments: any[]): any[] {
-    return comments
-      .filter((comment: any) => comment.content && comment.content.trim())
-      .sort((a: any, b: any) => {
-        // Sort by timestamp field ascending (oldest first, newest last)
-        // timestamp contains ISO 8601 format from Backlog API's 'created' field
-        const timeA = new Date(a.timestamp || a.created || 0).getTime();
-        const timeB = new Date(b.timestamp || b.created || 0).getTime();
-        return timeA - timeB;
-      });
+  private filterEmptyComments(comments: any[]): any[] {
+    return comments.filter((comment: any) => {
+      return comment.content && comment.content.trim();
+    });
   }
 
-  private buildTranslatePrompt(ticketData: any, sourceLanguage?: string, targetLanguage?: string): string {
+  private buildTranslatePrompt(
+    ticketData: any,
+    sourceLanguage?: string,
+    targetLanguage?: string
+  ): string {
     if (!ticketData) {
-      const sourceDisplay = sourceLanguage ? getLanguageDisplayName(sourceLanguage) : 'ngôn ngữ nguồn';
-      const targetDisplay = targetLanguage ? getLanguageDisplayName(targetLanguage) : 'tiếng Anh';
+      const sourceDisplay = sourceLanguage
+        ? getLanguageDisplayName(sourceLanguage)
+        : 'ngôn ngữ nguồn';
+      const targetDisplay = targetLanguage
+        ? getLanguageDisplayName(targetLanguage)
+        : 'tiếng Anh';
       return `Hãy dịch toàn bộ nội dung ticket từ ${sourceDisplay} sang ${targetDisplay}.`;
     }
 
-    const sourceDisplay = sourceLanguage ? getLanguageDisplayName(sourceLanguage) : 'ngôn ngữ hiện tại';
-    const targetDisplay = targetLanguage ? getLanguageDisplayName(targetLanguage) : 'tiếng Anh';
+    const sourceDisplay = sourceLanguage
+      ? getLanguageDisplayName(sourceLanguage)
+      : 'ngôn ngữ hiện tại';
+    const targetDisplay = targetLanguage
+      ? getLanguageDisplayName(targetLanguage)
+      : 'tiếng Anh';
 
-    const commentsSection = ticketData.comments && ticketData.comments.length > 0
-      ? `\n\n**Comments**:\n${this.sortCommentsByTime(ticketData.comments)
-          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
-          .join('\n')}`
-      : '';
+    const commentsSection =
+      ticketData.comments && ticketData.comments.length > 0
+        ? `\n\n**Comments**:\n${this.filterEmptyComments(ticketData.comments)
+            .map(
+              (comment: any, index: number) =>
+                `${index + 1}. ${
+                  comment.author || 'Unknown'
+                }: ${comment.content.trim()}`
+            )
+            .join('\n')}`
+        : '';
 
     return `Hãy dịch toàn bộ nội dung của ticket sau từ ${sourceDisplay} sang ${targetDisplay}:
 
@@ -601,7 +846,10 @@ Bao gồm title, description, và các thông tin quan trọng khác. Giữ nguy
   }
 
   // New method: Build suggestion prompt with ticket context
-  private buildSuggestionPrompt(suggestionMessage: string, ticketData: any): string {
+  private buildSuggestionPrompt(
+    suggestionMessage: string,
+    ticketData: any
+  ): string {
     if (!ticketData) {
       return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
 Hãy trả lời câu hỏi sau bằng tiếng Việt:
@@ -650,7 +898,11 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
   }
 
   // New method: Build chat prompt with full context
-  private buildChatPrompt(userMessage: string, ticketData: any, chatHistory: any[]): string {
+  private buildChatPrompt(
+    userMessage: string,
+    ticketData: any,
+    chatHistory: any[]
+  ): string {
     if (!ticketData) {
       return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
 Hãy trả lời câu hỏi sau bằng tiếng Việt:
@@ -663,11 +915,17 @@ Hãy trả lời câu hỏi sau bằng tiếng Việt:
 
     // Build chat history context (last 10 messages to avoid token limit)
     const recentHistory = chatHistory.slice(-10);
-    const historyContext = recentHistory.length > 0
-      ? `\n\n**Lịch sử cuộc trò chuyện:**\n${recentHistory
-          .map((msg: any, index: number) => `${index + 1}. ${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.content}`)
-          .join('\n')}`
-      : '';
+    const historyContext =
+      recentHistory.length > 0
+        ? `\n\n**Lịch sử cuộc trò chuyện:**\n${recentHistory
+            .map(
+              (msg: any, index: number) =>
+                `${index + 1}. ${msg.sender === 'user' ? 'User' : 'AI'}: ${
+                  msg.content
+                }`
+            )
+            .join('\n')}`
+        : '';
 
     return `Bạn là một AI assistant chuyên hỗ trợ developer trong việc xử lý ticket/issue.
 Hãy trả lời câu hỏi sau bằng tiếng Việt, dựa trên thông tin ticket và lịch sử cuộc trò chuyện:
@@ -688,13 +946,19 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
   // Helper method: Build ticket context
   private buildTicketContext(ticketData: any): string {
-    const sortedComments = this.sortCommentsByTime(ticketData.comments || []);
+    const sortedComments = this.filterEmptyComments(ticketData.comments || []);
 
-    const commentsSection = sortedComments.length > 0
-      ? `\n\n**Comments (theo thời gian):**\n${sortedComments
-          .map((comment: any, index: number) => `${index + 1}. ${comment.author || 'Unknown'}: ${comment.content.trim()}`)
-          .join('\n')}`
-      : '';
+    const commentsSection =
+      sortedComments.length > 0
+        ? `\n\n**Comments (theo thời gian):**\n${sortedComments
+            .map(
+              (comment: any, index: number) =>
+                `${index + 1}. ${
+                  comment.author || 'Unknown'
+                }: ${comment.content.trim()}`
+            )
+            .join('\n')}`
+        : '';
 
     return `**Thông tin ticket hiện tại:**
 - ID: ${ticketData.id || ticketData.key || 'Không rõ'}
@@ -714,10 +978,18 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
       // Return default settings
       return {
         general: { language: 'vi', userRole: 'developer' },
-        features: { rememberChatboxSize: true, autoOpenChatbox: false, enterToSend: true },
-        aiModels: { selectedModels: [defaultModelId], preferredModel: defaultModelId, aiProviderKeys: { openAi: '', gemini: '' } },
+        features: {
+          rememberChatboxSize: true,
+          autoOpenChatbox: false,
+          enterToSend: true,
+        },
+        aiModels: {
+          selectedModels: [defaultModelId],
+          preferredModel: defaultModelId,
+          aiProviderKeys: { openAi: '', gemini: '' },
+        },
         backlog: [],
-        sidebarWidth: 400
+        sidebarWidth: 400,
       };
     }
   }
@@ -737,21 +1009,21 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
       const data = await this.settingsService.getBacklogs();
       return {
         data,
-        success: true
-      }
+        success: true,
+      };
     } catch (error) {
       console.error('Error getting Backlog multi settings:', error);
       return {
         success: false,
-        error: 'Failed to get Backlog settings'
+        error: 'Failed to get Backlog settings',
       };
     }
   }
 
-  private async saveBacklogMultiSettings(settings: {configs: any[]}) {
+  private async saveBacklogMultiSettings(settings: { configs: any[] }) {
     try {
       await chrome.storage.sync.set({
-        backlogConfigs: settings.configs
+        backlogConfigs: settings.configs,
       });
     } catch (error) {
       console.error('Error saving Backlog multi settings:', error);
@@ -759,7 +1031,12 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
     }
   }
 
-  private async testBacklogConnection(config: {id: string, domain: string, spaceName: string, apiKey: string}): Promise<{success: boolean, message: string, data?: any}> {
+  private async testBacklogConnection(config: {
+    id: string;
+    domain: string;
+    spaceName: string;
+    apiKey: string;
+  }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       // Handle both old format (spaceName + domain) and new format (full domain)
       let baseUrl: string;
@@ -777,15 +1054,17 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         baseUrl = `https://${config.spaceName}.${config.domain}`;
       }
 
-      const apiUrl = `${baseUrl}/api/v2/space?apiKey=${encodeURIComponent(config.apiKey)}`;
+      const apiUrl = `${baseUrl}/api/v2/space?apiKey=${encodeURIComponent(
+        config.apiKey
+      )}`;
 
       console.log('Testing Backlog connection:', baseUrl);
 
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {
@@ -794,30 +1073,30 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
         return {
           success: true,
           message: `Kết nối thành công! Space: ${spaceInfo.name || spaceName}`,
-          data: spaceInfo
+          data: spaceInfo,
         };
       } else if (response.status === 401 || response.status === 403) {
         return {
           success: false,
-          message: 'API Key không hợp lệ hoặc không có quyền truy cập'
+          message: 'API Key không hợp lệ hoặc không có quyền truy cập',
         };
       } else if (response.status === 404) {
         return {
           success: false,
-          message: 'Domain không tồn tại hoặc không thể truy cập'
+          message: 'Domain không tồn tại hoặc không thể truy cập',
         };
       } else {
         const errorText = await response.text();
         return {
           success: false,
-          message: `Kết nối thất bại: ${response.status} ${response.statusText} - ${errorText}`
+          message: `Kết nối thất bại: ${response.status} ${response.statusText} - ${errorText}`,
         };
       }
     } catch (error) {
       console.error('Backlog connection test failed:', error);
       return {
         success: false,
-        message: 'Lỗi kết nối. Kiểm tra internet và thông tin cấu hình.'
+        message: 'Lỗi kết nối. Kiểm tra internet và thông tin cấu hình.',
       };
     }
   }
@@ -836,29 +1115,42 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
 
     // Get Backlog API configuration
     const backlogSettings = await this.settingsService.getBacklogs();
-    return backlogSettings.find(({ domain }) => domain === spaceInfo.fullDomain);
+    return backlogSettings.find(
+      ({ domain }) => domain === spaceInfo.fullDomain
+    );
   }
 
-  private async getCurrentUser(): Promise<{success: boolean, data?: any, error?: string}> {
+  private async getCurrentUser(): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+  }> {
     try {
       const backlogConfig = await this.getCurrentBacklogConfig();
 
       if (!backlogConfig) {
         return {
           success: false,
-          error: 'No matching Backlog API config found'
+          error: 'No matching Backlog API config found',
         };
       }
 
       // Call Backlog API to get current user
       const baseUrl = `https://${backlogConfig.domain}/api/v2`;
-      const apiUrl = `${baseUrl}/users/myself?apiKey=${encodeURIComponent(backlogConfig.apiKey)}`;
+      const apiUrl = `${baseUrl}/users/myself?apiKey=${encodeURIComponent(
+        backlogConfig.apiKey
+      )}`;
 
-      console.log('Getting current user from Backlog API:', apiUrl.replace(backlogConfig.apiKey, '***'));
+      console.log(
+        'Getting current user from Backlog API:',
+        apiUrl.replace(backlogConfig.apiKey, '***')
+      );
 
       const response = await fetch(apiUrl);
       if (!response.ok) {
-        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `API call failed: ${response.status} ${response.statusText}`
+        );
       }
 
       const userData = await response.json();
@@ -872,15 +1164,14 @@ Bạn đang tương tác với một Developer/Engineer. Hãy focus vào:
           avatar: userData.nulabAccount?.iconUrl || '', // Access correct avatar path
           mailAddress: userData.mailAddress,
           userId: userData.userId,
-          nulabAccount: userData.nulabAccount // Include full nulabAccount for debugging
-        }
+          nulabAccount: userData.nulabAccount, // Include full nulabAccount for debugging
+        },
       };
-
     } catch (error) {
       console.error('Error getting current user:', error);
       return {
         success: false,
-        error: String(error)
+        error: String(error),
       };
     }
   }
@@ -927,23 +1218,31 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 - General overview và context
 - Clear explanations
 - Actionable insights
-- Collaborative recommendations`
+- Collaborative recommendations`,
     };
 
-    return roleContexts[userRole as keyof typeof roleContexts] || roleContexts.other;
+    return (
+      roleContexts[userRole as keyof typeof roleContexts] || roleContexts.other
+    );
   }
 
   private getLanguagePrompt(language: string): string {
     const languagePrompts = {
       vi: `Hãy respond bằng tiếng Việt. Giữ technical terms bằng tiếng Anh khi cần thiết.`,
       en: `Please respond in English with clear and professional language.`,
-      ja: `日本語で回答してください。技術用語は適切に使用してください。`
+      ja: `日本語で回答してください。技術用語は適切に使用してください。`,
     };
 
-    return languagePrompts[language as keyof typeof languagePrompts] || languagePrompts.vi;
+    return (
+      languagePrompts[language as keyof typeof languagePrompts] ||
+      languagePrompts.vi
+    );
   }
 
-  private async handleSidebarWidthSync(width: number, sender: chrome.runtime.MessageSender): Promise<void> {
+  private async handleSidebarWidthSync(
+    width: number,
+    sender: chrome.runtime.MessageSender
+  ): Promise<void> {
     try {
       // Get all tabs to sync width
       const tabs = await chrome.tabs.query({});
@@ -954,7 +1253,7 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
           try {
             await chrome.tabs.sendMessage(tab.id, {
               type: 'SIDEBAR_WIDTH_UPDATE',
-              width: width
+              width: width,
             });
           } catch (error) {
             // Ignore errors for tabs without content script
@@ -974,7 +1273,7 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       // Open options page in a new tab
       chrome.tabs.create({
         url: chrome.runtime.getURL('options.html'),
-        active: true
+        active: true,
       });
     } catch (error) {
       console.error('❌ [Background] Error opening options page:', error);
@@ -985,30 +1284,36 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
   // Settings Message Handlers
   // ===========================================
 
-  private async handleGetSettings(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+  private async handleGetSettings(
+    message: SettingsMessage,
+    sendResponse: (response?: any) => void
+  ): Promise<void> {
     try {
       const settings = await this.settingsService.getAllSettings();
       const response: SettingsResponse = {
         success: true,
-        data: settings
+        data: settings,
       };
       sendResponse(response);
     } catch (error) {
       console.error('❌ [Settings] Failed to get settings:', error);
       const response: SettingsResponse = {
         success: false,
-        error: 'Failed to load settings'
+        error: 'Failed to load settings',
       };
       sendResponse(response);
     }
   }
 
-  private async handleUpdateSettings(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+  private async handleUpdateSettings(
+    message: SettingsMessage,
+    sendResponse: (response?: any) => void
+  ): Promise<void> {
     try {
       if (message.data) {
         await this.settingsService.saveAllSettings(message.data);
         const response: SettingsResponse = {
-          success: true
+          success: true,
         };
         sendResponse(response);
       } else {
@@ -1018,13 +1323,16 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       console.error('❌ [Settings] Failed to update settings:', error);
       const response: SettingsResponse = {
         success: false,
-        error: 'Failed to save settings'
+        error: 'Failed to save settings',
       };
       sendResponse(response);
     }
   }
 
-  private async handleGetSection(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+  private async handleGetSection(
+    message: SettingsMessage,
+    sendResponse: (response?: any) => void
+  ): Promise<void> {
     try {
       let sectionData: any;
 
@@ -1047,20 +1355,26 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 
       const response: SettingsResponse = {
         success: true,
-        data: sectionData
+        data: sectionData,
       };
       sendResponse(response);
     } catch (error) {
-      console.error(`❌ [Settings] Failed to get section ${message.section}:`, error);
+      console.error(
+        `❌ [Settings] Failed to get section ${message.section}:`,
+        error
+      );
       const response: SettingsResponse = {
         success: false,
-        error: `Failed to load ${message.section} settings`
+        error: `Failed to load ${message.section} settings`,
       };
       sendResponse(response);
     }
   }
 
-  private async handleUpdateSection(message: SettingsMessage, sendResponse: (response?: any) => void): Promise<void> {
+  private async handleUpdateSection(
+    message: SettingsMessage,
+    sendResponse: (response?: any) => void
+  ): Promise<void> {
     try {
       if (!message.data) {
         throw new Error('No section data provided');
@@ -1084,14 +1398,17 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       }
 
       const response: SettingsResponse = {
-        success: true
+        success: true,
       };
       sendResponse(response);
     } catch (error) {
-      console.error(`❌ [Settings] Failed to update section ${message.section}:`, error);
+      console.error(
+        `❌ [Settings] Failed to update section ${message.section}:`,
+        error
+      );
       const response: SettingsResponse = {
         success: false,
-        error: `Failed to save ${message.section} settings`
+        error: `Failed to save ${message.section} settings`,
       };
       sendResponse(response);
     }
@@ -1101,8 +1418,14 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
   // Create Ticket Feature Handlers
   // ===========================================
 
-  private async handleFetchBacklogProjects(data: any, sendResponse: (response?: any) => void) {
-    console.log('🔎 ~ BackgroundService ~ handleFetchBacklogProjects ~ data:', data);
+  private async handleFetchBacklogProjects(
+    data: any,
+    sendResponse: (response?: any) => void
+  ) {
+    console.log(
+      '🔎 ~ BackgroundService ~ handleFetchBacklogProjects ~ data:',
+      data
+    );
     try {
       const { domain, apiKey } = data;
 
@@ -1118,18 +1441,21 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 
       sendResponse({
         success: true,
-        data: projects
+        data: projects,
       });
     } catch (error) {
       console.error('❌ [Background] Failed to fetch projects:', error);
       sendResponse({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
 
-  private async handleFetchIssueTypes(data: any, sendResponse: (response?: any) => void) {
+  private async handleFetchIssueTypes(
+    data: any,
+    sendResponse: (response?: any) => void
+  ) {
     console.log('🔎 ~ BackgroundService ~ handleFetchIssueTypes ~ data:', data);
     try {
       const { domain, apiKey, projectKey } = data;
@@ -1138,44 +1464,110 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
         throw new Error('Missing domain, API key, or project key');
       }
 
-      console.log('📋 [Background] Fetching issue types for project:', projectKey);
+      console.log(
+        '📋 [Background] Fetching issue types for project:',
+        projectKey
+      );
 
-      const issueTypes = await BacklogApiService.fetchIssueTypes(domain, apiKey, projectKey);
+      const issueTypes = await BacklogApiService.fetchIssueTypes(
+        domain,
+        apiKey,
+        projectKey
+      );
 
       console.log('✅ [Background] Fetched issue types:', issueTypes.length);
 
       sendResponse({
         success: true,
-        data: issueTypes
+        data: issueTypes,
       });
     } catch (error) {
       console.error('❌ [Background] Failed to fetch issue types:', error);
       sendResponse({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
 
-  private async handleCreateTicketCommand({
-    backlogDomain,
-    projectKey,
-    language,
-    issueTypeId,
-    priorityId,
-    ticketData
-  }: {
-    backlogDomain: string;
-    projectKey: string;
-    language: string;
-    issueTypeId: number | string;
-    priorityId: number | string;
-    ticketData: any;
-  },
+  private async handleGetCommentContext(
+    data: {
+      spaceInfo: { spaceName: string; domain: string };
+      issueKey: string;
+      commentId: string;
+    },
     sendResponse: (response?: any) => void
   ) {
     try {
-      console.log('🎫 [Background] Processing create-ticket command:', { backlogDomain, projectKey, language });
+      const { spaceInfo, issueKey, commentId } = data;
+
+      // Get the selected comment details
+      const commentDetails = await this.getCommentDetails(
+        spaceInfo,
+        issueKey,
+        commentId
+      );
+
+      if (!commentDetails) {
+        sendResponse({
+          success: false,
+          error: 'Failed to get comment details',
+        });
+        return;
+      }
+
+      // Get previous comments (2 comments before the selected one)
+      const previousComments = await this.getPreviousComments(
+        spaceInfo,
+        issueKey,
+        commentId,
+        2
+      );
+
+      // Prepare context data
+      const contextData = {
+        selectedComment: commentDetails,
+        previousComments: previousComments || [],
+        issueKey: issueKey,
+        commentId: commentId,
+      };
+
+      console.log('✅ [Background] Comment context prepared:', {
+        selectedCommentId: commentId,
+        previousCommentsCount: previousComments?.length || 0,
+      });
+
+      sendResponse({ success: true, data: contextData });
+    } catch (error) {
+      console.error('❌ [Background] Failed to get comment context:', error);
+      sendResponse({ success: false, error: String(error) });
+    }
+  }
+
+  private async handleCreateTicketCommand(
+    {
+      backlogDomain,
+      projectKey,
+      language,
+      issueTypeId,
+      priorityId,
+      ticketData,
+    }: {
+      backlogDomain: string;
+      projectKey: string;
+      language: string;
+      issueTypeId: number | string;
+      priorityId: number | string;
+      ticketData: any;
+    },
+    sendResponse: (response?: any) => void
+  ) {
+    try {
+      console.log('🎫 [Background] Processing create-ticket command:', {
+        backlogDomain,
+        projectKey,
+        language,
+      });
 
       // Get AI service for generating ticket content
       const aiService = await this.getCurrentAIService();
@@ -1185,18 +1577,26 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
 
       // Build AI prompt for ticket creation
       const prompt = this.buildCreateTicketPrompt(ticketData, language);
-      console.log('🔎 ~ BackgroundService ~ handleCreateTicketCommand ~ prompt:', prompt);
+      console.log(
+        '🔎 ~ BackgroundService ~ handleCreateTicketCommand ~ prompt:',
+        prompt
+      );
 
       // Get AI-generated ticket data
       const settings = await this.settingsService.getAllSettings();
-      const aiResult = await aiService.processUserMessage(prompt, ticketData, settings);
+      const aiResult = await aiService.processUserMessage(
+        prompt,
+        ticketData,
+        settings
+      );
       const aiResponse = aiResult.response;
 
       // Parse AI response as JSON
       let aiTicketData;
       try {
         // Try to extract JSON from AI response
-        const jsonMatch = aiResponse.replace('```json\n', '')
+        const jsonMatch = aiResponse
+          .replace('```json\n', '')
           .replace('\n```', '')
           .match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -1212,10 +1612,12 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       // Get backlogs to find the appropriate one for the project
       const backlogs = await this.settingsService.getBacklogs();
       if (backlogs.length === 0) {
-        throw new Error('No backlog configurations found. Please configure backlogs in settings.');
+        throw new Error(
+          'No backlog configurations found. Please configure backlogs in settings.'
+        );
       }
 
-      const selectedBacklog = backlogs.find(b => b.domain === backlogDomain);
+      const selectedBacklog = backlogs.find((b) => b.domain === backlogDomain);
 
       if (!selectedBacklog) {
         throw new Error(`Backlog not found for domain: ${backlogDomain}`);
@@ -1229,7 +1631,9 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       );
 
       if (!project) {
-        throw new Error(`Project "${projectKey}" not found in backlog "${selectedBacklog.domain}"`);
+        throw new Error(
+          `Project "${projectKey}" not found in backlog "${selectedBacklog.domain}"`
+        );
       }
 
       // Create the ticket
@@ -1254,41 +1658,44 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
         success: true,
         response: successMessage,
         tokensUsed: aiResult.tokensUsed,
-        responseId: aiResult.responseId
+        responseId: aiResult.responseId,
       });
-
     } catch (error) {
       console.error('❌ [Background] Failed to create ticket:', error);
 
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
 
       sendResponse({
         success: false,
         response: {
           message: `❌ Lỗi tạo ticket: ${errorMessage}`,
-          sender: 'ai'
-        }
+          sender: 'ai',
+        },
       });
     }
   }
 
-  private buildCreateTicketPrompt(ticketData: any, targetLanguage: string): string {
+  private buildCreateTicketPrompt(
+    ticketData: any,
+    targetLanguage: string
+  ): string {
     const languageMap: Record<string, string> = {
-      'vi': 'tiếng Việt',
-      'en': 'English',
-      'ja': '日本語',
-      'ko': '한국어',
-      'zh': '中文',
-      'th': 'ไทย',
-      'id': 'Bahasa Indonesia',
-      'ms': 'Bahasa Melayu',
-      'tl': 'Filipino',
-      'fr': 'Français',
-      'de': 'Deutsch',
-      'es': 'Español',
-      'pt': 'Português',
-      'it': 'Italiano',
-      'ru': 'Русский'
+      vi: 'tiếng Việt',
+      en: 'English',
+      ja: '日本語',
+      ko: '한국어',
+      zh: '中文',
+      th: 'ไทย',
+      id: 'Bahasa Indonesia',
+      ms: 'Bahasa Melayu',
+      tl: 'Filipino',
+      fr: 'Français',
+      de: 'Deutsch',
+      es: 'Español',
+      pt: 'Português',
+      it: 'Italiano',
+      ru: 'Русский',
     };
 
     const languageName = languageMap[targetLanguage] || 'English';

@@ -300,3 +300,161 @@ $z-index-chatbot: 999998;
 .flex-1 {
   flex: 1;
 }
+
+/* Comment Enhancer Styles */
+.ai-ext-comment-chat-btn {
+  display: inline-block;
+  opacity: 0;
+  position: absolute;
+  top: 75px;
+  left: 32px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  outline: none;
+  pointer-events: none;
+  transition: 0.15s ease-in-out;
+}
+
+.ai-ext-comment-chat-btn img {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px 2px hsl(160deg 59% 53% / 0);
+  scale: 1;
+  transition: 0.15s ease-in-out;
+}
+
+
+.ai-ext-comment-chat-btn:hover {
+  img {
+    scale: 1.1;
+    box-shadow: 0 4px 8px 2px hsl(160deg 59% 53% / 30%);
+  }
+}
+
+/* Hiện nút khi hover comment-item */
+.comment-item:hover .ai-ext-comment-chat-btn {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* Highlight comment container when hovering button */
+.ai-ext-highlight-comment-container {
+  background: #40ce9f4f;
+  border-radius: 4px;
+}
+
+/* Responsive adjustments for comment enhancer */
+@media (max-width: 768px) {
+  .ai-ext-comment-chat-btn {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .ai-ext-comment-chat-btn img {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.ai-ext-comment-context-user {
+  position: relative;
+}
+
+.ai-ext-comment-context-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.ai-ext-comment-context-icon {
+  position: absolute;
+  left: 18px;
+  top: 4px;
+}
+
+.ai-ext-comment-context-name {
+  padding: 0 8px 0 10px;
+  font-weight: 700;
+}
+
+.ai-ext-comment-context-content {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  padding: 4px 8px;
+  margin-top: 8px;
+  border: 1px solid white;
+  border-radius: 6px;
+  margin-left: 38px;
+  width: calc(100% - 38px);
+  background: rgb(58 148 118);
+}
+
+/* Comment Context Badge Styles */
+.ai-ext-comment-context-badge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin: 0 0 8px;
+  background: linear-gradient(315deg, #3b9d7c, hsl(160.18deg 43.08% 50.39%));
+  color: white;
+}
+
+.ai-ext-comment-context-info {
+  width: calc(100% - 20px);
+}
+
+.ai-ext-comment-context-timestamp {
+  color: rgb(255 255 255 / 75%);
+  padding-left: 8px;
+}
+
+.ai-ext-comment-context-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.ai-ext-comment-context-icon {
+  font-size: 14px;
+}
+
+.ai-ext-comment-context-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-ext-comment-context-remove {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.ai-ext-comment-context-remove:hover {
+  background: white;
+  color: rgb(59, 157, 124);
+}

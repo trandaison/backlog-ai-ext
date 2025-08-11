@@ -80,6 +80,7 @@ export class AttachmentUtils {
   }
 
   static async processFile(file: File): Promise<FileProcessingResult> {
+    console.log('🔎 ~ AttachmentUtils ~ processFile ~ file:', file);
     try {
       // Validate file type
       if (!this.isAllowedFileType(file.type)) {

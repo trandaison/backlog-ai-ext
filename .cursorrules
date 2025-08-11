@@ -1,0 +1,213 @@
+# Backlog AI Extension - Cursor Rules
+
+This is a Chrome extension project that integrates AI assistance into Backlog ticket pages. The extension provides intelligent ticket analysis and chat functionality to help users understand and work with tickets more effectively.
+
+## Project Overview
+
+- **Technology Stack**: TypeScript, React, Chrome Extension APIs, Webpack
+- **AI Integration**: OpenAI GPT models for ticket analysis and conversational assistance
+- **Target Platform**: Backlog.com, Backlog.jp, Backlogtool.com
+
+## Architecture
+
+### Core Components:
+1. **Content Script** (`src/content/content.ts`): Injects chatbot into Backlog pages
+2. **Background Script** (`src/background/background.ts`): Handles AI API calls and message routing
+3. **Popup** (`src/popup/popup.tsx`): Extension settings and configuration
+4. **Chatbot** (`src/chatbot/chatbot.tsx`): React-based chat interface
+5. **Shared Utilities** (`src/shared/`): Ticket analysis and chat management
+
+### Key Features:
+- Automatic ticket data extraction from Backlog pages
+- AI-powered ticket analysis and recommendations
+- Interactive chatbot for discussing tickets
+- Secure API key storage
+- Multi-language support (Vietnamese, English, Japanese)
+
+## Development Guidelines
+
+### Code Style:
+- Use TypeScript with strict mode
+- Follow React functional component patterns with hooks
+- Implement proper error handling and user feedback
+- Use Chrome extension APIs according to Manifest V3 specifications
+
+### Configuration Management:
+- **Centralized Constants**: All reusable constants, configurations, and common values should be defined in `src/configs/` directory
+- **General Constants**: Common constants should be placed in `src/configs/index.ts` as the main export point
+- **Feature-Specific Constants**: Constants related to specific feature groups can be split into separate files (e.g., `aiModels.ts`, `uiConstants.ts`, `apiEndpoints.ts`) and stored in `src/configs/` directory
+- **Import Strategy**: For feature-specific config files, import directly from the specific file instead of re-exporting through index.ts
+- **Configs Directory Rules**:
+  - Only contain constants and configuration values
+  - NO functions or logic code allowed in this directory
+  - NO imports from other directories except `src/types/`
+  - Only define reusable constants that may change over time
+- **UI Constants Guidelines**:
+  - Avoid creating constants for UI values (class names, animations, colors) unless truly necessary
+  - Use direct values in components for better readability and simplicity
+  - Only create UI constants when values are reused across multiple components or likely to change
+- Always import configurations from `src/configs` instead of hardcoding values throughout the codebase
+- Common configuration patterns:
+  - AI model definitions and defaults (`availableModels`, `defaultModelId`)
+  - API endpoints and configuration
+  - Feature flags and settings defaults
+- When adding new constants that may change over time, create them in the configs directory first
+
+### Type Definitions Management:
+- **Type Location**: All type definitions and interfaces should be placed in `src/types/` directory
+- **File Naming**: Type definition files must have `.d.ts` suffix (e.g., `ticketData.d.ts`, `chatMessage.d.ts`)
+- **Type vs Interface**: Prefer using `type` over `interface` for type definitions unless you specifically need interface features like declaration merging or extending classes
+- **Type Files Rules**:
+  - Only contain type definitions, interfaces, and type aliases
+  - NO logic code, functions, or implementations allowed
+  - Keep types separate from business logic
+- **Separation Principle**: Prioritize separating logic and type definitions - write logic in separate files, define types in dedicated type files
+- Import types using TypeScript's `import type` syntax when possible for better tree-shaking
+
+### Webpack Bundle Splitting & Dynamic Imports:
+**CRITICAL**: Avoid dynamic imports in Chrome extensions - they cause webpack bundle splitting issues that are difficult to debug and resolve.
+
+**Problems with Dynamic Imports:**
+- Webpack creates separate chunks for dynamic imports
+- Chrome extension content scripts have strict loading constraints
+- Manifest V3 security policies interfere with dynamic chunk loading
+- Loading failures are hard to debug and occur inconsistently across environments
+
+**Solution - Dependency Injection Pattern:**
+Instead of using dynamic imports, implement a dependency injection pattern:
+
+```typescript
+// ❌ AVOID: Dynamic imports
+const Component = React.lazy(() => import('./SomeComponent'));
+
+// ✅ PREFERRED: Dependency injection with fallback
+interface Props {
+  SomeComponent?: React.ComponentType<SomeComponentProps>;
+}
+
+function MyComponent({ SomeComponent: InjectedComponent }: Props) {
+  if (InjectedComponent) {
+    return <InjectedComponent />;
+  }
+
+  // Fallback implementation or default component
+  return <DefaultComponent />;
+}
+```
+
+**Implementation Guidelines:**
+- Always provide fallback components for optional dependencies
+- Use static imports at the top level whenever possible
+- Pass components as props through dependency injection
+- Test both scenarios: with and without injected dependencies
+- Document which components support dependency injection
+
+**Historical Context:**
+This pattern was developed after multiple incidents where dynamic imports caused:
+- Bundle loading failures in production
+- Inconsistent behavior across different Backlog domains
+- Hours of debugging webpack chunk loading issues
+- Content script injection failures
+
+### Security:
+- Store API keys securely using Chrome storage APIs
+- Validate all user inputs
+- Handle API rate limiting gracefully
+- Follow content security policy guidelines
+
+### Performance:
+- Minimize bundle size using code splitting
+- Implement lazy loading for React components
+- Cache ticket data appropriately
+- Optimize DOM manipulation in content scripts
+
+### Git Workflow:
+- **DO NOT automatically commit changes** - Always let the user review and commit manually
+- Only build and test automatically, but wait for user's explicit commit instruction
+- User prefers to control git commits themselves for better change management
+
+### Testing:
+- Test on multiple Backlog domains and page types
+- Verify extension permissions and security
+- Test AI API integration with various scenarios
+- Ensure responsive design for different screen sizes
+- **Build Validation**: Use `./dev.sh build` to validate code changes and always check the build output log for TypeScript errors, not just exit status - the build command logs results and stops immediately
+
+## File Structure Guidelines:
+- Keep components small and focused
+- Separate business logic from UI components
+- Use TypeScript interfaces for all data structures
+- Implement proper error boundaries in React components
+
+## Chrome Extension Specific:
+- Follow Manifest V3 best practices
+- Use service workers for background processing
+- Implement proper message passing between scripts
+- Handle extension lifecycle events correctly
+
+## Development Commands:
+**IMPORTANT**: Always use the development helper script instead of direct npm commands:
+
+- **Build project**: Use `./dev.sh build` instead of `npm run build:dev`
+- **Start development**: Use `./dev.sh start` for watch mode
+- **Clean build**: Use `./dev.sh clean` to clean dev-build directory
+- **Check status**: Use `./dev.sh status` to check if watch mode is running
+- **Get help**: Use `./dev.sh help` for Chrome extension loading instructions
+
+The `dev.sh` script provides a standardized development workflow and should be used for all build operations.
+
+### Testing and Validation:
+- **Build Validation**: Use `./dev.sh build` to check for compilation errors and validate changes
+- **Error Checking**: Always check the build output log for errors, not just the exit status - build command will log results and stop immediately, so examine the output directly
+- **Avoid Shell Type Check**: Do NOT use VS Code's "Type Check" task as it may hang - use build command instead
+- Test on multiple Backlog domains and page types
+- Verify extension permissions and security
+- Test AI API integration with various scenarios
+- Ensure responsive design for different screen sizes
+
+## Release Management:
+
+### Versioning:
+- Use semantic versioning (MAJOR.MINOR.PATCH) starting from v1.0.0
+- Follow semver principles:
+  - PATCH: Bug fixes and minor improvements
+  - MINOR: New features that are backward compatible
+  - MAJOR: Breaking changes or significant feature overhauls
+
+### Changelog Management:
+- Use `changelogen` library for automated changelog generation and release management
+- Changelogen automatically parses commit messages and generates appropriate changelog entries
+- Release commands:
+  - `npx changelogen --release` - Generate changelog and create release
+  - `npx changelogen --bump` - Only bump version without release
+  - `npx changelogen` - Generate changelog preview
+
+### Commit Message Format:
+- Follow conventional commit format for automated changelog generation
+- Format: `type: short description`
+- Keep messages concise and descriptive, avoid multi-line commits
+- Common types:
+  - `feat: add new chat feature`
+  - `fix: resolve token optimization bug`
+  - `docs: update installation guide`
+  - `style: improve chatbot UI spacing`
+  - `refactor: optimize context processing`
+  - `test: add unit tests for storage service`
+  - `chore: update dependencies`
+
+## AI Assistant Guidelines:
+
+When helping with this project:
+
+1. **Always prioritize the established patterns** - follow the configuration management and type definition rules strictly
+2. **Avoid dynamic imports** - use dependency injection pattern instead
+3. **Use the dev.sh script** for all build operations
+4. **Check build output logs** for errors, not just exit status
+5. **Separate logic from types** - keep business logic and type definitions in separate files
+6. **Follow Chrome extension best practices** - Manifest V3, service workers, proper message passing
+7. **Implement proper error handling** - always provide user feedback and graceful degradation
+8. **Test across multiple Backlog domains** - ensure compatibility with different Backlog instances
+9. **Use TypeScript strict mode** - leverage type safety for better code quality
+10. **Follow React functional component patterns** - use hooks and modern React practices
+
+Remember: This is a Chrome extension that integrates with Backlog ticket pages, so all code must work within the constraints of Chrome extension APIs and Backlog's DOM structure.

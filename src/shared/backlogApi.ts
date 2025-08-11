@@ -1,3 +1,4 @@
+import { ISSUE_URL_REGEX } from '../configs/backlog';
 import { settingsClient } from '../shared/settingsClient';
 import { BacklogIntegration } from '../types/settings';
 
@@ -251,7 +252,7 @@ export class BacklogApiService {
 
     try {
       const baseUrl = this.getBaseUrl(config);
-      const response = await fetch(`${baseUrl}/issues/${issueKey}/comments?apiKey=${config.apiKey}`);
+      const response = await fetch(`${baseUrl}/issues/${issueKey}/comments?order=asc&apiKey=${config.apiKey}`);
 
       if (!response.ok) {
         throw new Error(`Backlog API error: ${response.status} ${response.statusText}`);
@@ -310,7 +311,7 @@ export class BacklogApiService {
     // - PROJ_SUB-123
     // - PROJECTKEY_2405-1603
     // - PROJECT123_ABC-999
-    const match = url.match(/\/view\/([A-Z][A-Z0-9_]*-\d+)/);
+    const match = url.match(ISSUE_URL_REGEX);
     return match ? match[1] : null;
   }
 

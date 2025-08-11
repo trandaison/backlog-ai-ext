@@ -12,6 +12,8 @@ import CreateTicketModal from '../chatbot/components/CreateTicketModal';
 import Modal from '../shared/Modal';
 import { TicketData, UserInfo } from "../types/backlog";
 import { ChatMessage } from "../types/chat";
+import CommentContextPreview from './CommentContextPreview';
+import { ISSUE_URL_REGEX, SPACE_URL_REGEX } from '../configs/backlog';
 
 // AI Icon as data URL
 const aiIcon = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgdmlld0JveD0iMCAwIDE0MiAxNDIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNzk2XzQ1OSkiPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTExMi41MjEgMTQxLjI3N0gyOS41NDk0QzEzLjgyNDMgMTQxLjI3NyAwLjk1NzAzMSAxMjguMzkgMC45NTcwMzEgMTEyLjYzOVYyOS41MzEyQzAuOTU3MDMxIDEzLjc4MDQgMTMuODI0MyAwLjg5MzU1NSAyOS41NDk0IDAuODkzNTU1SDExMi41MjFDMTI4LjI0NiAwLjg5MzU1NSAxNDEuMTEyIDEzLjc4MDQgMTQxLjExMiAyOS41MzEyVjExMi42MzlDMTQxLjExMiAxMjguMzkgMTI4LjI0NiAxNDEuMjc3IDExMi41MjEgMTQxLjI3N1oiIGZpbGw9IiM0MkNFOUYiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01Mi4xOTkgNjEuMzI0MkM1Mi4xNDQzIDcyLjk3NTIgNTIuMTE0OCA4NC4zMTI3IDUyLjE0NDIgOTEuMDk2NEM2Mi4yNzU4IDkwLjU0NjcgNjcuMjkzOSA4OC40ODI3IDcxLjI2MzQgODMuNzEzOEM3NC4wNzc3IDgwLjMzMjUgNzQuNjg2OSA3Ni40NTkxIDcyLjk4IDcyLjgwNzlDNzAuNzQ2OCA2OC4wMzMzIDY0LjE4MDYgNjIuOTkwMiA1Mi4xOTkgNjEuMzI0MlpNNDUuNTM1OSAxMDQuNzk2QzQzLjczNSAxMDQuNzk2IDQyLjAwNzEgMTA0LjA3NiA0MC43MzgyIDEwMi43OTdMNDAuNzM1NCAxMDIuNzk0QzM4Ljc0MzYgMTAwLjc4NSAzOC43MTU1IDk4Ljg2MjggMzguNjY1IDk1LjM3NDdDMzguNjM5NyA5My42NTEgMzguNjI0MyA5MS4yMDg5IDM4LjYxNzMgODguMjkwMUMzOC42MDYgODMuMTcyNSAzOC42MTg3IDc2LjA3MTEgMzguNjUzOCA2Ny4xODEzQzM4LjcxNTUgNTEuODg2MSAzOC44MjY0IDM2LjYzODcgMzguODI2NCAzNi42Mzg3TDUyLjM0NSAzNi43MzcxQzUyLjMxOTcgNDAuMTE1NiA1Mi4yOTU4IDQzLjgzMDEgNTIuMjcyIDQ3LjcwNjJDNjguMjY4IDQ5LjU1MzYgODAuMjgzMiA1Ni41MDA0IDg1LjIyMjcgNjcuMDY2Qzg5LjE2NDEgNzUuNDk0NiA4Ny44MjY1IDg0Ljk1OTQgODEuNjQ3NiA5Mi4zODQyQzcyLjExNjggMTAzLjgzNyA1OC41ODE0IDEwNC43OTYgNDUuNTM1OSAxMDQuNzk2WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTk4LjQ0MTQgMjcuMzY3MkM5OC40MzM1IDI2LjI2MiA5OC43NzM2IDI1LjE4MzEgOTkuNDEyMSAyNC4yODIyQzEwMC4wMTEgMjMuNDM3NiAxMDAuODQ0IDIyLjc4ODcgMTAxLjgwNiAyMi40MTVMMTAyIDIyLjM0MzdMMTAyLjAzMSAyMi4zMzRMMTA1LjE4OSAyMS4zMDQ3TDEwNS4zMTkgMjEuMjU2OEMxMDUuNjIgMjEuMTM2NSAxMDUuODk0IDIwLjk1NiAxMDYuMTI0IDIwLjcyNTZDMTA2LjM4NSAyMC40NjQgMTA2LjU4MSAyMC4xNDUgMTA2LjY5NyAxOS43OTQ5TDEwNy43MDQgMTYuNjk1M0MxMDguMDI5IDE1LjY3NDIgMTA4LjY1MyAxNC43NzYxIDEwOS40OTIgMTQuMTE2MkwxMDkuNjYyIDEzLjk4NzNMMTA5LjY2OSAxMy45ODI0TDEwOS42NzUgMTMuOTc4NUMxMTAuNTY4IDEzLjM0MjQgMTExLjYzOCAxMyAxMTIuNzM1IDEzQzExMy44MzIgMTMgMTE0LjkwMiAxMy4zNDIgMTE1Ljc5NiAxMy45Nzg1TDExNS43OTUgMTMuOTc5NUMxMTYuNjg1IDE0LjYxMTIgMTE3LjM2IDE1LjUwMTMgMTE3LjcyNiAxNi41MzAzTDExNy43MzUgMTYuNTU2NkwxMTcuNzQ0IDE2LjU4M0wxMTguNzc1IDE5Ljc2MjdDMTE4Ljg5NCAyMC4xMDcyIDExOS4wOSAyMC40MTk5IDExOS4zNDkgMjAuNjc3N0MxMTkuNjEyIDIwLjkzOTkgMTE5LjkzMiAyMS4xMzczIDEyMC4yODQgMjEuMjUzOUwxMjMuMzkzIDIyLjI2NTZMMTIzLjQxMiAyMi4yNzE1QzEyNC40NzIgMjIuNjI4NiAxMjUuMzk0IDIzLjMxMjQgMTI2LjA0MiAyNC4yMjU2TDEyNi4xNjMgMjQuNDA3MkMxMjYuNzEgMjUuMjU4MSAxMjcgMjYuMjQ5MSAxMjYuOTk5IDI3LjI2MjdDMTI2Ljk5OSAyNy4yNjgyIDEyNyAyNy4yNzM4IDEyNyAyNy4yNzkzTDEyNi45OTkgMjcuMjc5M0MxMjcgMjguMjk5MyAxMjYuNzA1IDI5LjI5NiAxMjYuMTUyIDMwLjE0OTRMMTI2LjAzOCAzMC4zMTkzQzEyNS40MDggMzEuMjEyNCAxMjQuNTE2IDMxLjg4OTQgMTIzLjQ4MyAzMi4yNTM5TDEyMy40NTkgMzIuMjYyN0wxMjMuNDM2IDMyLjI2OTVMMTIwLjI2OSAzMy4yOTg4QzExOS45MTUgMzMuNDE1IDExOS41OTQgMzMuNjEyMiAxMTkuMzMxIDMzLjg3NUwxMTkuMzMgMzMuODc1QzExOS4wNjkgMzQuMTM1MyAxMTguODcyIDM0LjQ1MjYgMTE4Ljc1NSAzNC44MDE4TDExNy43NCAzNy45MjA5TDExNy43MzggMzcuOTI4N0wxMTcuNzM1IDM3LjkzNTVDMTE3LjM4MiAzOC45OTM0IDExNi43MDUgMzkuOTEyMyAxMTUuOCA0MC41NjI1TDExNS43OTQgNDAuNTY2NEMxMTQuOSA0MS4yMDM2IDExMy44MyA0MS41NDU5IDExMi43MzIgNDEuNTQ1OUMxMTEuNzA0IDQxLjU0NTkgMTEwLjcgNDEuMjQ0OCAxMDkuODQyIDQwLjY4MjZMMTA5LjY3MiA0MC41Njc0QzEwOC43ODIgMzkuOTM1NyAxMDguMTA4IDM5LjA0NDMgMTA3Ljc0MiAzOC4wMTU2TDEwNy43MzIgMzcuOTg5M0wxMDcuNzI0IDM3Ljk2MjlMMTA2LjcwMSAzNC44MTE1QzEwNi41NzkgMzQuNDc1NyAxMDYuMzgzIDM0LjE3MDkgMTA2LjEyNyAzMy45MjA5QzEwNS44NjUgMzMuNjY1NSAxMDUuNTQ4IDMzLjQ3NDEgMTA1LjIgMzMuMzYwM0wxMDIuMDc0IDMyLjMzOThMMTAyLjA3MSAzMi4zMzg5QzEwMS4wMjIgMzEuOTk0OCAxMDAuMTA2IDMxLjMyOTYgOTkuNDU1MSAzMC40Mzc1Qzk4LjgwMzcgMjkuNTQ1MSA5OC40NDkzIDI4LjQ3MTQgOTguNDQxNCAyNy4zNjcyWk02MyA1My4yOTU5QzYzIDUyLjA1NzUgNjMuMzUzNiA1MC44NDY5IDY0LjAxNTYgNDkuODA0N0w2NC4xNTE0IDQ5LjU5NzdMNjQuMTU4MiA0OS41ODg5TDY0LjE2NDEgNDkuNTgwMUM2NC44ODM5IDQ4LjU2MTEgNjUuODg0NCA0Ny43NzQ3IDY3LjA0MSA0Ny4zMTU0TDY3LjI3NDQgNDcuMjI3NUw2Ny4yOTc5IDQ3LjIxOTdMNjcuMzIyMyA0Ny4yMTE5TDczLjQwOTIgNDUuMjM0NEw3My44NjgyIDQ1LjA2NjRDNzQuOTI3NiA0NC42NDI2IDc1Ljg5MTggNDQuMDA3MSA3Ni43MDAyIDQzLjE5NzNDNzcuNjIxMSA0Mi4yNzQ0IDc4LjMxNDUgNDEuMTUwMyA3OC43MjY2IDM5LjkxNDFMODAuNjc5NyAzMy45MTAyTDgwLjY3OTcgMzMuOTA5Mkw4MC42OTE0IDMzLjg3NEw4MC42OTE0IDMzLjg3NUM4MC45ODk5IDMyLjkxNTggODEuNTA4NSAzMi4wMzg3IDgyLjIwOCAzMS4zMTY0QzgyLjkxNTYgMzAuNTg1NSA4My43ODcgMzAuMDMzMyA4NC43NSAyOS43MDUxQzg1LjcxMzEgMjkuMzc2NyA4Ni43NDAxIDI5LjI4MjcgODcuNzQ2MSAyOS40Mjg3Qzg4Ljc0OTQgMjkuNTc0MyA4OS43MDI5IDI5Ljk1NjEgOTAuNTMwMyAzMC41NDFMOTAuNTMxMiAzMC41NEM5MS42MjUxIDMxLjMwNzMgOTIuNDUxNSAzMi4zOTgzIDkyLjg5MzYgMzMuNjU5Mkw5Mi45MDE0IDMzLjY4MDdMOTIuOTA4MiAzMy43MDMxTDk0Ljg4NTcgMzkuNzkxTDk0Ljg4NjcgMzkuNzlDOTUuMjQ5MiA0MC44NzUzIDk1LjgyODggNDEuODczNiA5Ni41ODc5IDQyLjcyNTZMOTYuOTIzOCA0My4wODJDOTcuODQ2OCA0NC4wMDQ0IDk4Ljk3MTkgNDQuNzAxNCAxMDAuMjEgNDUuMTE1MkwxMDAuMjExIDQ1LjExNDNMMTA2LjU5NSA0Ny4yMTA5TDEwNi42ODYgNDcuMjQxMkwxMDYuNzcyIDQ3LjI3ODNDMTA3LjkxOSA0Ny43Nzk3IDEwOC44OTQgNDguNjA0NyAxMDkuNTc5IDQ5LjY1MTRMMTA5LjU4IDQ5LjY1MTRDMTEwLjI2NSA1MC42OTgxIDExMC42MyA1MS45MjI1IDExMC42MzEgNTMuMTczOEwxMTAuNjMxIDUzLjE3NThDMTEwLjYzIDU0LjUwNzQgMTEwLjIxNSA1NS44MDU0IDEwOS40NDYgNTYuODkxNkwxMDkuNDQ2IDU2Ljg5MjZDMTA4LjY3NyA1Ny45NzkgMTA3LjU4OSA1OC44MDAxIDEwNi4zMzMgNTkuMjQzMkwxMDYuMzExIDU5LjI1MUwxMDYuMjg3IDU5LjI1ODhMMTAwLjE5NiA2MS4yNDMyQzk5LjI5MDQgNjEuNTQwMyA5OC40NDE4IDYxLjk5MDggOTcuNjg4NSA2Mi41NzUyTDk3LjY4MjYgNjIuNTgwMUM5Ny40MDU4IDYyLjc5MzEgOTcuMTQyNSA2My4wMjMyIDk2Ljg5NTUgNjMuMjY5NUM5NS45NjYzIDY0LjIwMDUgOTUuMjY2MSA2NS4zMzQ5IDk0Ljg0ODYgNjYuNTgyTDk0Ljg0ODYgNjYuNTgzTDkyLjg5MjYgNzIuNjA2NEw5Mi44ODQ4IDcyLjYzMThDOTIuNDU1MiA3My44OTg4IDkxLjY0MDYgNzUuMDAwMyA5MC41NTU3IDc1Ljc4MzJDODkuNDcwOCA3Ni41NjU5IDg4LjE2ODggNzYuOTkxMiA4Ni44MzExIDc3Qzg1LjQ5MzQgNzcuMDA4NyA4NC4xODU4IDc2LjU5OTggODMuMDkwOCA3NS44MzExTDgzLjA5MDggNzUuODMyQzgxLjk5NTcgNzUuMDYzNCA4MS4xNjY4IDczLjk3MjMgODAuNzIwNyA3Mi43MTA5TDgwLjcxMTkgNzIuNjg2NUw4MC43MDQxIDcyLjY2MTFMNzguNzMwNSA2Ni41ODU5Qzc4LjMxMTYgNjUuMzgzNCA3Ny42MjU2IDY0LjI5MTMgNzYuNzIyNyA2My4zOTI2Qzc1LjgyMDkgNjIuNDk1MSA3NC43MjY5IDYxLjgxNDMgNzMuNTIzNCA2MS40MDA0TDY3LjM2MjMgNTkuMzk1NUw2Ny4zNDY3IDU5LjM5MDZMNjcuMzMxMSA1OS4zODQ4QzY2LjA1MjkgNTguOTQ1NiA2NC45NDUgNTguMTE1NSA2NC4xNjUgNTcuMDExN0w2NC4xNTgyIDU3LjAwMjlMNjQuMTUyMyA1Ni45OTMyQzYzLjQwMjIgNTUuOTA2MSA2My4wMDAxIDU0LjYxNjYgNjMgNTMuMjk1OVoiIGZpbGw9IiNGRkY2MDAiIHN0cm9rZT0iIzQyQ0U5RiIgc3Ryb2tlLXdpZHRoPSI0Ii8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfMTc5Nl80NTkiPgo8cmVjdCB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K";
@@ -56,6 +58,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   // Quick actions state
   const [quickActionValue, setQuickActionValue] = useState('');
+
+  // Comment context state
+  const [commentContext, setCommentContext] = useState<any>(null);
+  const [isLoadingCommentContext, setIsLoadingCommentContext] = useState(false);
 
   // Modal states
   const [isTranslateModalOpen, setIsTranslateModalOpen] = useState(false);
@@ -134,6 +140,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           setCurrentModel(defaultModelId);
         }
         setIsLoadingModels(false);
+      } else if (event.data.type === 'COMMENT_CONTEXT_LOADED') {
+        // Handle comment context from comment enhancer
+        const commentData = event.data.data;
+        console.log('📝 [ChatbotAsidePanel] Received comment context:', commentData);
+
+        // Load comment context from API
+        handleLoadCommentContext(commentData);
       }
     };
 
@@ -557,7 +570,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     };
 
     // Send the suggestion as a message with 'suggestion' type
-    handleSendMessage(suggestionMessages[type], 'suggestion');
+    handleSendMessage(suggestionMessages[type], 'user');
   };
 
   const handleQuickActionChange = (value: string) => {
@@ -648,8 +661,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         userInfo: userInfo,
         currentModel: currentModel, // Include current selected model
         timestamp: new Date().toISOString(),
-        attachments: currentAttachments // Include file attachments
+        attachments: currentAttachments, // Include file attachments
+        commentContext: commentContext // Include comment context
       };
+
+      // Debug log to check comment context
+      console.log('🔍 [ChatbotAsidePanel] Sending contextData with commentContext:', {
+        hasCommentContext: !!commentContext,
+        commentContext: commentContext
+      });
 
       // Send message with full context via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
@@ -861,32 +881,124 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     setAttachmentError(null);
   };
 
+  const handleLoadCommentContext = async (commentData: any) => {
+    try {
+      setIsLoadingCommentContext(true);
+
+      // Extract space info and issue key from current URL
+      const url = window.location.href;
+      const issueMatch = url.match(ISSUE_URL_REGEX);
+      const spaceMatch = url.match(SPACE_URL_REGEX);
+
+      if (!issueMatch || !spaceMatch) {
+        throw new Error('Không thể xác định thông tin ticket');
+      }
+
+      const issueKey = issueMatch[1];
+      const spaceInfo = {
+        spaceName: spaceMatch[1],
+        domain: spaceMatch[2]
+      };
+
+      // Send message to content script with unique ID
+      const response = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (event.data.type === 'COMMENT_CONTEXT_RESPONSE' && event.data.id === messageId) {
+            window.removeEventListener('message', responseHandler);
+
+            if (event.data.success) {
+              resolve({ data: event.data.data, success: true });
+            } else {
+              reject(new Error(event.data.error));
+            }
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage({
+          type: 'GET_COMMENT_CONTEXT',
+          id: messageId,
+          data: {
+            spaceInfo,
+            issueKey,
+            commentId: commentData.id
+          }
+        }, '*');
+
+        // Timeout
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          reject(new Error('Timeout waiting for comment context response'));
+        }, 30000);
+      });
+
+      if (response.success) {
+        // Set comment context for badge display
+        setCommentContext(response.data);
+
+        // Focus textarea
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+
+        console.log('✅ [ChatbotAsidePanel] Comment context loaded:', response.data);
+      } else {
+        throw new Error(response.error || 'Không thể tải thông tin comment');
+      }
+
+    } catch (error) {
+      console.error('❌ [ChatbotAsidePanel] Error loading comment context:', error);
+
+      // Show error message in chat
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: `❌ Lỗi khi tải thông tin comment: ${error}`,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoadingCommentContext(false);
+    }
+  };
+
+  const handleRemoveCommentContext = () => {
+    setCommentContext(null);
+  };
+
   return (
-    <div className="ai-ext-aside-content" ref={sidebarRef}>
+    <div className='ai-ext-aside-content' ref={sidebarRef}>
       {/* Resize Handle */}
       <div
-        className={`ai-ext-resize-handle ${isResizing ? 'ai-ext-resize-active' : ''}`}
+        className={`ai-ext-resize-handle ${
+          isResizing ? 'ai-ext-resize-active' : ''
+        }`}
         onMouseDown={handleResizeStart}
       />
 
       {/* Header */}
-      <div className="ai-ext-header">
-        <h3 className="ai-ext-title">
-          <img src={aiIcon} alt="AI Icon" className="ai-ext-icon" />
+      <div className='ai-ext-header'>
+        <h3 className='ai-ext-title'>
+          <img src={aiIcon} alt='AI Icon' className='ai-ext-icon' />
           Backlog AI Assistant
         </h3>
-        <div className="ai-ext-header-controls">
+        <div className='ai-ext-header-controls'>
           <button
-            className="ai-ext-options-button"
+            className='ai-ext-options-button'
             onClick={handleOpenOptions}
-            title="Mở trang cài đặt"
+            title='Mở trang cài đặt'
           >
             ⚙️
           </button>
           <button
-            className="ai-ext-close-button"
+            className='ai-ext-close-button'
             onClick={onClose}
-            title="Đóng chatbot"
+            title='Đóng chatbot'
           >
             ✕
           </button>
@@ -895,16 +1007,22 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       {/* Storage warning banner */}
       {storageWarning && (
-        <div className={`ai-ext-storage-warning ${
-          storageWarning.includes('thành công') || storageWarning.includes('✅') ? 'success' :
-          storageWarning.includes('dọn dẹp') ? 'info' : 'warning'
-        }`}>
+        <div
+          className={`ai-ext-storage-warning ${
+            storageWarning.includes('thành công') ||
+            storageWarning.includes('✅')
+              ? 'success'
+              : storageWarning.includes('dọn dẹp')
+              ? 'info'
+              : 'warning'
+          }`}
+        >
           <span>{storageWarning}</span>
           {!autoSaveEnabled && (
             <button
-              className="ai-ext-manual-save-btn"
+              className='ai-ext-manual-save-btn'
               onClick={handleManualSave}
-              title="Lưu chat history thủ công"
+              title='Lưu chat history thủ công'
             >
               💾 Lưu
             </button>
@@ -914,78 +1032,90 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       {/* Ticket Info */}
       {ticketData && (
-        <div className="ai-ext-ticket-info">
-          <div className="ai-ext-ticket-title">
-            <div className="ai-ext-title-wrapper">
+        <div className='ai-ext-ticket-info'>
+          <div className='ai-ext-ticket-title'>
+            <div className='ai-ext-title-wrapper'>
               <div
-                className={`ai-ext-title-content ${isTitleExpanded ? 'ai-ext-title-expanded' : 'ai-ext-title-truncated'}`}
+                className={`ai-ext-title-content ${
+                  isTitleExpanded
+                    ? 'ai-ext-title-expanded'
+                    : 'ai-ext-title-truncated'
+                }`}
                 title={ticketData.title} // Tooltip showing full title
               >
-                <strong>{ticketData.id}</strong>: {
-                  isTitleExpanded || !shouldTruncateTitle(ticketData.title)
-                    ? ticketData.title
-                    : getTruncatedTitle(ticketData.title)
-                }
+                <strong>{ticketData.id}</strong>:{' '}
+                {isTitleExpanded || !shouldTruncateTitle(ticketData.title)
+                  ? ticketData.title
+                  : getTruncatedTitle(ticketData.title)}
               </div>
               {shouldTruncateTitle(ticketData.title) && (
                 <button
-                  className="ai-ext-toggle-title-caret"
+                  className='ai-ext-toggle-title-caret'
                   onClick={() => setIsTitleExpanded(!isTitleExpanded)}
-                  title={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
-                  aria-label={isTitleExpanded ? "Thu gọn tiêu đề" : "Xem đầy đủ tiêu đề"}
+                  title={
+                    isTitleExpanded ? 'Thu gọn tiêu đề' : 'Xem đầy đủ tiêu đề'
+                  }
+                  aria-label={
+                    isTitleExpanded ? 'Thu gọn tiêu đề' : 'Xem đầy đủ tiêu đề'
+                  }
                 >
                   <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="currentColor"
-                    className={`ai-ext-caret-icon ${isTitleExpanded ? 'ai-ext-caret-up' : 'ai-ext-caret-down'}`}
+                    width='12'
+                    height='12'
+                    viewBox='0 0 12 12'
+                    fill='currentColor'
+                    className={`ai-ext-caret-icon ${
+                      isTitleExpanded ? 'ai-ext-caret-up' : 'ai-ext-caret-down'
+                    }`}
                   >
-                    <path d="M6 8L2 4h8z"/>
+                    <path d='M6 8L2 4h8z' />
                   </svg>
                 </button>
               )}
             </div>
           </div>
-          <div className="ai-ext-ticket-meta">
-            <span className="ai-ext-status">{ticketData.status}</span>
+          <div className='ai-ext-ticket-meta'>
+            <span className='ai-ext-status'>{ticketData.status}</span>
             {ticketData.assignee && (
-              <span className="ai-ext-assignee">👤 {ticketData.assignee}</span>
+              <span className='ai-ext-assignee'>👤 {ticketData.assignee}</span>
             )}
             {ticketData.priority && (
-              <span className="ai-ext-priority">⚡ {ticketData.priority}</span>
+              <span className='ai-ext-priority'>⚡ {ticketData.priority}</span>
             )}
           </div>
         </div>
       )}
 
       {/* Chat Section */}
-      <div className="ai-ext-chatbot-content">
-        <div className="ai-ext-chat-header">
+      <div className='ai-ext-chatbot-content'>
+        <div className='ai-ext-chat-header'>
           <h4>💬 Chat với AI</h4>
-          <div className="ai-ext-chat-controls">
+          <div className='ai-ext-chat-controls'>
             {messages.length > 0 && (
               <>
                 {!autoSaveEnabled && (
                   <button
-                    className="ai-ext-control-button ai-ext-save-button"
+                    className='ai-ext-control-button ai-ext-save-button'
                     onClick={handleManualSave}
-                    title="Lưu chat history thủ công"
+                    title='Lưu chat history thủ công'
                   >
                     💾
                   </button>
                 )}
                 <button
-                  className="ai-ext-control-button ai-ext-clear-button"
+                  className='ai-ext-control-button ai-ext-clear-button'
                   onClick={handleClearHistory}
-                  title="Xóa lịch sử chat"
+                  title='Xóa lịch sử chat'
                 >
                   🗑️
                 </button>
               </>
             )}
             {isLoadingHistory && (
-              <div className="ai-ext-loading-indicator" title="Đang tải lịch sử chat...">
+              <div
+                className='ai-ext-loading-indicator'
+                title='Đang tải lịch sử chat...'
+              >
                 ⏳
               </div>
             )}
@@ -993,30 +1123,30 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         </div>
 
         {/* Messages */}
-        <div className="ai-ext-messages-container">
+        <div className='ai-ext-messages-container'>
           {messages.length === 0 ? (
-            <div className="ai-ext-welcome-message">
+            <div className='ai-ext-welcome-message'>
               <p>👋 Xin chào! Tôi có thể giúp bạn phân tích ticket này.</p>
               <p>Hãy hỏi tôi bất cứ điều gì về ticket!</p>
 
               {/* Suggestion buttons */}
-              <div className="ai-ext-suggestion-buttons">
+              <div className='ai-ext-suggestion-buttons'>
                 <button
-                  className="ai-ext-suggestion-button"
+                  className='ai-ext-suggestion-button'
                   onClick={() => handleSuggestionClick('summary')}
                   disabled={isTyping}
                 >
                   📝 Tóm tắt nội dung
                 </button>
                 <button
-                  className="ai-ext-suggestion-button"
+                  className='ai-ext-suggestion-button'
                   onClick={() => handleSuggestionClick('explain')}
                   disabled={isTyping}
                 >
                   💡 Giải thích yêu cầu ticket
                 </button>
                 <button
-                  className="ai-ext-suggestion-button"
+                  className='ai-ext-suggestion-button'
                   onClick={() => handleSuggestionClick('translate')}
                   disabled={isTyping}
                 >
@@ -1030,19 +1160,23 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
                 key={message.id}
                 className={`ai-ext-message ai-ext-message-${message.sender}`}
               >
-                <div className="ai-ext-message-avatar">
+                <div className='ai-ext-message-avatar'>
                   {message.sender === 'user' ? (
                     userInfo?.avatar && userInfo.avatar.trim() ? (
                       <img
                         src={userInfo.avatar}
                         alt={userInfo.name || 'User'}
                         title={userInfo.name || 'User'}
-                        className="ai-ext-avatar-image"
+                        className='ai-ext-avatar-image'
                         onError={(e) => {
-                          console.error('Failed to load user avatar:', userInfo.avatar);
+                          console.error(
+                            'Failed to load user avatar:',
+                            userInfo.avatar
+                          );
                           // Hide broken image and show fallback
                           (e.target as HTMLImageElement).style.display = 'none';
-                          const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                          const fallback = (e.target as HTMLImageElement)
+                            .nextElementSibling as HTMLElement;
                           if (fallback) fallback.style.display = 'flex';
                         }}
                       />
@@ -1050,50 +1184,62 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
                   ) : (
                     <img
                       src={aiIcon}
-                      alt="AI Assistant"
-                      title="AI Assistant"
-                      className="ai-ext-avatar-image ai-ext-ai-avatar"
+                      alt='AI Assistant'
+                      title='AI Assistant'
+                      className='ai-ext-avatar-image ai-ext-ai-avatar'
                     />
                   )}
                   {message.sender === 'user' && (
                     <span
-                      className="ai-ext-avatar-fallback"
+                      className='ai-ext-avatar-fallback'
                       style={{
-                        display: (userInfo?.avatar && userInfo.avatar.trim()) ? 'none' : 'flex'
+                        display:
+                          userInfo?.avatar && userInfo.avatar.trim()
+                            ? 'none'
+                            : 'flex',
                       }}
                     >
                       👤
                     </span>
                   )}
                 </div>
-                <div className="ai-ext-message-content">
+                <div className='ai-ext-message-content'>
                   {message.sender === 'ai' ? (
-                    <div className="ai-ext-message-text">
+                    <div className='ai-ext-message-text'>
                       <MarkdownRenderer content={message.content} />
                     </div>
                   ) : (
                     <div
-                      className="ai-ext-message-text"
-                      dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
+                      className='ai-ext-message-text'
+                      dangerouslySetInnerHTML={{
+                        __html: formatMessageContent(message.content),
+                      }}
                     />
                   )}
 
                   {/* Render attachments separately if present */}
                   {message.attachments && message.attachments.length > 0 && (
                     <div>
-                      <div className="ai-ext-attachments-title">Attached files:</div>
-                      <ul className="ai-ext-message-attachments">
-                        {message.attachments.map(attachment => (
+                      <div className='ai-ext-attachments-title'>
+                        Attached files:
+                      </div>
+                      <ul className='ai-ext-message-attachments'>
+                        {message.attachments.map((attachment) => (
                           <li key={attachment.id}>
-                            {attachment.name} ({AttachmentUtils.formatFileSize(attachment.size)})
+                            {attachment.name} (
+                            {AttachmentUtils.formatFileSize(attachment.size)})
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
-                  <div className="ai-ext-message-time"
-                       title={formatFullTimestamp(safeTimestampToDate(message.timestamp))}>
+                  <div
+                    className='ai-ext-message-time'
+                    title={formatFullTimestamp(
+                      safeTimestampToDate(message.timestamp)
+                    )}
+                  >
                     {formatRelativeTime(safeTimestampToDate(message.timestamp))}
                   </div>
                 </div>
@@ -1103,17 +1249,17 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
           {/* Typing indicator */}
           {isTyping && (
-            <div className="ai-ext-message ai-ext-message-ai">
-              <div className="ai-ext-message-avatar">
+            <div className='ai-ext-message ai-ext-message-ai'>
+              <div className='ai-ext-message-avatar'>
                 <img
                   src={aiIcon}
-                  alt="AI Assistant"
-                  title="AI Assistant"
-                  className="ai-ext-avatar-image ai-ext-ai-avatar"
+                  alt='AI Assistant'
+                  title='AI Assistant'
+                  className='ai-ext-avatar-image ai-ext-ai-avatar'
                 />
               </div>
-              <div className="ai-ext-message-content">
-                <div className="ai-ext-typing-indicator">
+              <div className='ai-ext-message-content'>
+                <div className='ai-ext-typing-indicator'>
                   <span></span>
                   <span></span>
                   <span></span>
@@ -1126,41 +1272,45 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         </div>
 
         {/* Input */}
-        <div className="ai-ext-chat-input-container">
+        <div className='ai-ext-chat-input-container'>
           {/* Quick Actions, Model Selector and Attachment Button Row */}
-          <div className="ai-ext-input-header">
+          <div className='ai-ext-input-header'>
             {/* Quick Actions Dropdown */}
             <select
-              className="ai-ext-quick-actions"
+              className='ai-ext-quick-actions'
               value={quickActionValue}
               onChange={(e) => handleQuickActionChange(e.target.value)}
               disabled={isTyping}
-              title="Quick actions for common requests"
+              title='Quick actions for common requests'
             >
-              <option value="">⚡️ Quick Actions</option>
-              <option value="summary">📝 Tóm tắt nội dung</option>
-              <option value="explain">💡 Giải thích yêu cầu</option>
-              <option value="translate">🌍 Dịch nội dung</option>
-              <option value="create-ticket">📋 Tạo Backlog ticket</option>
+              <option value=''>⚡️ Quick Actions</option>
+              <option value='summary'>📝 Tóm tắt nội dung</option>
+              <option value='explain'>💡 Giải thích yêu cầu</option>
+              <option value='translate'>🌍 Dịch nội dung</option>
+              <option value='create-ticket'>📋 Tạo Backlog ticket</option>
             </select>
 
             {/* Model Selector */}
             <select
-              className="ai-ext-model-selector"
+              className='ai-ext-model-selector'
               value={currentModel}
               onChange={(e) => handleModelChange(e.target.value)}
               disabled={isLoadingModels || isTyping}
-              title={`Current AI model: ${availableModels.find(m => m.id === currentModel)?.name || currentModel}`}
+              title={`Current AI model: ${
+                availableModels.find((m) => m.id === currentModel)?.name ||
+                currentModel
+              }`}
             >
               {isLoadingModels ? (
-                <option value="">Loading models...</option>
+                <option value=''>Loading models...</option>
               ) : selectedModels.length === 0 ? (
                 <option value={defaultModelId}>
-                  {availableModels.find(m => m.id === defaultModelId)?.name || defaultModelId}
+                  {availableModels.find((m) => m.id === defaultModelId)?.name ||
+                    defaultModelId}
                 </option>
               ) : (
-                selectedModels.map(modelId => {
-                  const model = availableModels.find(m => m.id === modelId);
+                selectedModels.map((modelId) => {
+                  const model = availableModels.find((m) => m.id === modelId);
                   return (
                     <option key={modelId} value={modelId}>
                       {model ? model.name : modelId}
@@ -1172,14 +1322,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
             {/* Attachment button with badge */}
             <button
-              className="ai-ext-attachment-button"
+              className='ai-ext-attachment-button'
               onClick={handleAttachmentClick}
               disabled={isTyping || isProcessingFile}
               title={isProcessingFile ? 'Processing files...' : 'Attach files'}
             >
               {isProcessingFile ? '⏳' : '📎'}
               {attachments.length > 0 && (
-                <span className="ai-ext-attachment-badge">
+                <span className='ai-ext-attachment-badge'>
                   {attachments.length}
                 </span>
               )}
@@ -1188,26 +1338,27 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
           {/* File Attachments Area */}
           {(attachments.length > 0 || attachmentError) && (
-            <div className="ai-ext-attachments-container">
+            <div className='ai-ext-attachments-container'>
               {attachmentError && (
-                <div className="ai-ext-attachment-error">
-                  {attachmentError}
-                </div>
+                <div className='ai-ext-attachment-error'>{attachmentError}</div>
               )}
               {attachments.length > 0 && (
-                <div className="ai-ext-attachments-list">
-                  {attachments.map(attachment => (
-                    <div key={attachment.id} className="ai-ext-attachment-item">
-                      <span className="ai-ext-attachment-name" title={attachment.name}>
+                <div className='ai-ext-attachments-list'>
+                  {attachments.map((attachment) => (
+                    <div key={attachment.id} className='ai-ext-attachment-item'>
+                      <span
+                        className='ai-ext-attachment-name'
+                        title={attachment.name}
+                      >
                         {attachment.name}
                       </span>
-                      <span className="ai-ext-attachment-size">
+                      <span className='ai-ext-attachment-size'>
                         {AttachmentUtils.formatFileSize(attachment.size)}
                       </span>
                       <button
-                        className="ai-ext-attachment-remove"
+                        className='ai-ext-attachment-remove'
                         onClick={() => handleRemoveAttachment(attachment.id)}
-                        title="Remove file"
+                        title='Remove file'
                       >
                         ×
                       </button>
@@ -1218,20 +1369,48 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
             </div>
           )}
 
-          <div className="ai-ext-chat-input-wrapper">
+          {/* Comment Context Badge */}
+          {/* {commentContext && (
+            <div className="ai-ext-comment-context-badge">
+              <div className="ai-ext-comment-context-info">
+                <span className="ai-ext-comment-context-icon">💬</span>
+                <span className="ai-ext-comment-context-text">
+                  Comment #{commentContext.selectedComment.id} - {commentContext.selectedComment.createdUser?.name || 'Unknown'}
+                </span>
+                <pre>{JSON.stringify(commentContext, null, 2)}</pre>
+              </div>
+              <button
+                className="ai-ext-comment-context-remove"
+                onClick={handleRemoveCommentContext}
+                title="Remove comment context"
+              >
+                ×
+              </button>
+            </div>
+          )} */}
+          {commentContext && (
+            <CommentContextPreview
+              commentContext={commentContext}
+              onRemove={handleRemoveCommentContext}
+            />
+          )}
+
+          <div className='ai-ext-chat-input-wrapper'>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
-              type="file"
+              type='file'
               multiple
-              accept=".txt,.md,.csv,.json,.xml,.js,.ts,.css,.html,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg"
+              accept='.txt,.md,.csv,.json,.xml,.js,.ts,.css,.html,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg'
               onChange={handleFileSelect}
               style={{ display: 'none' }}
             />
             <textarea
               ref={textareaRef}
-              className="ai-ext-chat-input"
-              placeholder={`Nhập câu hỏi về ticket... (Enter để xuống dòng • ${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter để gửi)`}
+              className='ai-ext-chat-input'
+              placeholder={`Nhập câu hỏi về ticket... (Enter để xuống dòng • ${
+                navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
+              } + Enter để gửi)`}
               value={currentMessage}
               onChange={(e) => {
                 setCurrentMessage(e.target.value);
@@ -1248,14 +1427,16 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
               rows={1}
               style={{
                 resize: 'none',
-                overflow: 'hidden'
+                overflow: 'hidden',
               }}
             />
             <button
-              className="ai-ext-send-button"
+              className='ai-ext-send-button'
               onClick={() => handleSendMessage(currentMessage)}
               disabled={!currentMessage.trim() || isTyping}
-              title={isTyping ? 'Đang xử lý...' : 'Gửi tin nhắn (Ctrl/Cmd + Enter)'}
+              title={
+                isTyping ? 'Đang xử lý...' : 'Gửi tin nhắn (Ctrl/Cmd + Enter)'
+              }
             >
               {isTyping ? '⏳' : '📤'}
             </button>

@@ -122,17 +122,35 @@ export class OpenAIService implements AIService {
       };
     }
 
-    // Build enhanced message with attachments if any
-    let enhancedMessage = message;
-    if (attachments && attachments.length > 0) {
-      enhancedMessage = this.buildMessageWithAttachments(message, attachments);
+    // Build prompt based on whether comment context is present
+    let finalPrompt: string;
+
+    if (contextData.commentContext) {
+      // Build comment-focused prompt
+      finalPrompt = this.buildCommentPrompt(message, contextData, settings);
+    } else {
+      // Build enhanced message with attachments if any
+      finalPrompt = message;
+      if (attachments && attachments.length > 0) {
+        finalPrompt = this.buildMessageWithAttachments(message, attachments);
+      }
+
+      // Check if this is optimized context from ContextOptimizer
+      if (contextData.isOptimized) {
+        // Use the optimized context as is
+      } else {
+        // Build regular chat prompt for legacy handling
+        finalPrompt = this.buildChatPrompt(message, contextData, settings);
+      }
     }
 
-    // The message is already processed by BackgroundService with full context
+    // Log the final prompt for review
+    console.log('🔍 [OpenAI] Final prompt being sent to AI:', finalPrompt);
+
     // Build messages array for OpenAI with multimodal support
     const userContent: any[] = [{
       type: 'text',
-      text: enhancedMessage
+      text: finalPrompt
     }];
 
     // Add image attachments for GPT-4V
@@ -156,7 +174,7 @@ export class OpenAIService implements AIService {
       },
       {
         role: 'user',
-        content: userContent.length === 1 ? enhancedMessage : userContent
+        content: userContent.length === 1 ? finalPrompt : userContent
       }
     ];
 
@@ -359,5 +377,76 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
     };
 
     return languagePrompts[language as keyof typeof languagePrompts] || languagePrompts.vi;
+  }
+
+  private buildChatPrompt(message: string, context: any, settings?: Settings): string {
+    const language = settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
+    const role = settings?.general.userRole || 'developer';
+
+    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
+Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
+
+    if (context.ticketData) {
+      prompt += `**Bối cảnh ticket hiện tại:**
+- ID: ${context.ticketData.id}
+- Tiêu đề: ${context.ticketData.title}
+- Trạng thái: ${context.ticketData.status}\n\n`;
+    }
+
+    if (context.chatHistory && context.chatHistory.length > 0) {
+      prompt += `**Lịch sử chat gần đây:**\n`;
+      context.chatHistory.slice(-3).forEach((msg: any) => {
+        prompt += `${msg.sender}: ${msg.content}\n`;
+      });
+      prompt += '\n';
+    }
+
+    prompt += `**Câu hỏi:** ${message}`;
+
+    return prompt;
+  }
+
+  private buildCommentPrompt(message: string, context: any, settings?: Settings): string {
+    const language = settings?.general.language === 'vi' ? 'tiếng Việt' : 'English';
+    const role = settings?.general.userRole || 'developer';
+
+    let prompt = `Bạn là một AI assistant chuyên hỗ trợ ${role} trong việc xử lý ticket/issue.
+Hãy trả lời câu hỏi sau bằng ${language}:\n\n`;
+
+    // Add ticket context
+    if (context.ticketData) {
+      prompt += `Bối cảnh ticket:
+- ID: ${context.ticketData.id}
+- Tiêu đề: ${context.ticketData.title}
+- Trạng thái: ${context.ticketData.status}
+- Mô tả ticket: ${context.ticketData.description || 'Không có mô tả'}\n\n`;
+    }
+
+    // Add selected comment context
+    const commentContext = context.commentContext;
+    if (commentContext && commentContext.selectedComment) {
+      const selectedComment = commentContext.selectedComment;
+      const createdDate = selectedComment.created ? new Date(selectedComment.created).toLocaleString('vi-VN') : 'Không rõ';
+
+      prompt += `Comment cần phân tích (người dùng tập trung vào comment này):
+- Người gửi: ${selectedComment.createdUser?.name || 'Không rõ'}
+- Thời gian: ${createdDate}
+- Nội dung: ${selectedComment.content || 'Không có nội dung'}\n\n`;
+    }
+
+    // Add previous comments for context
+    if (commentContext && commentContext.previousComments && commentContext.previousComments.length > 0) {
+      prompt += `2 comments gần đó nhất cho việc tham khảo các thông tin liên quan:\n`;
+
+      commentContext.previousComments.slice(0, 2).forEach((comment: any, index: number) => {
+        const createdDate = comment.created ? new Date(comment.created).toLocaleString('vi-VN') : 'Không rõ';
+        prompt += `${index + 1}. ${comment.createdUser?.name || 'Không rõ'} lúc ${createdDate} với nội dung: ${comment.content || 'Không có nội dung'}\n`;
+      });
+      prompt += '\n';
+    }
+
+    prompt += `---\nCâu hỏi: ${message}`;
+
+    return prompt;
   }
 }

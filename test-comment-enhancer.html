@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Comment Enhancer - Backlog AI Extension</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #007acc;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .comment-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .comment-item {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: white;
+            position: relative;
+        }
+
+        .comment-item:hover {
+            border-color: #007acc;
+            box-shadow: 0 2px 8px rgba(0,122,204,0.1);
+        }
+
+        .comment-item__header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .comment-item__author {
+            font-weight: 600;
+            color: #24292e;
+            margin-right: 8px;
+        }
+
+        .comment-item__date {
+            color: #586069;
+            font-size: 12px;
+        }
+
+        .comment-item__text {
+            color: #24292e;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .comment-item__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 4px 8px;
+            border: 1px solid #d1d5da;
+            border-radius: 3px;
+            background: white;
+            color: #24292e;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: #f6f8fa;
+        }
+
+        .btn-primary {
+            background: #007acc;
+            color: white;
+            border-color: #007acc;
+        }
+
+        .btn-primary:hover {
+            background: #005a9e;
+        }
+
+        .test-info {
+            background: #f1f8ff;
+            border: 1px solid #c8e1ff;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .test-info h3 {
+            margin-top: 0;
+            color: #0366d6;
+        }
+
+        .test-info ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .test-info li {
+            margin-bottom: 4px;
+        }
+
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Test Comment Enhancer</h1>
+            <p>Backlog AI Extension - Comment Enhancer Feature</p>
+        </div>
+
+        <div class="content">
+            <div class="test-info">
+                <h3>📋 Hướng dẫn test:</h3>
+                <ul>
+                    <li>Hover vào các comment bên dưới để thấy nút "AI Chat"</li>
+                    <li>Click vào nút "AI Chat" để mở chatbot với context comment</li>
+                    <li>Kiểm tra console để xem log của comment enhancer</li>
+                    <li>Test responsive trên mobile (thu nhỏ browser)</li>
+                </ul>
+            </div>
+
+            <div id="status-container"></div>
+
+            <h2>💬 Comments Test</h2>
+            <ul class="comment-list">
+                <li class="comment-item" data-id="comment-1">
+                    <div class="comment-item__header">
+                        <span class="comment-item__author">Nguyễn Văn A</span>
+                        <span class="comment-item__date">2 giờ trước</span>
+                    </div>
+                    <div class="comment-item__text">
+                        Tôi đã kiểm tra bug này và thấy rằng vấn đề xuất hiện khi user click vào button quá nhanh.
+                        Có vẻ như có race condition trong event handler. Tôi đề xuất thêm debounce để tránh việc này.
+                    </div>
+                    <div class="comment-item__actions">
+                        <a href="#" class="btn">Reply</a>
+                        <a href="#" class="btn">Edit</a>
+                    </div>
+                </li>
+
+                <li class="comment-item" data-id="comment-2">
+                    <div class="comment-item__header">
+                        <span class="comment-item__author">Trần Thị B</span>
+                        <span class="comment-item__date">1 ngày trước</span>
+                    </div>
+                    <div class="comment-item__text">
+                        Cảm ơn bạn đã báo cáo vấn đề này. Tôi sẽ xem xét và cập nhật documentation để làm rõ hơn về cách sử dụng API.
+                    </div>
+                    <div class="comment-item__actions">
+                        <a href="#" class="btn">Reply</a>
+                        <a href="#" class="btn">Edit</a>
+                    </div>
+                </li>
+
+                <li class="comment-item" data-id="comment-3">
+                    <div class="comment-item__header">
+                        <span class="comment-item__author">Lê Văn C</span>
+                        <span class="comment-item__date">3 ngày trước</span>
+                    </div>
+                    <div class="comment-item__text">
+                        Tôi nghĩ chúng ta nên refactor lại component này để dễ maintain hơn.
+                        Hiện tại có quá nhiều logic phức tạp trong một component duy nhất.
+                    </div>
+                    <div class="comment-item__actions">
+                        <a href="#" class="btn">Reply</a>
+                        <a href="#" class="btn">Edit</a>
+                    </div>
+                </li>
+            </ul>
+
+            <div style="margin-top: 20px; padding: 16px; background: #f6f8fa; border-radius: 6px;">
+                <h3>🔧 Test Controls</h3>
+                <button onclick="addNewComment()" class="btn btn-primary">Add New Comment</button>
+                <button onclick="testCommentEnhancer()" class="btn">Test Comment Enhancer</button>
+                <button onclick="clearStatus()" class="btn">Clear Status</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock chrome API for testing
+        window.chrome = {
+            runtime: {
+                getURL: (path) => {
+                    return `chrome-extension://test/${path}`;
+                }
+            }
+        };
+
+        // Status management
+        function addStatus(message, type = 'info') {
+            const container = document.getElementById('status-container');
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            container.appendChild(status);
+        }
+
+        function clearStatus() {
+            const container = document.getElementById('status-container');
+            container.innerHTML = '';
+        }
+
+        // Test functions
+        function addNewComment() {
+            const commentList = document.querySelector('.comment-list');
+            const newComment = document.createElement('li');
+            newComment.className = 'comment-item';
+            newComment.dataset.id = `comment-${Date.now()}`;
+
+            newComment.innerHTML = `
+                <div class="comment-item__header">
+                    <span class="comment-item__author">Test User</span>
+                    <span class="comment-item__date">Vừa xong</span>
+                </div>
+                <div class="comment-item__text">
+                    Đây là comment mới được thêm để test MutationObserver.
+                </div>
+                <div class="comment-item__actions">
+                    <a href="#" class="btn">Reply</a>
+                    <a href="#" class="btn">Edit</a>
+                </div>
+            `;
+
+            commentList.appendChild(newComment);
+            addStatus('✅ Đã thêm comment mới', 'success');
+        }
+
+        function testCommentEnhancer() {
+            // Simulate comment enhancer functionality
+            const commentItems = document.querySelectorAll('.comment-item');
+            let injectedCount = 0;
+
+            commentItems.forEach(item => {
+                if (!item.querySelector('.ai-ext-comment-chat-btn')) {
+                    const btn = document.createElement('button');
+                    btn.className = 'ai-ext-comment-chat-btn';
+                    btn.innerHTML = `
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHZpZXdCb3g9IjAgMCAxNCAxNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyLjUgMTAuNUgxLjVWMS41SDEyLjVWMTAuNVoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxIi8+CjxwYXRoIGQ9Ik0zLjUgNC41SDQuNUw1LjUgNS41TDMuNSA3LjVMMi41IDYuNUwzLjUgNC41WiIgZmlsbD0iI2ZmZiIvPgo8L3N2Zz4K" alt="AI Chat" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
+                        <span>AI Chat</span>
+                    `;
+                    btn.title = 'Chat với AI về comment này';
+
+                    const actions = item.querySelector('.comment-item__actions');
+                    if (actions) {
+                        actions.appendChild(btn);
+                        injectedCount++;
+                    }
+                }
+            });
+
+            addStatus(`✅ Đã inject ${injectedCount} nút AI Chat`, 'success');
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            addStatus('🚀 Trang test đã load xong', 'info');
+            addStatus('💡 Hover vào comments để thấy nút AI Chat', 'info');
+        });
+
+        // Listen for comment enhancer messages
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'OPEN_CHATBOX_WITH_COMMENT') {
+                addStatus(`📝 Comment enhancer triggered: ${event.data.data.text.substring(0, 50)}...`, 'success');
+            }
+        });
+    </script>
+</body>
+</html>
