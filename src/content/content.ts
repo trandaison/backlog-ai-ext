@@ -1,7 +1,10 @@
 // Content script chính để inject chatbot aside panel vào trang Backlog
 import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatbotManager } from '../shared/chatbotManager';
-import { TicketURLMonitor, TicketChangeEvent } from '../shared/ticketURLMonitor';
+import {
+  TicketURLMonitor,
+  TicketChangeEvent,
+} from '../shared/ticketURLMonitor';
 import { availableModels } from '../configs';
 import { ISSUE_URL_REGEX } from '../configs/backlog';
 
@@ -41,7 +44,9 @@ class CommentEnhancer {
       // If no comments found, try again after a longer delay
       const commentItems = document.querySelectorAll('.comment-item');
       if (commentItems.length === 0) {
-        console.log('⚠️ [CommentEnhancer] No comments found, retrying in 2 seconds...');
+        console.log(
+          '⚠️ [CommentEnhancer] No comments found, retrying in 2 seconds...'
+        );
         setTimeout(() => {
           this.injectAllCommentButtons();
         }, 2000);
@@ -85,7 +90,8 @@ class CommentEnhancer {
 
   private highlightCommentContainer(commentItem: HTMLElement): void {
     // Tìm comment container (có thể là commentItem hoặc parent element)
-    const commentContainer = commentItem.closest('.js_comment-container') || commentItem;
+    const commentContainer =
+      commentItem.closest('.js_comment-container') || commentItem;
     if (commentContainer) {
       commentContainer.classList.add('ai-ext-highlight-comment-container');
     }
@@ -93,7 +99,8 @@ class CommentEnhancer {
 
   private unhighlightCommentContainer(commentItem: HTMLElement): void {
     // Tìm comment container và xóa class highlight
-    const commentContainer = commentItem.closest('.js_comment-container') || commentItem;
+    const commentContainer =
+      commentItem.closest('.js_comment-container') || commentItem;
     if (commentContainer) {
       commentContainer.classList.remove('ai-ext-highlight-comment-container');
     }
@@ -101,24 +108,28 @@ class CommentEnhancer {
 
   private injectAllCommentButtons(): void {
     const commentItems = document.querySelectorAll('.comment-item');
-    commentItems.forEach(item => {
+    commentItems.forEach((item) => {
       this.injectChatButton(item as HTMLElement);
     });
-    console.log(`✅ [CommentEnhancer] Injected buttons for ${commentItems.length} comments`);
+    console.log(
+      `✅ [CommentEnhancer] Injected buttons for ${commentItems.length} comments`
+    );
   }
 
   private observeCommentList(): void {
     const commentList = document.querySelector('.comment-list__items');
     if (!commentList) {
-      console.warn('⚠️ [CommentEnhancer] Comment list not found, will retry later');
+      console.warn(
+        '⚠️ [CommentEnhancer] Comment list not found, will retry later'
+      );
       // Retry after a delay
       setTimeout(() => this.observeCommentList(), 2000);
       return;
     }
 
     this.observer = new MutationObserver((mutations) => {
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
           if (node instanceof HTMLElement && node.matches('.comment-item')) {
             this.injectChatButton(node);
           }
@@ -128,7 +139,7 @@ class CommentEnhancer {
 
     this.observer.observe(commentList, {
       childList: true,
-      subtree: false
+      subtree: false,
     });
 
     console.log('✅ [CommentEnhancer] Observer started');
@@ -144,19 +155,27 @@ class CommentEnhancer {
         return;
       }
 
-      console.log('📝 [CommentEnhancer] Opening chatbox with comment:', commentData);
+      console.log(
+        '📝 [CommentEnhancer] Opening chatbox with comment:',
+        commentData
+      );
 
       // Mở chatbot panel trước
-      window.postMessage({
-        type: 'OPEN_CHATBOT_PANEL'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'OPEN_CHATBOT_PANEL',
+        },
+        '*'
+      );
 
       // Gửi message để load comment context và focus textarea
-      window.postMessage({
-        type: 'LOAD_COMMENT_CONTEXT',
-        data: commentData
-      }, '*');
-
+      window.postMessage(
+        {
+          type: 'LOAD_COMMENT_CONTEXT',
+          data: commentData,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [CommentEnhancer] Error opening chatbox:', error);
     }
@@ -165,7 +184,9 @@ class CommentEnhancer {
   private extractCommentData(commentItem: HTMLElement): any {
     try {
       // Extract comment text
-      const commentText = commentItem.querySelector('.comment-item__text')?.textContent?.trim() || '';
+      const commentText =
+        commentItem.querySelector('.comment-item__text')?.textContent?.trim() ||
+        '';
 
       // Extract comment author
       const authorElement = commentItem.querySelector('.comment-item__author');
@@ -176,10 +197,13 @@ class CommentEnhancer {
       const date = dateElement?.textContent?.trim() || '';
 
       // Extract comment ID (if available)
-      const commentId = commentItem.dataset.id || commentItem.getAttribute('data-id') || '';
+      const commentId =
+        commentItem.dataset.id || commentItem.getAttribute('data-id') || '';
 
       // Extract comment URL (if available)
-      const commentLink = commentItem.querySelector('a[href*="/view/"]') as HTMLAnchorElement;
+      const commentLink = commentItem.querySelector(
+        'a[href*="/view/"]'
+      ) as HTMLAnchorElement;
       const commentUrl = commentLink?.href || '';
 
       return {
@@ -188,10 +212,13 @@ class CommentEnhancer {
         author: author,
         date: date,
         url: commentUrl,
-        element: commentItem.outerHTML // Include HTML for context
+        element: commentItem.outerHTML, // Include HTML for context
       };
     } catch (error) {
-      console.error('❌ [CommentEnhancer] Error extracting comment data:', error);
+      console.error(
+        '❌ [CommentEnhancer] Error extracting comment data:',
+        error
+      );
       return null;
     }
   }
@@ -210,7 +237,7 @@ class CommentEnhancer {
 
     // Remove injected buttons
     const buttons = document.querySelectorAll('.ai-ext-comment-chat-btn');
-    buttons.forEach(btn => btn.remove());
+    buttons.forEach((btn) => btn.remove());
 
     this.isInitialized = false;
     console.log('✅ [CommentEnhancer] Destroyed');
@@ -275,10 +302,13 @@ class BacklogAIInjector {
   private handleSidebarWidthUpdate(width: number): void {
     try {
       // Forward width update to React component via postMessage
-      window.postMessage({
-        type: 'SIDEBAR_WIDTH_UPDATE',
-        width: width
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SIDEBAR_WIDTH_UPDATE',
+          width: width,
+        },
+        '*'
+      );
 
       // Also update our content script width management
       this.handleSidebarWidthChange(width);
@@ -299,7 +329,10 @@ class BacklogAIInjector {
         this.handleTicketChange(event);
       });
     } catch (error) {
-      console.error('❌ [Content] Error initializing ticket monitoring:', error);
+      console.error(
+        '❌ [Content] Error initializing ticket monitoring:',
+        error
+      );
     }
   }
 
@@ -309,7 +342,9 @@ class BacklogAIInjector {
 
     // Chỉ xử lý nếu thực sự có thay đổi ticket ID
     if (oldTicketId !== event.newTicketId) {
-      console.log(`📋 [Content] Switching from ticket ${oldTicketId} to ${event.newTicketId}`);
+      console.log(
+        `📋 [Content] Switching from ticket ${oldTicketId} to ${event.newTicketId}`
+      );
 
       // Gửi message đến ChatbotAsidePanel để reset chat context
       this.notifyTicketChange(event);
@@ -323,19 +358,24 @@ class BacklogAIInjector {
 
   private notifyTicketChange(event: TicketChangeEvent): void {
     // Gửi message đến React component trong main world
-    window.postMessage({
-      type: 'TICKET_CHANGE',
-      oldTicketId: event.oldTicketId,
-      newTicketId: event.newTicketId,
-      url: event.url,
-      timestamp: Date.now()
-    }, '*');
+    window.postMessage(
+      {
+        type: 'TICKET_CHANGE',
+        oldTicketId: event.oldTicketId,
+        newTicketId: event.newTicketId,
+        url: event.url,
+        timestamp: Date.now(),
+      },
+      '*'
+    );
   }
 
   private showTicketTransitionState(): void {
     // Optional: Hiển thị loading state khi đang chuyển đổi ticket
     if (this.chatbotAsideContainer) {
-      const existingOverlay = this.chatbotAsideContainer.querySelector('.ticket-transition-overlay');
+      const existingOverlay = this.chatbotAsideContainer.querySelector(
+        '.ticket-transition-overlay'
+      );
       if (!existingOverlay) {
         const overlay = document.createElement('div');
         overlay.className = 'ticket-transition-overlay';
@@ -354,10 +394,17 @@ class BacklogAIInjector {
           ">
             <div style="text-align: center;">
               <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
-                🔄 Đang chuyển đổi ticket...
-              </div>
-              <div style="font-size: 12px; color: #999;">
-                Đang tải ngữ cảnh mới
+                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="30px" height="30px" viewBox="0 0 30 30" class="lds-ring">
+                    <circle cx="15" cy="15" fill="none" r="13" stroke="#b7b7b7" stroke-width="2" stroke-linecap="round" transform="rotate(216.567 15 15)">
+                        <animateTransform attributeName="transform" type="rotate" calcMode="linear" values="0 15 15;320 15 15;720 15 15" keyTimes="0;0.5;1" dur="1s" begin="0s" repeatCount="indefinite"/>
+                        <animate attributeName="stroke-dasharray" calcMode="linear" values="0 80; 70 80; 00 80" keyTimes="0;0.5;1" dur="1" begin="0s" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+                <p style="
+                  margin: 16px 0;
+                  font0-size: 12px;
+                  color: #666;
+                ">Đang tải thông tin ticket...</p>
               </div>
             </div>
           </div>
@@ -395,14 +442,22 @@ class BacklogAIInjector {
 
   private async checkAutoOpenFeature() {
     try {
-      const result = await chrome.storage.sync.get(['autoOpenChatbox']);
-      const autoOpenEnabled = result.autoOpenChatbox || false;
+      const response = await chrome.runtime.sendMessage({
+        action: 'GET_SECTION',
+        section: 'features',
+      });
 
-      if (autoOpenEnabled && !this.isChatbotOpen) {
-        // Small delay to ensure DOM is ready
-        setTimeout(() => {
-          this.openChatbotPanel();
-        }, 500);
+      if (response.success) {
+        const autoOpenEnabled = response.data.autoOpenChatbox || false;
+
+        if (autoOpenEnabled && !this.isChatbotOpen) {
+          // Small delay to ensure DOM is ready
+          setTimeout(() => {
+            this.openChatbotPanel();
+          }, 500);
+        }
+      } else {
+        console.error('Failed to get feature flags:', response.error);
       }
     } catch (error) {
       console.error('Failed to check auto-open feature:', error);
@@ -438,7 +493,9 @@ class BacklogAIInjector {
     iconImg.alt = 'AI Assistant';
 
     this.chatbotToggleButton.appendChild(iconImg);
-    this.chatbotToggleButton.addEventListener('click', () => this.toggleChatbotPanel());
+    this.chatbotToggleButton.addEventListener('click', () =>
+      this.toggleChatbotPanel()
+    );
 
     // Thêm vào DOM
     container.appendChild(this.chatbotAsideContainer);
@@ -450,7 +507,8 @@ class BacklogAIInjector {
 
   private toggleChatbotPanel() {
     if (this.chatbotAsideContainer) {
-      const isVisible = this.chatbotAsideContainer.classList.contains('ai-ext-open');
+      const isVisible =
+        this.chatbotAsideContainer.classList.contains('ai-ext-open');
       if (isVisible) {
         this.closeChatbotPanel();
       } else {
@@ -511,37 +569,41 @@ class BacklogAIInjector {
   private async loadChatbotAsidePanelScript(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Check if already loaded using postMessage communication
-      this.checkComponentsReady().then(resolve).catch(() => {
+      this.checkComponentsReady()
+        .then(resolve)
+        .catch(() => {
+          // Set up message listener for component loading
+          const messageHandler = (event: MessageEvent) => {
+            if (event.source !== window) return;
 
-        // Set up message listener for component loading
-        const messageHandler = (event: MessageEvent) => {
-          if (event.source !== window) return;
+            if (event.data.type === 'REACT_COMPONENTS_LOADED') {
+              window.removeEventListener('message', messageHandler);
 
-          if (event.data.type === 'REACT_COMPONENTS_LOADED') {
+              // Small delay then check components
+              setTimeout(() => {
+                this.checkComponentsReady().then(resolve).catch(reject);
+              }, 100);
+            }
+          };
+
+          window.addEventListener('message', messageHandler);
+
+          // Inject scripts into main world using chrome.scripting API
+          this.injectMainWorldScripts().catch((error) => {
+            console.error(
+              '❌ [ContentScript] Failed to inject scripts:',
+              error
+            );
             window.removeEventListener('message', messageHandler);
+            reject(error);
+          });
 
-            // Small delay then check components
-            setTimeout(() => {
-              this.checkComponentsReady().then(resolve).catch(reject);
-            }, 100);
-          }
-        };
-
-        window.addEventListener('message', messageHandler);
-
-        // Inject scripts into main world using chrome.scripting API
-        this.injectMainWorldScripts().catch((error) => {
-          console.error('❌ [ContentScript] Failed to inject scripts:', error);
-          window.removeEventListener('message', messageHandler);
-          reject(error);
+          // Fallback timeout
+          setTimeout(() => {
+            window.removeEventListener('message', messageHandler);
+            reject(new Error('Timeout waiting for React components to load'));
+          }, 15000);
         });
-
-        // Fallback timeout
-        setTimeout(() => {
-          window.removeEventListener('message', messageHandler);
-          reject(new Error('Timeout waiting for React components to load'));
-        }, 15000);
-      });
     });
   }
 
@@ -572,7 +634,10 @@ class BacklogAIInjector {
       const responseHandler = (event: MessageEvent) => {
         if (event.source !== window) return;
 
-        if (event.data.type === 'COMPONENTS_CHECK_RESPONSE' && event.data.id === messageId) {
+        if (
+          event.data.type === 'COMPONENTS_CHECK_RESPONSE' &&
+          event.data.id === messageId
+        ) {
           window.removeEventListener('message', responseHandler);
 
           if (event.data.available) {
@@ -586,10 +651,13 @@ class BacklogAIInjector {
       window.addEventListener('message', responseHandler);
 
       // Send check message to main world
-      window.postMessage({
-        type: 'CHECK_COMPONENTS',
-        id: messageId
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHECK_COMPONENTS',
+          id: messageId,
+        },
+        '*'
+      );
 
       // Timeout
       setTimeout(() => {
@@ -607,11 +675,18 @@ class BacklogAIInjector {
       let savedWidth = null;
       try {
         // Check if remember chatbox size feature is enabled
-        const featureResult = await chrome.storage.sync.get(['rememberChatboxSize']);
-        const rememberSizeEnabled = featureResult.rememberChatboxSize !== undefined ? featureResult.rememberChatboxSize : true;
+        const featureResult = await chrome.storage.sync.get([
+          'rememberChatboxSize',
+        ]);
+        const rememberSizeEnabled =
+          featureResult.rememberChatboxSize !== undefined
+            ? featureResult.rememberChatboxSize
+            : true;
 
         if (rememberSizeEnabled) {
-          const result = await chrome.storage.local.get(['ai-ext-sidebar-width']);
+          const result = await chrome.storage.local.get([
+            'ai-ext-sidebar-width',
+          ]);
           savedWidth = result['ai-ext-sidebar-width'];
         }
       } catch (error) {
@@ -621,17 +696,23 @@ class BacklogAIInjector {
       const responseHandler = (event: MessageEvent) => {
         if (event.source !== window) return;
 
-        if (event.data.type === 'COMPONENT_CREATED' && event.data.id === messageId) {
+        if (
+          event.data.type === 'COMPONENT_CREATED' &&
+          event.data.id === messageId
+        ) {
           window.removeEventListener('message', responseHandler);
 
           if (event.data.success) {
             // Send saved width to component immediately after creation
             if (savedWidth) {
               setTimeout(() => {
-                window.postMessage({
-                  type: 'SIDEBAR_WIDTH_UPDATE',
-                  width: savedWidth
-                }, '*');
+                window.postMessage(
+                  {
+                    type: 'SIDEBAR_WIDTH_UPDATE',
+                    width: savedWidth,
+                  },
+                  '*'
+                );
               }, 100);
             }
 
@@ -639,7 +720,9 @@ class BacklogAIInjector {
             this.setupComponentMessageHandlers();
             resolve();
           } else {
-            reject(new Error(`Failed to create component: ${event.data.error}`));
+            reject(
+              new Error(`Failed to create component: ${event.data.error}`)
+            );
           }
         }
       };
@@ -647,18 +730,22 @@ class BacklogAIInjector {
       window.addEventListener('message', responseHandler);
 
       // Send create component message to main world
-      const containerId = this.chatbotAsideContainer?.id || 'ai-ext-chatbot-aside';
+      const containerId =
+        this.chatbotAsideContainer?.id || 'ai-ext-chatbot-aside';
 
-      window.postMessage({
-        type: 'CREATE_COMPONENT',
-        id: messageId,
-        containerId,
-        props: {
-          // Don't pass functions - handle via separate messages
-          // We'll set up message handlers for component interactions
-          initialWidth: savedWidth // Pass saved width as initial prop
-        }
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CREATE_COMPONENT',
+          id: messageId,
+          containerId,
+          props: {
+            // Don't pass functions - handle via separate messages
+            // We'll set up message handlers for component interactions
+            initialWidth: savedWidth, // Pass saved width as initial prop
+          },
+        },
+        '*'
+      );
 
       // Timeout
       setTimeout(() => {
@@ -714,7 +801,11 @@ class BacklogAIInjector {
           break;
 
         case 'CHAT_STORAGE_SAVE':
-          this.handleChatStorageSave(event.data.id, event.data.ticketKey || event.data.data?.ticketId, event.data.data);
+          this.handleChatStorageSave(
+            event.data.id,
+            event.data.ticketKey || event.data.data?.ticketId,
+            event.data.data
+          );
           break;
 
         case 'CHAT_STORAGE_CLEAR':
@@ -738,7 +829,11 @@ class BacklogAIInjector {
           break;
 
         case 'FETCH_ISSUE_TYPES_REQUEST':
-          this.handleFetchIssueTypes(event.data.backlog, event.data.projectKey, event.data.id);
+          this.handleFetchIssueTypes(
+            event.data.backlog,
+            event.data.projectKey,
+            event.data.id
+          );
           break;
 
         case 'OPEN_CHATBOX_WITH_COMMENT':
@@ -763,26 +858,37 @@ class BacklogAIInjector {
   private async handleTicketDataRequest(messageId: string): Promise<void> {
     try {
       const ticketData = await this.ticketAnalyzer.extractTicketData();
-      window.postMessage({
-        type: 'TICKET_DATA_RESPONSE',
-        id: messageId,
-        success: true,
-        data: ticketData
-      }, '*');
+      window.postMessage(
+        {
+          type: 'TICKET_DATA_RESPONSE',
+          id: messageId,
+          success: true,
+          data: ticketData,
+        },
+        '*'
+      );
     } catch (error) {
-      window.postMessage({
-        type: 'TICKET_DATA_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'TICKET_DATA_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleChatMessage(contextData: any, messageId: string): Promise<void> {
+  private async handleChatMessage(
+    contextData: any,
+    messageId: string
+  ): Promise<void> {
     try {
       // Extract current ticket data if not provided in context
-      const finalTicketData = contextData.ticketData || await this.ticketAnalyzer.extractTicketData();
+      const finalTicketData =
+        contextData.ticketData ||
+        (await this.ticketAnalyzer.extractTicketData());
 
       // Prepare full context for background script
       const fullContextData = {
@@ -796,7 +902,7 @@ class BacklogAIInjector {
         ticketUrl: window.location.href, // Add current URL for background script
         timestamp: contextData.timestamp || new Date().toISOString(),
         attachments: contextData.attachments || [], // Include file attachments
-        commentContext: contextData.commentContext // Include comment context
+        commentContext: contextData.commentContext, // Include comment context
       };
 
       console.log('📤 [Content] Sending to background:', {
@@ -805,60 +911,75 @@ class BacklogAIInjector {
         hasTicketData: !!fullContextData.ticketData,
         chatHistoryLength: fullContextData.chatHistory.length,
         hasCommentContext: !!fullContextData.commentContext,
-        commentContext: fullContextData.commentContext
+        commentContext: fullContextData.commentContext,
       });
 
       // Send to background script with full context
       const response = await chrome.runtime.sendMessage({
         action: 'processUserMessage',
-        data: fullContextData
+        data: fullContextData,
       });
 
       console.log('📨 [Content] Background response:', response);
 
-      window.postMessage({
-        type: 'CHAT_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.response : null,
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.response : null,
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error handling chat message:', error);
-      window.postMessage({
-        type: 'CHAT_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleSummaryRequest(ticketData: any, messageId: string): Promise<void> {
+  private async handleSummaryRequest(
+    ticketData: any,
+    messageId: string
+  ): Promise<void> {
     try {
       // Handle summary request via background script
       const response = await chrome.runtime.sendMessage({
         action: 'requestTicketSummary',
         data: {
           ticketId: ticketData.id,
-          ticketData: ticketData
-        }
+          ticketData: ticketData,
+        },
       });
 
-      window.postMessage({
-        type: 'SUMMARY_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.summary : null,
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SUMMARY_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.summary : null,
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
-      window.postMessage({
-        type: 'SUMMARY_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SUMMARY_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
@@ -866,129 +987,182 @@ class BacklogAIInjector {
     try {
       // Request user info via background script
       const response = await chrome.runtime.sendMessage({
-        action: 'getCurrentUser'
+        action: 'getCurrentUser',
       });
 
-      window.postMessage({
-        type: 'USER_INFO_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.data : null,
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'USER_INFO_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : null,
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('Error getting user info:', error);
-      window.postMessage({
-        type: 'USER_INFO_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'USER_INFO_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
   private async handleGetBacklogs(messageId: string): Promise<void> {
     try {
       const response = await chrome.runtime.sendMessage({
-        action: 'getBacklogSettings'
+        action: 'getBacklogSettings',
       });
 
-      window.postMessage({
-        type: 'GET_BACKLOGS_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.data : [],
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'GET_BACKLOGS_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : [],
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error getting backlogs:', error);
-      window.postMessage({
-        type: 'GET_BACKLOGS_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'GET_BACKLOGS_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleFetchBacklogProjects(backlog: any, messageId: string): Promise<void> {
-    console.log('🔎 ~ BacklogAIInjector ~ handleFetchBacklogProjects ~ backlog:', {backlog, messageId});
+  private async handleFetchBacklogProjects(
+    backlog: any,
+    messageId: string
+  ): Promise<void> {
+    console.log(
+      '🔎 ~ BacklogAIInjector ~ handleFetchBacklogProjects ~ backlog:',
+      { backlog, messageId }
+    );
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'fetchBacklogProjects',
-        data: backlog
+        data: backlog,
       });
 
-      window.postMessage({
-        type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.data : [],
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : [],
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error fetching backlog projects:', error);
-      window.postMessage({
-        type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'FETCH_BACKLOG_PROJECTS_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleFetchIssueTypes(backlog: any, projectKey: string, messageId: string): Promise<void> {
-    console.log('🔎 ~ BacklogAIInjector ~ handleFetchIssueTypes ~ backlog:', {backlog, projectKey, messageId});
+  private async handleFetchIssueTypes(
+    backlog: any,
+    projectKey: string,
+    messageId: string
+  ): Promise<void> {
+    console.log('🔎 ~ BacklogAIInjector ~ handleFetchIssueTypes ~ backlog:', {
+      backlog,
+      projectKey,
+      messageId,
+    });
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'fetchIssueTypes',
-        data: { ...backlog, projectKey }
+        data: { ...backlog, projectKey },
       });
 
-      window.postMessage({
-        type: 'FETCH_ISSUE_TYPES_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.data : [],
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'FETCH_ISSUE_TYPES_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : [],
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error fetching issue types:', error);
-      window.postMessage({
-        type: 'FETCH_ISSUE_TYPES_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'FETCH_ISSUE_TYPES_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleChatStorageLoad(messageId: string, ticketKey: string): Promise<void> {
+  private async handleChatStorageLoad(
+    messageId: string,
+    ticketKey: string
+  ): Promise<void> {
     try {
-      const result = await chrome.storage.local.get([`chat-history-${ticketKey}`]);
+      const result = await chrome.storage.local.get([
+        `chat-history-${ticketKey}`,
+      ]);
       const historyData = result[`chat-history-${ticketKey}`];
 
       // Extract messages array from the ChatHistoryData structure
       const messages = historyData?.messages || [];
 
-      window.postMessage({
-        type: 'CHAT_STORAGE_LOAD_RESPONSE',
-        id: messageId,
-        success: true,
-        data: messages
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_LOAD_RESPONSE',
+          id: messageId,
+          success: true,
+          data: messages,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('Error loading chat history:', error);
-      window.postMessage({
-        type: 'CHAT_STORAGE_LOAD_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_LOAD_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleChatStorageSave(messageId: string, ticketKey: string, saveData: any): Promise<void> {
+  private async handleChatStorageSave(
+    messageId: string,
+    ticketKey: string,
+    saveData: any
+  ): Promise<void> {
     try {
       // Construct ChatHistoryData structure
       const historyData = {
@@ -996,62 +1170,79 @@ class BacklogAIInjector {
         ticketUrl: window.location.href,
         messages: (saveData.messages || []).slice(-100).map((msg: any) => ({
           ...msg,
-          timestamp: new Date(msg.timestamp).toISOString()  // Convert any other type to ISO string
+          timestamp: new Date(msg.timestamp).toISOString(), // Convert any other type to ISO string
         })), // Keep only recent 100 messages and normalize timestamps as ISO strings
         lastUpdated: new Date().toISOString(),
         userInfo: saveData.userInfo,
         ticketInfo: {
           title: (saveData.ticketData?.title || '').slice(0, 200),
           status: saveData.ticketData?.status || '',
-          assignee: (saveData.ticketData?.assignee || '').slice(0, 100)
-        }
+          assignee: (saveData.ticketData?.assignee || '').slice(0, 100),
+        },
       };
 
       await chrome.storage.local.set({
-        [`chat-history-${ticketKey}`]: historyData
+        [`chat-history-${ticketKey}`]: historyData,
       });
 
-      window.postMessage({
-        type: 'CHAT_STORAGE_SAVE_RESPONSE',
-        id: messageId,
-        success: true
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_SAVE_RESPONSE',
+          id: messageId,
+          success: true,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('Error saving chat history:', error);
-      window.postMessage({
-        type: 'CHAT_STORAGE_SAVE_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_SAVE_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
-  private async handleChatStorageClear(messageId: string, ticketKey?: string): Promise<void> {
+  private async handleChatStorageClear(
+    messageId: string,
+    ticketKey?: string
+  ): Promise<void> {
     try {
       if (ticketKey) {
         await chrome.storage.local.remove([`chat-history-${ticketKey}`]);
       } else {
         const result = await chrome.storage.local.get(null);
-        const keysToRemove = Object.keys(result).filter(key => key.startsWith('chat-history-'));
+        const keysToRemove = Object.keys(result).filter((key) =>
+          key.startsWith('chat-history-')
+        );
         if (keysToRemove.length > 0) {
           await chrome.storage.local.remove(keysToRemove);
         }
       }
 
-      window.postMessage({
-        type: 'CHAT_STORAGE_CLEAR_RESPONSE',
-        id: messageId,
-        success: true
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_CLEAR_RESPONSE',
+          id: messageId,
+          success: true,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('Error clearing chat history:', error);
-      window.postMessage({
-        type: 'CHAT_STORAGE_CLEAR_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'CHAT_STORAGE_CLEAR_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
@@ -1059,55 +1250,70 @@ class BacklogAIInjector {
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'GET_SECTION',
-        section: 'aiModels'
+        section: 'aiModels',
       });
 
       if (response.success) {
-        window.postMessage({
-          type: 'MODEL_SETTINGS_RESPONSE',
-          success: true,
-          data: {
-            selectedModels: response.data.selectedModels.sort() || [],
-            preferredModel: response.data.preferredModel || 'gemini-2.5-flash'
-          }
-        }, '*');
+        window.postMessage(
+          {
+            type: 'MODEL_SETTINGS_RESPONSE',
+            success: true,
+            data: {
+              selectedModels: response.data.selectedModels.sort() || [],
+              preferredModel:
+                response.data.preferredModel || 'gemini-2.5-flash',
+            },
+          },
+          '*'
+        );
       } else {
         throw new Error(response.error || 'Failed to get AI model settings');
       }
     } catch (error) {
       console.error('Error getting model settings:', error);
-      window.postMessage({
-        type: 'MODEL_SETTINGS_RESPONSE',
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'MODEL_SETTINGS_RESPONSE',
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
   private async handleUpdatePreferredModel(modelId: string): Promise<void> {
     try {
       // Use statically imported availableModels to determine provider
-      const selectedModel = availableModels.find(model => model.id === modelId);
+      const selectedModel = availableModels.find(
+        (model) => model.id === modelId
+      );
       const preferredProvider = selectedModel?.provider || 'openai';
 
       await chrome.storage.sync.set({
         preferredModel: modelId,
-        preferredProvider: preferredProvider
+        preferredProvider: preferredProvider,
       });
 
-      window.postMessage({
-        type: 'PREFERRED_MODEL_UPDATED',
-        success: true,
-        modelId: modelId,
-        provider: preferredProvider
-      }, '*');
+      window.postMessage(
+        {
+          type: 'PREFERRED_MODEL_UPDATED',
+          success: true,
+          modelId: modelId,
+          provider: preferredProvider,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('Error updating preferred model:', error);
-      window.postMessage({
-        type: 'PREFERRED_MODEL_UPDATED',
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'PREFERRED_MODEL_UPDATED',
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 
@@ -1117,7 +1323,9 @@ class BacklogAIInjector {
 
       const checkGlobals = () => {
         attempts++;
-        console.log(`🔍 [ContentScript] Checking globals (attempt ${attempts}/${maxAttempts})`);
+        console.log(
+          `🔍 [ContentScript] Checking globals (attempt ${attempts}/${maxAttempts})`
+        );
 
         // Try to access globals in different ways
         let React, ReactDOM, ChatbotAsidePanel;
@@ -1127,7 +1335,10 @@ class BacklogAIInjector {
           ReactDOM = (window as any).ReactDOM;
           ChatbotAsidePanel = (window as any).ChatbotAsidePanel;
         } catch (error) {
-          console.warn('🔍 [ContentScript] Error accessing window globals:', error);
+          console.warn(
+            '🔍 [ContentScript] Error accessing window globals:',
+            error
+          );
         }
 
         // Also try accessing through document or other means
@@ -1139,13 +1350,16 @@ class BacklogAIInjector {
 
         if (!ReactDOM) {
           try {
-            ReactDOM = (document as any).ReactDOM || (globalThis as any).ReactDOM;
+            ReactDOM =
+              (document as any).ReactDOM || (globalThis as any).ReactDOM;
           } catch (e) {}
         }
 
         if (!ChatbotAsidePanel) {
           try {
-            ChatbotAsidePanel = (document as any).ChatbotAsidePanel || (globalThis as any).ChatbotAsidePanel;
+            ChatbotAsidePanel =
+              (document as any).ChatbotAsidePanel ||
+              (globalThis as any).ChatbotAsidePanel;
           } catch (e) {}
         }
 
@@ -1154,8 +1368,15 @@ class BacklogAIInjector {
           this.reactGlobals = { React, ReactDOM, ChatbotAsidePanel };
           resolve();
         } else if (attempts >= maxAttempts) {
-          console.error('❌ [ContentScript] Failed to find globals. Window keys:', Object.keys(window).slice(0, 20));
-          reject(new Error(`Globals not available after ${maxAttempts} attempts. React: ${!!React}, ReactDOM: ${!!ReactDOM}, ChatbotAsidePanel: ${!!ChatbotAsidePanel}`));
+          console.error(
+            '❌ [ContentScript] Failed to find globals. Window keys:',
+            Object.keys(window).slice(0, 20)
+          );
+          reject(
+            new Error(
+              `Globals not available after ${maxAttempts} attempts. React: ${!!React}, ReactDOM: ${!!ReactDOM}, ChatbotAsidePanel: ${!!ChatbotAsidePanel}`
+            )
+          );
         } else {
           setTimeout(checkGlobals, delay);
         }
@@ -1181,7 +1402,7 @@ class BacklogAIInjector {
         // Send ticket data to background for analysis
         chrome.runtime.sendMessage({
           action: 'analyzeTicket',
-          data: ticketData
+          data: ticketData,
         });
       }
     } catch (error) {
@@ -1191,11 +1412,14 @@ class BacklogAIInjector {
 
   private async getBacklogSettings(): Promise<{ configs: any[] }> {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        action: 'getBacklogSettings'
-      }, (response) => {
-        resolve(response || { configs: [] });
-      });
+      chrome.runtime.sendMessage(
+        {
+          action: 'getBacklogSettings',
+        },
+        (response) => {
+          resolve(response || { configs: [] });
+        }
+      );
     });
   }
 
@@ -1251,7 +1475,10 @@ class BacklogAIInjector {
   private handleSidebarWidthChange(width: number): void {
     try {
       // Update CSS custom property for dynamic width
-      document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${width}px`);
+      document.documentElement.style.setProperty(
+        '--ai-ext-sidebar-width',
+        `${width}px`
+      );
 
       // Update chatbot container width if it exists
       if (this.chatbotAsideContainer) {
@@ -1268,8 +1495,13 @@ class BacklogAIInjector {
       console.log('💾 [Content] Saving width to storage:', width);
 
       // Check if remember chatbox size feature is enabled
-      const featureResult = await chrome.storage.sync.get(['rememberChatboxSize']);
-      const rememberSizeEnabled = featureResult.rememberChatboxSize !== undefined ? featureResult.rememberChatboxSize : true;
+      const featureResult = await chrome.storage.sync.get([
+        'rememberChatboxSize',
+      ]);
+      const rememberSizeEnabled =
+        featureResult.rememberChatboxSize !== undefined
+          ? featureResult.rememberChatboxSize
+          : true;
 
       if (rememberSizeEnabled) {
         await chrome.storage.local.set({ 'ai-ext-sidebar-width': width });
@@ -1281,12 +1513,14 @@ class BacklogAIInjector {
       this.handleSidebarWidthChange(width);
 
       // Broadcast width change to other tabs
-      chrome.runtime.sendMessage({
-        action: 'sidebarWidthChanged',
-        width: width
-      }).catch(() => {
-        // Ignore errors if background script is not available
-      });
+      chrome.runtime
+        .sendMessage({
+          action: 'sidebarWidthChanged',
+          width: width,
+        })
+        .catch(() => {
+          // Ignore errors if background script is not available
+        });
     } catch (error) {
       console.error('❌ [Content] Could not save width:', error);
     }
@@ -1294,27 +1528,40 @@ class BacklogAIInjector {
 
   private handleOpenChatboxWithComment(commentData: any): void {
     try {
-      console.log('📝 [Content] Opening chatbox with comment data:', commentData);
+      console.log(
+        '📝 [Content] Opening chatbox with comment data:',
+        commentData
+      );
 
       // Gửi comment data đến chatbot component
-      window.postMessage({
-        type: 'COMMENT_CONTEXT_LOADED',
-        data: commentData
-      }, '*');
-
+      window.postMessage(
+        {
+          type: 'COMMENT_CONTEXT_LOADED',
+          data: commentData,
+        },
+        '*'
+      );
     } catch (error) {
-      console.error('❌ [Content] Error handling open chatbox with comment:', error);
+      console.error(
+        '❌ [Content] Error handling open chatbox with comment:',
+        error
+      );
     }
   }
 
   private handleOpenOptionsPage(): void {
     try {
       // Send message to background script to open options page
-      chrome.runtime.sendMessage({
-        action: 'openOptionsPage'
-      }).catch((error) => {
-        console.error('❌ [Content] Error sending openOptionsPage message:', error);
-      });
+      chrome.runtime
+        .sendMessage({
+          action: 'openOptionsPage',
+        })
+        .catch((error) => {
+          console.error(
+            '❌ [Content] Error sending openOptionsPage message:',
+            error
+          );
+        });
     } catch (error) {
       console.error('❌ [Content] Error handling open options page:', error);
     }
@@ -1325,43 +1572,57 @@ class BacklogAIInjector {
       console.log('📝 [Content] Loading comment context:', commentData);
 
       // Gửi comment data đến chatbot component để hiển thị và focus textarea
-      window.postMessage({
-        type: 'COMMENT_CONTEXT_LOADED',
-        data: commentData
-      }, '*');
-
+      window.postMessage(
+        {
+          type: 'COMMENT_CONTEXT_LOADED',
+          data: commentData,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error handling load comment context:', error);
     }
   }
 
-  private async handleGetCommentContext(commentData: any, messageId: string): Promise<void> {
+  private async handleGetCommentContext(
+    commentData: any,
+    messageId: string
+  ): Promise<void> {
     try {
       console.log('📝 [Content] Getting comment context:', commentData);
 
       // Call background script to get comment context from API
       const response = await chrome.runtime.sendMessage({
         action: 'getCommentContext',
-        data: commentData
+        data: commentData,
       });
 
-      console.log('📨 [Content] Background response for comment context:', response);
+      console.log(
+        '📨 [Content] Background response for comment context:',
+        response
+      );
 
-      window.postMessage({
-        type: 'COMMENT_CONTEXT_RESPONSE',
-        id: messageId,
-        success: response.success,
-        data: response.success ? response.data : null,
-        error: response.success ? null : response.error
-      }, '*');
+      window.postMessage(
+        {
+          type: 'COMMENT_CONTEXT_RESPONSE',
+          id: messageId,
+          success: response.success,
+          data: response.success ? response.data : null,
+          error: response.success ? null : response.error,
+        },
+        '*'
+      );
     } catch (error) {
       console.error('❌ [Content] Error handling get comment context:', error);
-      window.postMessage({
-        type: 'COMMENT_CONTEXT_RESPONSE',
-        id: messageId,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, '*');
+      window.postMessage(
+        {
+          type: 'COMMENT_CONTEXT_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
     }
   }
 }
