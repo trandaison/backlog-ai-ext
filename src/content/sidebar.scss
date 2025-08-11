@@ -1,11 +1,11 @@
 /* Sidebar AI Extension Styles */
-@use "sass:color";
+@use 'sass:color';
 
 // Variables
 $sidebar-width: 400px;
 $animation-duration: 0.15s;
 $animation-easing: ease-in-out;
-$primary-color: #4CBA95;
+$primary-color: #4cba95;
 $border-color: #c4c4c4;
 $bg-color: white;
 $text-color: #333;
@@ -19,7 +19,11 @@ $border-light-2: rgba(0, 0, 0, 0.18);
 }
 
 // Mixins
-@mixin transition($property, $duration: $animation-duration, $easing: $animation-easing) {
+@mixin transition(
+  $property,
+  $duration: $animation-duration,
+  $easing: $animation-easing
+) {
   transition: $property $duration $easing;
 }
 
@@ -60,7 +64,8 @@ body.ai-ext-sidebar-open {
     .comment-editor.-fixed-footer {
       width: calc(100% - 200px - var(--ai-ext-sidebar-width));
       right: var(--ai-ext-sidebar-width);
-      transition: width $animation-duration $animation-easing, right $animation-duration $animation-easing;
+      transition: width $animation-duration $animation-easing,
+        right $animation-duration $animation-easing;
     }
 
     &.is_project-nav-collapsed .comment-editor.-fixed-footer {
@@ -696,13 +701,13 @@ body.ai-ext-sidebar-open {
         background: #e9ecef;
         border-color: #adb5bd;
         transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
       }
 
       &:active:not(:disabled) {
         background: #dee2e6;
         transform: translateY(0);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
       }
 
       &:disabled {
@@ -758,7 +763,7 @@ body.ai-ext-sidebar-open {
     border-radius: 50%;
 
     &.ai-ext-ai-avatar {
-      background: #4CBA95;
+      background: #4cba95;
     }
   }
 
@@ -796,7 +801,7 @@ body.ai-ext-sidebar-open {
     margin-top: 4px;
   }
 
-    .ai-ext-attachments-title {
+  .ai-ext-attachments-title {
     font-size: 10px;
     font-weight: 600;
     color: #d2e7ff;
@@ -852,9 +857,15 @@ body.ai-ext-sidebar-open {
     background: #6c757d;
     animation: typing 1.4s infinite ease-in-out;
 
-    &:nth-child(1) { animation-delay: -0.32s; }
-    &:nth-child(2) { animation-delay: -0.16s; }
-    &:nth-child(3) { animation-delay: 0s; }
+    &:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+    &:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0s;
+    }
   }
 }
 
@@ -984,7 +995,7 @@ body.ai-ext-sidebar-open {
   }
 
   // Highlight the default option differently
-  option[value=""] {
+  option[value=''] {
     font-weight: 500;
     color: #495057;
   }
@@ -1027,7 +1038,7 @@ body.ai-ext-sidebar-open {
 .ai-ext-attachment-item {
   display: inline-flex;
   align-items: center;
-  background: linear-gradient(135deg, #4CBA95, #3a9b7a);
+  background: linear-gradient(135deg, #4cba95, #3a9b7a);
   border: none;
   border-radius: 12px;
   padding: 4px 6px 4px 8px;
@@ -1157,8 +1168,8 @@ body.ai-ext-sidebar-open {
 }
 
 .ai-ext-root .ai-ext-send-button {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: none;
   border-radius: 50%;
   background: #007bff;
@@ -1181,8 +1192,12 @@ body.ai-ext-sidebar-open {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 // Error State
@@ -1276,12 +1291,18 @@ body.ai-ext-sidebar-open {
 
 // Animations
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes typing {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.4;
   }
@@ -1303,7 +1324,8 @@ body.ai-ext-sidebar-open {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

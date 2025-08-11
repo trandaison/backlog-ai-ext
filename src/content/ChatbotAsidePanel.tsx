@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TicketAnalyzer } from '../shared/ticketAnalyzer';
 import { ChatStorageService } from '../shared/chatStorageService';
-import { formatRelativeTime, formatFullTimestamp, safeTimestampToDate } from '../shared/timeUtils';
+import {
+  formatRelativeTime,
+  formatFullTimestamp,
+  safeTimestampToDate,
+} from '../shared/timeUtils';
 import { MarkdownRenderer } from '../shared/MarkdownRenderer';
 import { availableModels, defaultModelId } from '../configs';
 import { parseCommand } from '../shared/commandUtils';
@@ -10,13 +14,14 @@ import { AttachmentUtils } from '../shared/attachmentUtils';
 import TranslateModal from '../shared/TranslateModal';
 import CreateTicketModal from '../chatbot/components/CreateTicketModal';
 import Modal from '../shared/Modal';
-import { TicketData, UserInfo } from "../types/backlog";
-import { ChatMessage } from "../types/chat";
+import { TicketData, UserInfo } from '../types/backlog';
+import { ChatMessage } from '../types/chat';
 import CommentContextPreview from './CommentContextPreview';
 import { ISSUE_URL_REGEX, SPACE_URL_REGEX } from '../configs/backlog';
 
 // AI Icon as data URL
-const aiIcon = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgdmlld0JveD0iMCAwIDE0MiAxNDIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNzk2XzQ1OSkiPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTExMi41MjEgMTQxLjI3N0gyOS41NDk0QzEzLjgyNDMgMTQxLjI3NyAwLjk1NzAzMSAxMjguMzkgMC45NTcwMzEgMTEyLjYzOVYyOS41MzEyQzAuOTU3MDMxIDEzLjc4MDQgMTMuODI0MyAwLjg5MzU1NSAyOS41NDk0IDAuODkzNTU1SDExMi41MjFDMTI4LjI0NiAwLjg5MzU1NSAxNDEuMTEyIDEzLjc4MDQgMTQxLjExMiAyOS41MzEyVjExMi42MzlDMTQxLjExMiAxMjguMzkgMTI4LjI0NiAxNDEuMjc3IDExMi41MjEgMTQxLjI3N1oiIGZpbGw9IiM0MkNFOUYiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01Mi4xOTkgNjEuMzI0MkM1Mi4xNDQzIDcyLjk3NTIgNTIuMTE0OCA4NC4zMTI3IDUyLjE0NDIgOTEuMDk2NEM2Mi4yNzU4IDkwLjU0NjcgNjcuMjkzOSA4OC40ODI3IDcxLjI2MzQgODMuNzEzOEM3NC4wNzc3IDgwLjMzMjUgNzQuNjg2OSA3Ni40NTkxIDcyLjk4IDcyLjgwNzlDNzAuNzQ2OCA2OC4wMzMzIDY0LjE4MDYgNjIuOTkwMiA1Mi4xOTkgNjEuMzI0MlpNNDUuNTM1OSAxMDQuNzk2QzQzLjczNSAxMDQuNzk2IDQyLjAwNzEgMTA0LjA3NiA0MC43MzgyIDEwMi43OTdMNDAuNzM1NCAxMDIuNzk0QzM4Ljc0MzYgMTAwLjc4NSAzOC43MTU1IDk4Ljg2MjggMzguNjY1IDk1LjM3NDdDMzguNjM5NyA5My42NTEgMzguNjI0MyA5MS4yMDg5IDM4LjYxNzMgODguMjkwMUMzOC42MDYgODMuMTcyNSAzOC42MTg3IDc2LjA3MTEgMzguNjUzOCA2Ny4xODEzQzM4LjcxNTUgNTEuODg2MSAzOC44MjY0IDM2LjYzODcgMzguODI2NCAzNi42Mzg3TDUyLjM0NSAzNi43MzcxQzUyLjMxOTcgNDAuMTE1NiA1Mi4yOTU4IDQzLjgzMDEgNTIuMjcyIDQ3LjcwNjJDNjguMjY4IDQ5LjU1MzYgODAuMjgzMiA1Ni41MDA0IDg1LjIyMjcgNjcuMDY2Qzg5LjE2NDEgNzUuNDk0NiA4Ny44MjY1IDg0Ljk1OTQgODEuNjQ3NiA5Mi4zODQyQzcyLjExNjggMTAzLjgzNyA1OC41ODE0IDEwNC43OTYgNDUuNTM1OSAxMDQuNzk2WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTk4LjQ0MTQgMjcuMzY3MkM5OC40MzM1IDI2LjI2MiA5OC43NzM2IDI1LjE4MzEgOTkuNDEyMSAyNC4yODIyQzEwMC4wMTEgMjMuNDM3NiAxMDAuODQ0IDIyLjc4ODcgMTAxLjgwNiAyMi40MTVMMTAyIDIyLjM0MzdMMTAyLjAzMSAyMi4zMzRMMTA1LjE4OSAyMS4zMDQ3TDEwNS4zMTkgMjEuMjU2OEMxMDUuNjIgMjEuMTM2NSAxMDUuODk0IDIwLjk1NiAxMDYuMTI0IDIwLjcyNTZDMTA2LjM4NSAyMC40NjQgMTA2LjU4MSAyMC4xNDUgMTA2LjY5NyAxOS43OTQ5TDEwNy43MDQgMTYuNjk1M0MxMDguMDI5IDE1LjY3NDIgMTA4LjY1MyAxNC43NzYxIDEwOS40OTIgMTQuMTE2MkwxMDkuNjYyIDEzLjk4NzNMMTA5LjY2OSAxMy45ODI0TDEwOS42NzUgMTMuOTc4NUMxMTAuNTY4IDEzLjM0MjQgMTExLjYzOCAxMyAxMTIuNzM1IDEzQzExMy44MzIgMTMgMTE0LjkwMiAxMy4zNDIgMTE1Ljc5NiAxMy45Nzg1TDExNS43OTUgMTMuOTc5NUMxMTYuNjg1IDE0LjYxMTIgMTE3LjM2IDE1LjUwMTMgMTE3LjcyNiAxNi41MzAzTDExNy43MzUgMTYuNTU2NkwxMTcuNzQ0IDE2LjU4M0wxMTguNzc1IDE5Ljc2MjdDMTE4Ljg5NCAyMC4xMDcyIDExOS4wOSAyMC40MTk5IDExOS4zNDkgMjAuNjc3N0MxMTkuNjEyIDIwLjkzOTkgMTE5LjkzMiAyMS4xMzczIDEyMC4yODQgMjEuMjUzOUwxMjMuMzkzIDIyLjI2NTZMMTIzLjQxMiAyMi4yNzE1QzEyNC40NzIgMjIuNjI4NiAxMjUuMzk0IDIzLjMxMjQgMTI2LjA0MiAyNC4yMjU2TDEyNi4xNjMgMjQuNDA3MkMxMjYuNzEgMjUuMjU4MSAxMjcgMjYuMjQ5MSAxMjYuOTk5IDI3LjI2MjdDMTI2Ljk5OSAyNy4yNjgyIDEyNyAyNy4yNzM4IDEyNyAyNy4yNzkzTDEyNi45OTkgMjcuMjc5M0MxMjcgMjguMjk5MyAxMjYuNzA1IDI5LjI5NiAxMjYuMTUyIDMwLjE0OTRMMTI2LjAzOCAzMC4zMTkzQzEyNS40MDggMzEuMjEyNCAxMjQuNTE2IDMxLjg4OTQgMTIzLjQ4MyAzMi4yNTM5TDEyMy40NTkgMzIuMjYyN0wxMjMuNDM2IDMyLjI2OTVMMTIwLjI2OSAzMy4yOTg4QzExOS45MTUgMzMuNDE1IDExOS41OTQgMzMuNjEyMiAxMTkuMzMxIDMzLjg3NUwxMTkuMzMgMzMuODc1QzExOS4wNjkgMzQuMTM1MyAxMTguODcyIDM0LjQ1MjYgMTE4Ljc1NSAzNC44MDE4TDExNy43NCAzNy45MjA5TDExNy43MzggMzcuOTI4N0wxMTcuNzM1IDM3LjkzNTVDMTE3LjM4MiAzOC45OTM0IDExNi43MDUgMzkuOTEyMyAxMTUuOCA0MC41NjI1TDExNS43OTQgNDAuNTY2NEMxMTQuOSA0MS4yMDM2IDExMy44MyA0MS41NDU5IDExMi43MzIgNDEuNTQ1OUMxMTEuNzA0IDQxLjU0NTkgMTEwLjcgNDEuMjQ0OCAxMDkuODQyIDQwLjY4MjZMMTA5LjY3MiA0MC41Njc0QzEwOC43ODIgMzkuOTM1NyAxMDguMTA4IDM5LjA0NDMgMTA3Ljc0MiAzOC4wMTU2TDEwNy43MzIgMzcuOTg5M0wxMDcuNzI0IDM3Ljk2MjlMMTA2LjcwMSAzNC44MTE1QzEwNi41NzkgMzQuNDc1NyAxMDYuMzgzIDM0LjE3MDkgMTA2LjEyNyAzMy45MjA5QzEwNS44NjUgMzMuNjY1NSAxMDUuNTQ4IDMzLjQ3NDEgMTA1LjIgMzMuMzYwM0wxMDIuMDc0IDMyLjMzOThMMTAyLjA3MSAzMi4zMzg5QzEwMS4wMjIgMzEuOTk0OCAxMDAuMTA2IDMxLjMyOTYgOTkuNDU1MSAzMC40Mzc1Qzk4LjgwMzcgMjkuNTQ1MSA5OC40NDkzIDI4LjQ3MTQgOTguNDQxNCAyNy4zNjcyWk02MyA1My4yOTU5QzYzIDUyLjA1NzUgNjMuMzUzNiA1MC44NDY5IDY0LjAxNTYgNDkuODA0N0w2NC4xNTE0IDQ5LjU5NzdMNjQuMTU4MiA0OS41ODg5TDY0LjE2NDEgNDkuNTgwMUM2NC44ODM5IDQ4LjU2MTEgNjUuODg0NCA0Ny43NzQ3IDY3LjA0MSA0Ny4zMTU0TDY3LjI3NDQgNDcuMjI3NUw2Ny4yOTc5IDQ3LjIxOTdMNjcuMzIyMyA0Ny4yMTE5TDczLjQwOTIgNDUuMjM0NEw3My44NjgyIDQ1LjA2NjRDNzQuOTI3NiA0NC42NDI2IDc1Ljg5MTggNDQuMDA3MSA3Ni43MDAyIDQzLjE5NzNDNzcuNjIxMSA0Mi4yNzQ0IDc4LjMxNDUgNDEuMTUwMyA3OC43MjY2IDM5LjkxNDFMODAuNjc5NyAzMy45MTAyTDgwLjY3OTcgMzMuOTA5Mkw4MC42OTE0IDMzLjg3NEw4MC42OTE0IDMzLjg3NUM4MC45ODk5IDMyLjkxNTggODEuNTA4NSAzMi4wMzg3IDgyLjIwOCAzMS4zMTY0QzgyLjkxNTYgMzAuNTg1NSA4My43ODcgMzAuMDMzMyA4NC43NSAyOS43MDUxQzg1LjcxMzEgMjkuMzc2NyA4Ni43NDAxIDI5LjI4MjcgODcuNzQ2MSAyOS40Mjg3Qzg4Ljc0OTQgMjkuNTc0MyA4OS43MDI5IDI5Ljk1NjEgOTAuNTMwMyAzMC41NDFMOTAuNTMxMiAzMC41NEM5MS42MjUxIDMxLjMwNzMgOTIuNDUxNSAzMi4zOTgzIDkyLjg5MzYgMzMuNjU5Mkw5Mi45MDE0IDMzLjY4MDdMOTIuOTA4MiAzMy43MDMxTDk0Ljg4NTcgMzkuNzkxTDk0Ljg4NjcgMzkuNzlDOTUuMjQ5MiA0MC44NzUzIDk1LjgyODggNDEuODczNiA5Ni41ODc5IDQyLjcyNTZMOTYuOTIzOCA0My4wODJDOTcuODQ2OCA0NC4wMDQ0IDk4Ljk3MTkgNDQuNzAxNCAxMDAuMjEgNDUuMTE1MkwxMDAuMjExIDQ1LjExNDNMMTA2LjU5NSA0Ny4yMTA5TDEwNi42ODYgNDcuMjQxMkwxMDYuNzcyIDQ3LjI3ODNDMTA3LjkxOSA0Ny43Nzk3IDEwOC44OTQgNDguNjA0NyAxMDkuNTc5IDQ5LjY1MTRMMTA5LjU4IDQ5LjY1MTRDMTEwLjI2NSA1MC42OTgxIDExMC42MyA1MS45MjI1IDExMC42MzEgNTMuMTczOEwxMTAuNjMxIDUzLjE3NThDMTEwLjYzIDU0LjUwNzQgMTEwLjIxNSA1NS44MDU0IDEwOS40NDYgNTYuODkxNkwxMDkuNDQ2IDU2Ljg5MjZDMTA4LjY3NyA1Ny45NzkgMTA3LjU4OSA1OC44MDAxIDEwNi4zMzMgNTkuMjQzMkwxMDYuMzExIDU5LjI1MUwxMDYuMjg3IDU5LjI1ODhMMTAwLjE5NiA2MS4yNDMyQzk5LjI5MDQgNjEuNTQwMyA5OC40NDE4IDYxLjk5MDggOTcuNjg4NSA2Mi41NzUyTDk3LjY4MjYgNjIuNTgwMUM5Ny40MDU4IDYyLjc5MzEgOTcuMTQyNSA2My4wMjMyIDk2Ljg5NTUgNjMuMjY5NUM5NS45NjYzIDY0LjIwMDUgOTUuMjY2MSA2NS4zMzQ5IDk0Ljg0ODYgNjYuNTgyTDk0Ljg0ODYgNjYuNTgzTDkyLjg5MjYgNzIuNjA2NEw5Mi44ODQ4IDcyLjYzMThDOTIuNDU1MiA3My44OTg4IDkxLjY0MDYgNzUuMDAwMyA5MC41NTU3IDc1Ljc4MzJDODkuNDcwOCA3Ni41NjU5IDg4LjE2ODggNzYuOTkxMiA4Ni44MzExIDc3Qzg1LjQ5MzQgNzcuMDA4NyA4NC4xODU4IDc2LjU5OTggODMuMDkwOCA3NS44MzExTDgzLjA5MDggNzUuODMyQzgxLjk5NTcgNzUuMDYzNCA4MS4xNjY4IDczLjk3MjMgODAuNzIwNyA3Mi43MTA5TDgwLjcxMTkgNzIuNjg2NUw4MC43MDQxIDcyLjY2MTFMNzguNzMwNSA2Ni41ODU5Qzc4LjMxMTYgNjUuMzgzNCA3Ny42MjU2IDY0LjI5MTMgNzYuNzIyNyA2My4zOTI2Qzc1LjgyMDkgNjIuNDk1MSA3NC43MjY5IDYxLjgxNDMgNzMuNTIzNCA2MS40MDA0TDY3LjM2MjMgNTkuMzk1NUw2Ny4zNDY3IDU5LjM5MDZMNjcuMzMxMSA1OS4zODQ4QzY2LjA1MjkgNTguOTQ1NiA2NC45NDUgNTguMTE1NSA2NC4xNjUgNTcuMDExN0w2NC4xNTgyIDU3LjAwMjlMNjQuMTUyMyA1Ni45OTMyQzYzLjQwMjIgNTUuOTA2MSA2My4wMDAxIDU0LjYxNjYgNjMgNTMuMjk1OVoiIGZpbGw9IiNGRkY2MDAiIHN0cm9rZT0iIzQyQ0U5RiIgc3Ryb2tlLXdpZHRoPSI0Ii8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfMTc5Nl80NTkiPgo8cmVjdCB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K";
+const aiIcon =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgdmlld0JveD0iMCAwIDE0MiAxNDIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNzk2XzQ1OSkiPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTExMi41MjEgMTQxLjI3N0gyOS41NDk0QzEzLjgyNDMgMTQxLjI3NyAwLjk1NzAzMSAxMjguMzkgMC45NTcwMzEgMTEyLjYzOVYyOS41MzEyQzAuOTU3MDMxIDEzLjc4MDQgMTMuODI0MyAwLjg5MzU1NSAyOS41NDk0IDAuODkzNTU1SDExMi41MjFDMTI4LjI0NiAwLjg5MzU1NSAxNDEuMTEyIDEzLjc4MDQgMTQxLjExMiAyOS41MzEyVjExMi42MzlDMTQxLjExMiAxMjguMzkgMTI4LjI0NiAxNDEuMjc3IDExMi41MjEgMTQxLjI3N1oiIGZpbGw9IiM0MkNFOUYiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01Mi4xOTkgNjEuMzI0MkM1Mi4xNDQzIDcyLjk3NTIgNTIuMTE0OCA4NC4zMTI3IDUyLjE0NDIgOTEuMDk2NEM2Mi4yNzU4IDkwLjU0NjcgNjcuMjkzOSA4OC40ODI3IDcxLjI2MzQgODMuNzEzOEM3NC4wNzc3IDgwLjMzMjUgNzQuNjg2OSA3Ni40NTkxIDcyLjk4IDcyLjgwNzlDNzAuNzQ2OCA2OC4wMzMzIDY0LjE4MDYgNjIuOTkwMiA1Mi4xOTkgNjEuMzI0MlpNNDUuNTM1OSAxMDQuNzk2QzQzLjczNSAxMDQuNzk2IDQyLjAwNzEgMTA0LjA3NiA0MC43MzgyIDEwMi43OTdMNDAuNzM1NCAxMDIuNzk0QzM4Ljc0MzYgMTAwLjc4NSAzOC43MTU1IDk4Ljg2MjggMzguNjY1IDk1LjM3NDdDMzguNjM5NyA5My42NTEgMzguNjI0MyA5MS4yMDg5IDM4LjYxNzMgODguMjkwMUMzOC42MDYgODMuMTcyNSAzOC42MTg3IDc2LjA3MTEgMzguNjUzOCA2Ny4xODEzQzM4LjcxNTUgNTEuODg2MSAzOC44MjY0IDM2LjYzODcgMzguODI2NCAzNi42Mzg3TDUyLjM0NSAzNi43MzcxQzUyLjMxOTcgNDAuMTE1NiA1Mi4yOTU4IDQzLjgzMDEgNTIuMjcyIDQ3LjcwNjJDNjguMjY4IDQ5LjU1MzYgODAuMjgzMiA1Ni41MDA0IDg1LjIyMjcgNjcuMDY2Qzg5LjE2NDEgNzUuNDk0NiA4Ny44MjY1IDg0Ljk1OTQgODEuNjQ3NiA5Mi4zODQyQzcyLjExNjggMTAzLjgzNyA1OC41ODE0IDEwNC43OTYgNDUuNTM1OSAxMDQuNzk2WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTk4LjQ0MTQgMjcuMzY3MkM5OC40MzM1IDI2LjI2MiA5OC43NzM2IDI1LjE4MzEgOTkuNDEyMSAyNC4yODIyQzEwMC4wMTEgMjMuNDM3NiAxMDAuODQ0IDIyLjc4ODcgMTAxLjgwNiAyMi40MTVMMTAyIDIyLjM0MzdMMTAyLjAzMSAyMi4zMzRMMTA1LjE4OSAyMS4zMDQ3TDEwNS4zMTkgMjEuMjU2OEMxMDUuNjIgMjEuMTM2NSAxMDUuODk0IDIwLjk1NiAxMDYuMTI0IDIwLjcyNTZDMTA2LjM4NSAyMC40NjQgMTA2LjU4MSAyMC4xNDUgMTA2LjY5NyAxOS43OTQ5TDEwNy43MDQgMTYuNjk1M0MxMDguMDI5IDE1LjY3NDIgMTA4LjY1MyAxNC43NzYxIDEwOS40OTIgMTQuMTE2MkwxMDkuNjYyIDEzLjk4NzNMMTA5LjY2OSAxMy45ODI0TDEwOS42NzUgMTMuOTc4NUMxMTAuNTY4IDEzLjM0MjQgMTExLjYzOCAxMyAxMTIuNzM1IDEzQzExMy44MzIgMTMgMTE0LjkwMiAxMy4zNDIgMTE1Ljc5NiAxMy45Nzg1TDExNS43OTUgMTMuOTc5NUMxMTYuNjg1IDE0LjYxMTIgMTE3LjM2IDE1LjUwMTMgMTE3LjcyNiAxNi41MzAzTDExNy43MzUgMTYuNTU2NkwxMTcuNzQ0IDE2LjU4M0wxMTguNzc1IDE5Ljc2MjdDMTE4Ljg5NCAyMC4xMDcyIDExOS4wOSAyMC40MTk5IDExOS4zNDkgMjAuNjc3N0MxMTkuNjEyIDIwLjkzOTkgMTE5LjkzMiAyMS4xMzczIDEyMC4yODQgMjEuMjUzOUwxMjMuMzkzIDIyLjI2NTZMMTIzLjQxMiAyMi4yNzE1QzEyNC40NzIgMjIuNjI4NiAxMjUuMzk0IDIzLjMxMjQgMTI2LjA0MiAyNC4yMjU2TDEyNi4xNjMgMjQuNDA3MkMxMjYuNzEgMjUuMjU4MSAxMjcgMjYuMjQ5MSAxMjYuOTk5IDI3LjI2MjdDMTI2Ljk5OSAyNy4yNjgyIDEyNyAyNy4yNzM4IDEyNyAyNy4yNzkzTDEyNi45OTkgMjcuMjc5M0MxMjcgMjguMjk5MyAxMjYuNzA1IDI5LjI5NiAxMjYuMTUyIDMwLjE0OTRMMTI2LjAzOCAzMC4zMTkzQzEyNS40MDggMzEuMjEyNCAxMjQuNTE2IDMxLjg4OTQgMTIzLjQ4MyAzMi4yNTM5TDEyMy40NTkgMzIuMjYyN0wxMjMuNDM2IDMyLjI2OTVMMTIwLjI2OSAzMy4yOTg4QzExOS45MTUgMzMuNDE1IDExOS41OTQgMzMuNjEyMiAxMTkuMzMxIDMzLjg3NUwxMTkuMzMgMzMuODc1QzExOS4wNjkgMzQuMTM1MyAxMTguODcyIDM0LjQ1MjYgMTE4Ljc1NSAzNC44MDE4TDExNy43NCAzNy45MjA5TDExNy43MzggMzcuOTI4N0wxMTcuNzM1IDM3LjkzNTVDMTE3LjM4MiAzOC45OTM0IDExNi43MDUgMzkuOTEyMyAxMTUuOCA0MC41NjI1TDExNS43OTQgNDAuNTY2NEMxMTQuOSA0MS4yMDM2IDExMy44MyA0MS41NDU5IDExMi43MzIgNDEuNTQ1OUMxMTEuNzA0IDQxLjU0NTkgMTEwLjcgNDEuMjQ0OCAxMDkuODQyIDQwLjY4MjZMMTA5LjY3MiA0MC41Njc0QzEwOC43ODIgMzkuOTM1NyAxMDguMTA4IDM5LjA0NDMgMTA3Ljc0MiAzOC4wMTU2TDEwNy43MzIgMzcuOTg5M0wxMDcuNzI0IDM3Ljk2MjlMMTA2LjcwMSAzNC44MTE1QzEwNi41NzkgMzQuNDc1NyAxMDYuMzgzIDM0LjE3MDkgMTA2LjEyNyAzMy45MjA5QzEwNS44NjUgMzMuNjY1NSAxMDUuNTQ4IDMzLjQ3NDEgMTA1LjIgMzMuMzYwM0wxMDIuMDc0IDMyLjMzOThMMTAyLjA3MSAzMi4zMzg5QzEwMS4wMjIgMzEuOTk0OCAxMDAuMTA2IDMxLjMyOTYgOTkuNDU1MSAzMC40Mzc1Qzk4LjgwMzcgMjkuNTQ1MSA5OC40NDkzIDI4LjQ3MTQgOTguNDQxNCAyNy4zNjcyWk02MyA1My4yOTU5QzYzIDUyLjA1NzUgNjMuMzUzNiA1MC44NDY5IDY0LjAxNTYgNDkuODA0N0w2NC4xNTE0IDQ5LjU5NzdMNjQuMTU4MiA0OS41ODg5TDY0LjE2NDEgNDkuNTgwMUM2NC44ODM5IDQ4LjU2MTEgNjUuODg0NCA0Ny43NzQ3IDY3LjA0MSA0Ny4zMTU0TDY3LjI3NDQgNDcuMjI3NUw2Ny4yOTc5IDQ3LjIxOTdMNjcuMzIyMyA0Ny4yMTE5TDczLjQwOTIgNDUuMjM0NEw3My44NjgyIDQ1LjA2NjRDNzQuOTI3NiA0NC42NDI2IDc1Ljg5MTggNDQuMDA3MSA3Ni43MDAyIDQzLjE5NzNDNzcuNjIxMSA0Mi4yNzQ0IDc4LjMxNDUgNDEuMTUwMyA3OC43MjY2IDM5LjkxNDFMODAuNjc5NyAzMy45MTAyTDgwLjY3OTcgMzMuOTA5Mkw4MC42OTE0IDMzLjg3NEw4MC42OTE0IDMzLjg3NUM4MC45ODk5IDMyLjkxNTggODEuNTA4NSAzMi4wMzg3IDgyLjIwOCAzMS4zMTY0QzgyLjkxNTYgMzAuNTg1NSA4My43ODcgMzAuMDMzMyA4NC43NSAyOS43MDUxQzg1LjcxMzEgMjkuMzc2NyA4Ni43NDAxIDI5LjI4MjcgODcuNzQ2MSAyOS40Mjg3Qzg4Ljc0OTQgMjkuNTc0MyA4OS43MDI5IDI5Ljk1NjEgOTAuNTMwMyAzMC41NDFMOTAuNTMxMiAzMC41NEM5MS42MjUxIDMxLjMwNzMgOTIuNDUxNSAzMi4zOTgzIDkyLjg5MzYgMzMuNjU5Mkw5Mi45MDE0IDMzLjY4MDdMOTIuOTA4MiAzMy43MDMxTDk0Ljg4NTcgMzkuNzkxTDk0Ljg4NjcgMzkuNzlDOTUuMjQ5MiA0MC44NzUzIDk1LjgyODggNDEuODczNiA5Ni41ODc5IDQyLjcyNTZMOTYuOTIzOCA0My4wODJDOTcuODQ2OCA0NC4wMDQ0IDk4Ljk3MTkgNDQuNzAxNCAxMDAuMjEgNDUuMTE1MkwxMDAuMjExIDQ1LjExNDNMMTA2LjU5NSA0Ny4yMTA5TDEwNi42ODYgNDcuMjQxMkwxMDYuNzcyIDQ3LjI3ODNDMTA3LjkxOSA0Ny43Nzk3IDEwOC44OTQgNDguNjA0NyAxMDkuNTc5IDQ5LjY1MTRMMTA5LjU4IDQ5LjY1MTRDMTEwLjI2NSA1MC42OTgxIDExMC42MyA1MS45MjI1IDExMC42MzEgNTMuMTczOEwxMTAuNjMxIDUzLjE3NThDMTEwLjYzIDU0LjUwNzQgMTEwLjIxNSA1NS44MDU0IDEwOS40NDYgNTYuODkxNkwxMDkuNDQ2IDU2Ljg5MjZDMTA4LjY3NyA1Ny45NzkgMTA3LjU4OSA1OC44MDAxIDEwNi4zMzMgNTkuMjQzMkwxMDYuMzExIDU5LjI1MUwxMDYuMjg3IDU5LjI1ODhMMTAwLjE5NiA2MS4yNDMyQzk5LjI5MDQgNjEuNTQwMyA5OC40NDE4IDYxLjk5MDggOTcuNjg4NSA2Mi41NzUyTDk3LjY4MjYgNjIuNTgwMUM5Ny40MDU4IDYyLjc5MzEgOTcuMTQyNSA2My4wMjMyIDk2Ljg5NTUgNjMuMjY5NUM5NS45NjYzIDY0LjIwMDUgOTUuMjY2MSA2NS4zMzQ5IDk0Ljg0ODYgNjYuNTgyTDk0Ljg0ODYgNjYuNTgzTDkyLjg5MjYgNzIuNjA2NEw5Mi44ODQ4IDcyLjYzMThDOTIuNDU1MiA3My44OTg4IDkxLjY0MDYgNzUuMDAwMyA5MC41NTU3IDc1Ljc4MzJDODkuNDcwOCA3Ni41NjU5IDg4LjE2ODggNzYuOTkxMiA4Ni44MzExIDc3Qzg1LjQ5MzQgNzcuMDA4NyA4NC4xODU4IDc2LjU5OTggODMuMDkwOCA3NS44MzExTDgzLjA5MDggNzUuODMyQzgxLjk5NTcgNzUuMDYzNCA4MS4xNjY4IDczLjk3MjMgODAuNzIwNyA3Mi43MTA5TDgwLjcxMTkgNzIuNjg2NUw4MC43MDQxIDcyLjY2MTFMNzguNzMwNSA2Ni41ODU5Qzc4LjMxMTYgNjUuMzgzNCA3Ny42MjU2IDY0LjI5MTMgNzYuNzIyNyA2My4zOTI2Qzc1LjgyMDkgNjIuNDk1MSA3NC43MjY5IDYxLjgxNDMgNzMuNTIzNCA2MS40MDA0TDY3LjM2MjMgNTkuMzk1NUw2Ny4zNDY3IDU5LjM5MDZMNjcuMzMxMSA1OS4zODQ4QzY2LjA1MjkgNTguOTQ1NiA2NC45NDUgNTguMTE1NSA2NC4xNjUgNTcuMDExN0w2NC4xNTgyIDU3LjAwMjlMNjQuMTUyMyA1Ni45OTMyQzYzLjQwMjIgNTUuOTA2MSA2My4wMDAxIDU0LjYxNjYgNjMgNTMuMjk1OVoiIGZpbGw9IiNGRkY2MDAiIHN0cm9rZT0iIzQyQ0U5RiIgc3Ryb2tlLXdpZHRoPSI0Ii8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfMTc5Nl80NTkiPgo8cmVjdCB3aWR0aD0iMTQyIiBoZWlnaHQ9IjE0MiIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K';
 
 interface ChatbotAsidePanelProps {
   ticketAnalyzer: TicketAnalyzer;
@@ -24,7 +29,11 @@ interface ChatbotAsidePanelProps {
   initialWidth?: number;
 }
 
-const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, onClose, initialWidth }) => {
+const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
+  ticketAnalyzer,
+  onClose,
+  initialWidth,
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -67,6 +76,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   const [isTranslateModalOpen, setIsTranslateModalOpen] = useState(false);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
 
+  // Feature flags state
+  const [enterToSend, setEnterToSend] = useState(true); // Default to true (Enter to send)
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +88,32 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   const MIN_WIDTH = 200;
   const MAX_WIDTH = 1000;
   const STORAGE_KEY = 'ai-ext-sidebar-width';
+
+  // Generate placeholder text based on enterToSend setting
+  const getPlaceholderText = () => {
+    const isMac = navigator.platform.includes('Mac');
+    const modifierKey = isMac ? '⌘' : 'Ctrl';
+
+    if (enterToSend) {
+      return `Nhập câu hỏi về ticket... (Enter để gửi • Shift + Enter để xuống dòng)`;
+    } else {
+      return `Nhập câu hỏi về ticket... (Enter để xuống dòng • ${modifierKey} + Enter để gửi)`;
+    }
+  };
+
+  // Generate send button title based on enterToSend setting
+  const getSendButtonTitle = () => {
+    const isMac = navigator.platform.includes('Mac');
+    const modifierKey = isMac ? 'Cmd' : 'Ctrl';
+
+    if (enterToSend) {
+      return isTyping ? 'Đang xử lý...' : `Gửi tin nhắn (Enter để gửi)`;
+    } else {
+      return isTyping
+        ? 'Đang xử lý...'
+        : `Gửi tin nhắn (${modifierKey} + Enter)`;
+    }
+  };
 
   // Auto-resize textarea function
   const autoResizeTextarea = (textarea: HTMLTextAreaElement) => {
@@ -100,8 +138,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     if (!initialWidth) {
       loadSavedWidth();
     }
-    // Load model settings
+    // Load model settings and feature flags
     loadModelSettings();
+    loadFeatureFlags();
   }, []);
 
   useEffect(() => {
@@ -114,27 +153,41 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       if (event.source !== window) return;
 
       if (event.data.type === 'SIDEBAR_WIDTH_UPDATE') {
-        const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), event.data.width));
+        const newWidth = Math.max(
+          MIN_WIDTH,
+          Math.min(getMaxAllowedWidth(), event.data.width)
+        );
         setSidebarWidth(newWidth);
       } else if (event.data.type === 'TICKET_CHANGE') {
         handleTicketChange(event.data);
       } else if (event.data.type === 'MODEL_SETTINGS_RESPONSE') {
         // Handle model settings response from content script
         if (event.data.success) {
-          const { selectedModels: responseSelectedModels, preferredModel } = event.data.data;
+          const { selectedModels: responseSelectedModels, preferredModel } =
+            event.data.data;
 
           // Filter to only include available models
-          const validSelectedModels = responseSelectedModels.filter((modelId: string) =>
-            availableModels.some(m => m.id === modelId)
+          const validSelectedModels = responseSelectedModels.filter(
+            (modelId: string) => availableModels.some((m) => m.id === modelId)
           );
-          setSelectedModels(validSelectedModels.length > 0 ? validSelectedModels : [defaultModelId]);
+          setSelectedModels(
+            validSelectedModels.length > 0
+              ? validSelectedModels
+              : [defaultModelId]
+          );
 
           // Set current model to preferred model if it's in selected models
-          const validCurrentModel = validSelectedModels.includes(preferredModel) ? preferredModel :
-                                   (validSelectedModels.length > 0 ? validSelectedModels[0] : defaultModelId);
+          const validCurrentModel = validSelectedModels.includes(preferredModel)
+            ? preferredModel
+            : validSelectedModels.length > 0
+            ? validSelectedModels[0]
+            : defaultModelId;
           setCurrentModel(validCurrentModel);
         } else {
-          console.error('❌ [ChatbotAsidePanel] Error loading model settings via message:', event.data.error);
+          console.error(
+            '❌ [ChatbotAsidePanel] Error loading model settings via message:',
+            event.data.error
+          );
           // Fallback to defaults
           setSelectedModels([defaultModelId]);
           setCurrentModel(defaultModelId);
@@ -143,7 +196,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       } else if (event.data.type === 'COMMENT_CONTEXT_LOADED') {
         // Handle comment context from comment enhancer
         const commentData = event.data.data;
-        console.log('📝 [ChatbotAsidePanel] Received comment context:', commentData);
+        console.log(
+          '📝 [ChatbotAsidePanel] Received comment context:',
+          commentData
+        );
 
         // Load comment context from API
         handleLoadCommentContext(commentData);
@@ -164,12 +220,17 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         try {
           setIsLoadingHistory(true);
 
-          const savedMessages = await ChatStorageService.loadChatHistory(ticketData.id);
+          const savedMessages = await ChatStorageService.loadChatHistory(
+            ticketData.id
+          );
           if (savedMessages.length > 0) {
             setMessages(savedMessages);
           }
         } catch (error) {
-          console.error('❌ [ChatbotAsidePanel] Failed to load chat history:', error);
+          console.error(
+            '❌ [ChatbotAsidePanel] Failed to load chat history:',
+            error
+          );
           setStorageWarning('Không thể tải lịch sử chat.');
           setTimeout(() => setStorageWarning(null), 5000);
         } finally {
@@ -184,7 +245,12 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   // Auto-save messages when they change
   useEffect(() => {
     const saveChatHistory = async () => {
-      if (!autoSaveEnabled || !ticketData?.id || !userInfo || messages.length === 0) {
+      if (
+        !autoSaveEnabled ||
+        !ticketData?.id ||
+        !userInfo ||
+        messages.length === 0
+      ) {
         return;
       }
 
@@ -200,9 +266,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           setStorageWarning(result.error || 'Lỗi lưu chat history');
 
           // Disable auto-save if storage is consistently failing
-          if (result.error?.includes('đầy') || result.error?.includes('quota')) {
+          if (
+            result.error?.includes('đầy') ||
+            result.error?.includes('quota')
+          ) {
             setAutoSaveEnabled(false);
-            console.warn('⚠️ [ChatbotAsidePanel] Auto-save disabled due to storage issues');
+            console.warn(
+              '⚠️ [ChatbotAsidePanel] Auto-save disabled due to storage issues'
+            );
           }
         } else {
           // Clear any previous warnings on successful save
@@ -216,7 +287,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
             setTimeout(() => setStorageWarning(null), 5000);
           }
         }
-
       } catch (error) {
         console.error('❌ [ChatbotAsidePanel] Auto-save failed:', error);
         setStorageWarning('Không thể lưu chat history tự động.');
@@ -243,14 +313,20 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
   useEffect(() => {
     // Update CSS custom property for layout adjustment
-    document.documentElement.style.setProperty('--ai-ext-sidebar-width', `${sidebarWidth}px`);
+    document.documentElement.style.setProperty(
+      '--ai-ext-sidebar-width',
+      `${sidebarWidth}px`
+    );
 
     // Send message to content script to update outer container width
     // This is needed because the CSS positioning is based on .ai-ext-chatbot-aside, not .ai-ext-aside-content
-    window.postMessage({
-      type: 'SIDEBAR_WIDTH_CHANGED',
-      width: sidebarWidth
-    }, '*');
+    window.postMessage(
+      {
+        type: 'SIDEBAR_WIDTH_CHANGED',
+        width: sidebarWidth,
+      },
+      '*'
+    );
   }, [sidebarWidth]);
 
   // Load saved width from storage
@@ -258,17 +334,25 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     try {
       // Don't attempt chrome.storage.local if we're in main world without access
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log('⚠️ [ChatbotAsidePanel] Chrome storage not available in main world');
+        console.log(
+          '⚠️ [ChatbotAsidePanel] Chrome storage not available in main world'
+        );
         return;
       }
 
       const result = await chrome.storage.local.get([STORAGE_KEY]);
 
       if (result[STORAGE_KEY]) {
-        const savedWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), result[STORAGE_KEY]));
+        const savedWidth = Math.max(
+          MIN_WIDTH,
+          Math.min(getMaxAllowedWidth(), result[STORAGE_KEY])
+        );
         setSidebarWidth(savedWidth);
       } else {
-        console.log('ℹ️ [ChatbotAsidePanel] No saved width found, using default:', 400);
+        console.log(
+          'ℹ️ [ChatbotAsidePanel] No saved width found, using default:',
+          400
+        );
       }
     } catch (error) {
       console.log('❌ [ChatbotAsidePanel] Could not load saved width:', error);
@@ -282,29 +366,39 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       // If chrome.storage not available (main world), send message to content script
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log('📤 [ChatbotAsidePanel] Sending width save request to content script');
-        window.postMessage({
-          type: 'SAVE_SIDEBAR_WIDTH',
-          width: width
-        }, '*');
+        console.log(
+          '📤 [ChatbotAsidePanel] Sending width save request to content script'
+        );
+        window.postMessage(
+          {
+            type: 'SAVE_SIDEBAR_WIDTH',
+            width: width,
+          },
+          '*'
+        );
         return;
       }
 
       await chrome.storage.local.set({ [STORAGE_KEY]: width });
       // Broadcast width change to other tabs
-      chrome.runtime.sendMessage({
-        action: 'sidebarWidthChanged',
-        width: width
-      }).catch(() => {
-        // Ignore errors if background script is not available
-      });
+      chrome.runtime
+        .sendMessage({
+          action: 'sidebarWidthChanged',
+          width: width,
+        })
+        .catch(() => {
+          // Ignore errors if background script is not available
+        });
     } catch (error) {
       console.log('❌ [ChatbotAsidePanel] Could not save width:', error);
       // Fallback: send message to content script
-      window.postMessage({
-        type: 'SAVE_SIDEBAR_WIDTH',
-        width: width
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SAVE_SIDEBAR_WIDTH',
+          width: width,
+        },
+        '*'
+      );
     }
   };
 
@@ -315,34 +409,76 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
       // If chrome.storage not available (main world), use postMessage
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.log('📤 [ChatbotAsidePanel] Requesting model settings from content script');
-        window.postMessage({
-          type: 'GET_MODEL_SETTINGS'
-        }, '*');
+        console.log(
+          '📤 [ChatbotAsidePanel] Requesting model settings from content script'
+        );
+        window.postMessage(
+          {
+            type: 'GET_MODEL_SETTINGS',
+          },
+          '*'
+        );
         return;
       }
 
-      const result = await chrome.storage.sync.get(['selectedModels', 'preferredModel']);
+      const result = await chrome.storage.sync.get([
+        'selectedModels',
+        'preferredModel',
+      ]);
 
       // Set selected models (filter to only include available models)
       const savedSelectedModels = result.selectedModels || [];
-      const validSelectedModels = savedSelectedModels.filter((modelId: string) =>
-        availableModels.some(m => m.id === modelId)
+      const validSelectedModels = savedSelectedModels.filter(
+        (modelId: string) => availableModels.some((m) => m.id === modelId)
       );
-      setSelectedModels(validSelectedModels.length > 0 ? validSelectedModels : [defaultModelId]);
+      setSelectedModels(
+        validSelectedModels.length > 0 ? validSelectedModels : [defaultModelId]
+      );
 
       // Set current model to preferred model if it's in selected models
       const preferredModel = result.preferredModel || defaultModelId;
-      const validCurrentModel = validSelectedModels.includes(preferredModel) ? preferredModel :
-                               (validSelectedModels.length > 0 ? validSelectedModels[0] : defaultModelId);
+      const validCurrentModel = validSelectedModels.includes(preferredModel)
+        ? preferredModel
+        : validSelectedModels.length > 0
+        ? validSelectedModels[0]
+        : defaultModelId;
       setCurrentModel(validCurrentModel);
     } catch (error) {
-      console.error('❌ [ChatbotAsidePanel] Error loading model settings:', error);
+      console.error(
+        '❌ [ChatbotAsidePanel] Error loading model settings:',
+        error
+      );
       // Fallback to defaults
       setSelectedModels([defaultModelId]);
       setCurrentModel(defaultModelId);
     } finally {
       setIsLoadingModels(false);
+    }
+  };
+
+  // Load feature flags from storage
+  const loadFeatureFlags = async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'GET_SECTION',
+        section: 'features',
+      });
+
+      if (response.success) {
+        setEnterToSend(response.data.enterToSend !== false); // Default to true if undefined
+      } else {
+        console.error(
+          '❌ [ChatbotAsidePanel] Failed to load feature flags:',
+          response.error
+        );
+        // Keep default value
+      }
+    } catch (error) {
+      console.error(
+        '❌ [ChatbotAsidePanel] Error loading feature flags:',
+        error
+      );
+      // Keep default value
     }
   };
 
@@ -369,7 +505,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       // Calculate new width: when moving left (negative deltaX), width should increase
       // when moving right (positive deltaX), width should decrease
       const deltaX = startX - e.clientX; // This gives us the distance moved from start point
-      const newWidth = Math.max(MIN_WIDTH, Math.min(getMaxAllowedWidth(), initialWidth + deltaX));
+      const newWidth = Math.max(
+        MIN_WIDTH,
+        Math.min(getMaxAllowedWidth(), initialWidth + deltaX)
+      );
       currentWidth = newWidth; // Update current width
       setSidebarWidth(newWidth);
     };
@@ -399,22 +538,30 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       // Update preferred model in storage
       if (typeof chrome !== 'undefined' && chrome.storage) {
         // Determine provider based on selected model
-        const selectedModel = availableModels.find(model => model.id === modelId);
+        const selectedModel = availableModels.find(
+          (model) => model.id === modelId
+        );
         const preferredProvider = selectedModel?.provider || 'openai';
 
         await chrome.storage.sync.set({
           preferredModel: modelId,
-          preferredProvider: preferredProvider
+          preferredProvider: preferredProvider,
         });
       } else {
         // Send message to content script to update storage
-        window.postMessage({
-          type: 'UPDATE_PREFERRED_MODEL',
-          modelId: modelId
-        }, '*');
+        window.postMessage(
+          {
+            type: 'UPDATE_PREFERRED_MODEL',
+            modelId: modelId,
+          },
+          '*'
+        );
       }
     } catch (error) {
-      console.error('❌ [ChatbotAsidePanel] Error updating preferred model:', error);
+      console.error(
+        '❌ [ChatbotAsidePanel] Error updating preferred model:',
+        error
+      );
     }
   };
 
@@ -440,7 +587,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'USER_INFO_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'USER_INFO_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
@@ -453,10 +603,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'GET_USER_INFO',
-          id: messageId
-        }, '*');
+        window.postMessage(
+          {
+            type: 'GET_USER_INFO',
+            id: messageId,
+          },
+          '*'
+        );
 
         // Timeout after 10 seconds
         setTimeout(() => {
@@ -468,7 +621,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       if (response.success && response.data) {
         setUserInfo(response.data);
       } else {
-        console.log('❌ [ChatbotAsidePanel] Failed to load user info:', response.error);
+        console.log(
+          '❌ [ChatbotAsidePanel] Failed to load user info:',
+          response.error
+        );
       }
     } catch (error) {
       console.error('Error loading user info:', error);
@@ -496,10 +652,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         await loadTicketData();
 
         // Show transition notification
-        setStorageWarning(`Đã chuyển sang ticket ${changeData.newTicketId || 'mới'}`);
+        setStorageWarning(
+          `Đã chuyển sang ticket ${changeData.newTicketId || 'mới'}`
+        );
         setTimeout(() => setStorageWarning(null), 3000);
       } catch (error) {
-        console.error('❌ [ChatbotAsidePanel] Error during ticket transition:', error);
+        console.error(
+          '❌ [ChatbotAsidePanel] Error during ticket transition:',
+          error
+        );
         setStorageWarning('Lỗi khi chuyển đổi ticket');
         setTimeout(() => setStorageWarning(null), 5000);
       }
@@ -517,7 +678,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       setSummaryError('');
       setSummaryContent('');
 
-
       // Request summary via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
         const messageId = Date.now() + Math.random();
@@ -525,7 +685,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'SUMMARY_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'SUMMARY_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
@@ -538,12 +701,15 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'REQUEST_SUMMARY',
-          id: messageId,
-          ticketId: ticketData.id,
-          ticketData: ticketData
-        }, '*');
+        window.postMessage(
+          {
+            type: 'REQUEST_SUMMARY',
+            id: messageId,
+            ticketId: ticketData.id,
+            ticketData: ticketData,
+          },
+          '*'
+        );
 
         // Timeout
         setTimeout(() => {
@@ -566,7 +732,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     const suggestionMessages = {
       summary: 'Tóm tắt nội dung',
       explain: 'Giải thích yêu cầu ticket',
-      translate: 'Dịch nội dung ticket'
+      translate: 'Dịch nội dung ticket',
     };
 
     // Send the suggestion as a message with 'suggestion' type
@@ -612,7 +778,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     setIsCreateTicketModalOpen(false);
   };
 
-  const handleSendMessage = async (message: string, messageType: 'user' | 'suggestion' = 'user') => {
+  const handleSendMessage = async (
+    message: string,
+    messageType: 'user' | 'suggestion' = 'user'
+  ) => {
     if (!message.trim() || isTyping) return;
 
     // Check if this is a command that needs special processing
@@ -630,7 +799,8 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       content: message.trim(), // Store clean content without attachment list
       sender: 'user',
       timestamp: new Date(),
-      attachments: currentAttachments.length > 0 ? currentAttachments : undefined // Store attachments separately
+      attachments:
+        currentAttachments.length > 0 ? currentAttachments : undefined, // Store attachments separately
     };
 
     // Update messages with the new user message
@@ -662,14 +832,17 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         currentModel: currentModel, // Include current selected model
         timestamp: new Date().toISOString(),
         attachments: currentAttachments, // Include file attachments
-        commentContext: commentContext // Include comment context
+        commentContext: commentContext, // Include comment context
       };
 
       // Debug log to check comment context
-      console.log('🔍 [ChatbotAsidePanel] Sending contextData with commentContext:', {
-        hasCommentContext: !!commentContext,
-        commentContext: commentContext
-      });
+      console.log(
+        '🔍 [ChatbotAsidePanel] Sending contextData with commentContext:',
+        {
+          hasCommentContext: !!commentContext,
+          commentContext: commentContext,
+        }
+      );
 
       // Send message with full context via postMessage to content script
       const response = await new Promise<any>((resolve, reject) => {
@@ -678,13 +851,19 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'CHAT_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'CHAT_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
               resolve({ response: event.data.data, success: true });
             } else {
-              console.error('❌ [ChatbotAsidePanel] Response error:', event.data.error);
+              console.error(
+                '❌ [ChatbotAsidePanel] Response error:',
+                event.data.error
+              );
               reject(new Error(event.data.error));
             }
           }
@@ -692,11 +871,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'CHAT_MESSAGE',
-          id: messageId,
-          data: contextData
-        }, '*');
+        window.postMessage(
+          {
+            type: 'CHAT_MESSAGE',
+            id: messageId,
+            data: contextData,
+          },
+          '*'
+        );
 
         // Timeout
         setTimeout(() => {
@@ -709,23 +891,22 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         id: (Date.now() + 1).toString(),
         content: response.response,
         sender: 'ai',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev, aiMessage];
         return newMessages;
       });
-
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: `Lỗi: ${error}`,
         sender: 'ai',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
     }
@@ -774,7 +955,11 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       return;
     }
 
-    if (!window.confirm('Bạn có chắc muốn xóa toàn bộ lịch sử chat cho ticket này? Hành động này không thể hoàn tác.')) {
+    if (
+      !window.confirm(
+        'Bạn có chắc muốn xóa toàn bộ lịch sử chat cho ticket này? Hành động này không thể hoàn tác.'
+      )
+    ) {
       return;
     }
 
@@ -790,7 +975,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         setTimeout(() => setStorageWarning(null), 5000);
       }
     } catch (error) {
-      console.error('❌ [ChatbotAsidePanel] Failed to clear chat history:', error);
+      console.error(
+        '❌ [ChatbotAsidePanel] Failed to clear chat history:',
+        error
+      );
       setStorageWarning('Lỗi khi xóa lịch sử chat.');
       setTimeout(() => setStorageWarning(null), 5000);
     }
@@ -819,9 +1007,12 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   // Function to open options page
   const handleOpenOptions = () => {
     // Send message to content script to open options page
-    window.postMessage({
-      type: 'OPEN_OPTIONS_PAGE'
-    }, '*');
+    window.postMessage(
+      {
+        type: 'OPEN_OPTIONS_PAGE',
+      },
+      '*'
+    );
   };
 
   // File attachment handlers
@@ -831,7 +1022,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
     }
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -850,12 +1043,16 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           errors.push(`${file.name}: ${result.error}`);
         }
       } catch (error) {
-        errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(
+          `${file.name}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        );
       }
     }
 
     if (newAttachments.length > 0) {
-      setAttachments(prev => [...prev, ...newAttachments]);
+      setAttachments((prev) => [...prev, ...newAttachments]);
     }
 
     if (errors.length > 0) {
@@ -873,7 +1070,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
   };
 
   const handleRemoveAttachment = (attachmentId: string) => {
-    setAttachments(prev => prev.filter(att => att.id !== attachmentId));
+    setAttachments((prev) => prev.filter((att) => att.id !== attachmentId));
   };
 
   const handleClearAllAttachments = () => {
@@ -897,7 +1094,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
       const issueKey = issueMatch[1];
       const spaceInfo = {
         spaceName: spaceMatch[1],
-        domain: spaceMatch[2]
+        domain: spaceMatch[2],
       };
 
       // Send message to content script with unique ID
@@ -907,7 +1104,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'COMMENT_CONTEXT_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'COMMENT_CONTEXT_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
@@ -920,15 +1120,18 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'GET_COMMENT_CONTEXT',
-          id: messageId,
-          data: {
-            spaceInfo,
-            issueKey,
-            commentId: commentData.id
-          }
-        }, '*');
+        window.postMessage(
+          {
+            type: 'GET_COMMENT_CONTEXT',
+            id: messageId,
+            data: {
+              spaceInfo,
+              issueKey,
+              commentId: commentData.id,
+            },
+          },
+          '*'
+        );
 
         // Timeout
         setTimeout(() => {
@@ -946,22 +1149,27 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
           textareaRef.current.focus();
         }
 
-        console.log('✅ [ChatbotAsidePanel] Comment context loaded:', response.data);
+        console.log(
+          '✅ [ChatbotAsidePanel] Comment context loaded:',
+          response.data
+        );
       } else {
         throw new Error(response.error || 'Không thể tải thông tin comment');
       }
-
     } catch (error) {
-      console.error('❌ [ChatbotAsidePanel] Error loading comment context:', error);
+      console.error(
+        '❌ [ChatbotAsidePanel] Error loading comment context:',
+        error
+      );
 
       // Show error message in chat
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: `❌ Lỗi khi tải thông tin comment: ${error}`,
         sender: 'ai',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoadingCommentContext(false);
     }
@@ -1369,25 +1577,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
             </div>
           )}
 
-          {/* Comment Context Badge */}
-          {/* {commentContext && (
-            <div className="ai-ext-comment-context-badge">
-              <div className="ai-ext-comment-context-info">
-                <span className="ai-ext-comment-context-icon">💬</span>
-                <span className="ai-ext-comment-context-text">
-                  Comment #{commentContext.selectedComment.id} - {commentContext.selectedComment.createdUser?.name || 'Unknown'}
-                </span>
-                <pre>{JSON.stringify(commentContext, null, 2)}</pre>
-              </div>
-              <button
-                className="ai-ext-comment-context-remove"
-                onClick={handleRemoveCommentContext}
-                title="Remove comment context"
-              >
-                ×
-              </button>
-            </div>
-          )} */}
           {commentContext && (
             <CommentContextPreview
               commentContext={commentContext}
@@ -1408,19 +1597,56 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
             <textarea
               ref={textareaRef}
               className='ai-ext-chat-input'
-              placeholder={`Nhập câu hỏi về ticket... (Enter để xuống dòng • ${
-                navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
-              } + Enter để gửi)`}
+              placeholder={getPlaceholderText()}
               value={currentMessage}
               onChange={(e) => {
                 setCurrentMessage(e.target.value);
                 autoResizeTextarea(e.target as HTMLTextAreaElement);
               }}
               onKeyDown={(e) => {
-                // Handle Ctrl+Enter or Cmd+Enter to submit
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  handleSendMessage(currentMessage);
+                if (e.key === 'Enter') {
+                  // Helper function to insert new line manually
+                  const insertNewLine = () => {
+                    e.preventDefault();
+                    const textarea = e.target as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const newValue =
+                      currentMessage.substring(0, start) +
+                      '\n' +
+                      currentMessage.substring(end);
+                    setCurrentMessage(newValue);
+
+                    // Set cursor position after the new line
+                    setTimeout(() => {
+                      textarea.selectionStart = textarea.selectionEnd =
+                        start + 1;
+                      autoResizeTextarea(textarea);
+                    }, 0);
+                  };
+
+                  if (enterToSend) {
+                    // Enter to send mode: Enter sends, modifier keys for new line
+                    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+                      // Insert new line with Ctrl/Cmd/Shift/Alt + Enter
+                      insertNewLine();
+                    } else {
+                      // Send message with plain Enter
+                      e.preventDefault();
+                      handleSendMessage(currentMessage);
+                    }
+                  } else {
+                    // Traditional mode: Enter for new line, Ctrl/Cmd+Enter to send
+                    if (e.ctrlKey || e.metaKey) {
+                      // Send message with Ctrl/Cmd+Enter
+                      e.preventDefault();
+                      handleSendMessage(currentMessage);
+                    } else if (e.shiftKey || e.altKey) {
+                      // Insert new line with Shift/Alt + Enter (manual handling for consistency)
+                      insertNewLine();
+                    }
+                    // Allow new line with plain Enter (default behavior)
+                  }
                 }
               }}
               disabled={isTyping}
@@ -1434,11 +1660,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({ ticketAnalyzer, o
               className='ai-ext-send-button'
               onClick={() => handleSendMessage(currentMessage)}
               disabled={!currentMessage.trim() || isTyping}
-              title={
-                isTyping ? 'Đang xử lý...' : 'Gửi tin nhắn (Ctrl/Cmd + Enter)'
-              }
+              title={getSendButtonTitle()}
             >
-              {isTyping ? '⏳' : '📤'}
+              {isTyping ? '⏳' : '↑'}
             </button>
           </div>
         </div>
