@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Backlog AI Assistant",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "description": "AI-powered assistant for Backlog ticket analysis and chat",
   "permissions": [
     "activeTab",
@@ -21,8 +21,13 @@
         "*://*.backlog.jp/view/*",
         "*://*.backlogtool.com/view/*"
       ],
-      "js": ["content.js"],
-      "css": ["content-styles.css", "sidebar-styles.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content-styles.css",
+        "sidebar-styles.css"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -51,7 +56,11 @@
         "sidebar-styles.css",
         "icons/icon.svg"
       ],
-      "matches": ["*://*.backlog.com/*", "*://*.backlog.jp/*", "*://*.backlogtool.com/*"]
+      "matches": [
+        "*://*.backlog.com/*",
+        "*://*.backlog.jp/*",
+        "*://*.backlogtool.com/*"
+      ]
     }
   ]
 }
