@@ -18,6 +18,8 @@ import { TicketData, UserInfo } from '../types/backlog';
 import { ChatMessage } from '../types/chat';
 import CommentContextPreview from './CommentContextPreview';
 import { ISSUE_URL_REGEX, SPACE_URL_REGEX } from '../configs/backlog';
+import IconBacklog from './icons/IconBacklog';
+import IconAI from './icons/IconAI';
 
 // AI Icon as data URL
 const aiIcon =
@@ -79,6 +81,12 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
   // Feature flags state
   const [enterToSend, setEnterToSend] = useState(true); // Default to true (Enter to send)
 
+  // Setup check state
+  const [needsSetup, setNeedsSetup] = useState<{
+    aiKeys: boolean;
+    backlogKeys: boolean;
+  } | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -134,13 +142,21 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
   };
 
   useEffect(() => {
-    // Load saved width immediately when component mounts, but only if no initialWidth provided
-    if (!initialWidth) {
-      loadSavedWidth();
-    }
-    // Load model settings and feature flags
-    loadModelSettings();
-    loadFeatureFlags();
+    // Check setup first
+    const initializeComponent = async () => {
+      const setupNeeded = await checkSetupNeeded();
+
+      if (!setupNeeded) {
+        // Only load data if setup is complete
+        if (!initialWidth) {
+          loadSavedWidth();
+        }
+        loadModelSettings();
+        loadFeatureFlags();
+      }
+    };
+
+    initializeComponent();
   }, []);
 
   useEffect(() => {
@@ -397,6 +413,128 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
       );
     } catch (error) {
       console.log('❌ [ChatbotAsidePanel] Could not save width:', error);
+    }
+  };
+
+  // Check if setup is needed (AI keys and Backlog keys)
+  const checkSetupNeeded = async () => {
+    try {
+      // Check AI models settings
+      const modelResponse = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (
+            event.data.type === 'MODEL_SETTINGS_RESPONSE' &&
+            event.data.id === messageId
+          ) {
+            window.removeEventListener('message', responseHandler);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage(
+          {
+            type: 'GET_MODEL_SETTINGS',
+            id: messageId,
+          },
+          '*'
+        );
+
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          reject(new Error('Timeout'));
+        }, 5000);
+      });
+
+      // Check Backlog settings
+      const backlogResponse = await new Promise<any>((resolve, reject) => {
+        const messageId = Date.now() + Math.random();
+
+        const responseHandler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          if (
+            event.data.type === 'BACKLOG_SETTINGS_RESPONSE' &&
+            event.data.id === messageId
+          ) {
+            window.removeEventListener('message', responseHandler);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', responseHandler);
+
+        window.postMessage(
+          {
+            type: 'GET_BACKLOG_SETTINGS',
+            id: messageId,
+          },
+          '*'
+        );
+
+        setTimeout(() => {
+          window.removeEventListener('message', responseHandler);
+          reject(new Error('Timeout'));
+        }, 5000);
+      });
+
+      // Check if AI keys are configured - at least one provider has API key
+      let hasAIKeys = false;
+      if (
+        modelResponse.success &&
+        modelResponse.data &&
+        modelResponse.data.aiProviderKeys
+      ) {
+        const providerKeys = modelResponse.data.aiProviderKeys;
+        hasAIKeys = Object.values(providerKeys).some(
+          (key: any) => key && typeof key === 'string' && key.trim().length > 0
+        );
+      }
+      console.log('🔎 ~ checkSetupNeeded ~ hasAIKeys:', hasAIKeys, {
+        modelResponse,
+      });
+
+      // Check if Backlog keys are configured for current domain
+      let hasBacklogKeys = false;
+      if (
+        backlogResponse.success &&
+        backlogResponse.data &&
+        backlogResponse.data.backlog
+      ) {
+        const currentDomain = window.location.hostname;
+        const backlogConfigs = backlogResponse.data.backlog;
+
+        hasBacklogKeys = backlogConfigs.some(
+          (config: any) =>
+            config.domain === currentDomain &&
+            config.apiKey &&
+            config.apiKey.trim().length > 0
+        );
+      }
+
+      if (!hasAIKeys || !hasBacklogKeys) {
+        setNeedsSetup({
+          aiKeys: !hasAIKeys,
+          backlogKeys: !hasBacklogKeys,
+        });
+        return true;
+      }
+
+      setNeedsSetup(null);
+      return false;
+    } catch (error) {
+      console.error('Error checking setup:', error);
+      // Assume setup is needed if we can't check
+      setNeedsSetup({
+        aiKeys: true,
+        backlogKeys: true,
+      });
+      return true;
     }
   };
 
@@ -989,11 +1127,12 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
   };
 
   // Function to open options page
-  const handleOpenOptions = () => {
+  const handleOpenOptions = (hash?: string) => {
     // Send message to content script to open options page
     window.postMessage(
       {
         type: 'OPEN_OPTIONS_PAGE',
+        hash: hash || '',
       },
       '*'
     );
@@ -1182,7 +1321,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         <div className='ai-ext-header-controls'>
           <button
             className='ai-ext-options-button'
-            onClick={handleOpenOptions}
+            onClick={() => handleOpenOptions()}
             title='Mở trang cài đặt'
           >
             ⚙️
@@ -1222,442 +1361,674 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         </div>
       )}
 
-      {/* Ticket Info */}
-      {ticketData && (
-        <div className='ai-ext-ticket-info'>
-          <div className='ai-ext-ticket-title'>
-            <div className='ai-ext-title-wrapper'>
+      {/* Setup Message - Replace entire content when setup is needed */}
+      {needsSetup ? (
+        <div
+          className='ai-ext-setup-container'
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '24px',
+            gap: '16px',
+          }}
+        >
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '24px',
+              }}
+            >
+              ⚙️
+            </div>
+            <h3
+              style={{
+                margin: '0 0 4px 0',
+                color: '#1a1a1a',
+                fontSize: '18px',
+                fontWeight: '600',
+              }}
+            >
+              Setup Required
+            </h3>
+            <p
+              style={{
+                margin: '0',
+                color: '#6b7280',
+                fontSize: '14px',
+              }}
+            >
+              Configure the following to get started
+            </p>
+          </div>
+
+          {/* Setup Items */}
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            {needsSetup.aiKeys && (
               <div
-                className={`ai-ext-title-content ${
-                  isTitleExpanded
-                    ? 'ai-ext-title-expanded'
-                    : 'ai-ext-title-truncated'
-                }`}
-                title={ticketData.title} // Tooltip showing full title
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
               >
-                <strong>{ticketData.id}</strong>:{' '}
-                {isTitleExpanded || !shouldTruncateTitle(ticketData.title)
-                  ? ticketData.title
-                  : getTruncatedTitle(ticketData.title)}
-              </div>
-              {shouldTruncateTitle(ticketData.title) && (
-                <button
-                  className='ai-ext-toggle-title-caret'
-                  onClick={() => setIsTitleExpanded(!isTitleExpanded)}
-                  title={
-                    isTitleExpanded ? 'Thu gọn tiêu đề' : 'Xem đầy đủ tiêu đề'
-                  }
-                  aria-label={
-                    isTitleExpanded ? 'Thu gọn tiêu đề' : 'Xem đầy đủ tiêu đề'
-                  }
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
                 >
-                  <svg
-                    width='12'
-                    height='12'
-                    viewBox='0 0 12 12'
-                    fill='currentColor'
-                    className={`ai-ext-caret-icon ${
-                      isTitleExpanded ? 'ai-ext-caret-up' : 'ai-ext-caret-down'
+                  <IconAI />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#1f2937',
+                      }}
+                    >
+                      AI API Keys
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      OpenAI, Gemini...
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleOpenOptions('ai-keys')}
+                  style={{
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s',
+                    minWidth: '60px',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#2563eb';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#3b82f6';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  Setup
+                </button>
+              </div>
+            )}
+
+            {needsSetup.backlogKeys && (
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <IconBacklog />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#1f2937',
+                      }}
+                    >
+                      Backlog Integration
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      {window.location.hostname}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleOpenOptions('backlog-keys')}
+                  style={{
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s',
+                    minWidth: '60px',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#059669';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#10b981';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  Setup
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              textAlign: 'center',
+              marginTop: '8px',
+            }}
+          >
+            <p
+              style={{
+                margin: '0',
+                fontSize: '11px',
+                color: '#9ca3af',
+              }}
+            >
+              Reload page after configuration
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Ticket Info */}
+          {ticketData && (
+            <div className='ai-ext-ticket-info'>
+              <div className='ai-ext-ticket-title'>
+                <div className='ai-ext-title-wrapper'>
+                  <div
+                    className={`ai-ext-title-content ${
+                      isTitleExpanded
+                        ? 'ai-ext-title-expanded'
+                        : 'ai-ext-title-truncated'
                     }`}
+                    title={ticketData.title} // Tooltip showing full title
                   >
-                    <path d='M6 8L2 4h8z' />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-          <div className='ai-ext-ticket-meta'>
-            <span className='ai-ext-status'>{ticketData.status}</span>
-            {ticketData.assignee && (
-              <span className='ai-ext-assignee'>👤 {ticketData.assignee}</span>
-            )}
-            {ticketData.priority && (
-              <span className='ai-ext-priority'>⚡ {ticketData.priority}</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Chat Section */}
-      <div className='ai-ext-chatbot-content'>
-        <div className='ai-ext-chat-header'>
-          <h4>💬 Chat với AI</h4>
-          <div className='ai-ext-chat-controls'>
-            {messages.length > 0 && (
-              <>
-                {!autoSaveEnabled && (
-                  <button
-                    className='ai-ext-control-button ai-ext-save-button'
-                    onClick={handleManualSave}
-                    title='Lưu chat history thủ công'
-                  >
-                    💾
-                  </button>
+                    <strong>{ticketData.id}</strong>:{' '}
+                    {isTitleExpanded || !shouldTruncateTitle(ticketData.title)
+                      ? ticketData.title
+                      : getTruncatedTitle(ticketData.title)}
+                  </div>
+                  {shouldTruncateTitle(ticketData.title) && (
+                    <button
+                      className='ai-ext-toggle-title-caret'
+                      onClick={() => setIsTitleExpanded(!isTitleExpanded)}
+                      title={
+                        isTitleExpanded
+                          ? 'Thu gọn tiêu đề'
+                          : 'Xem đầy đủ tiêu đề'
+                      }
+                      aria-label={
+                        isTitleExpanded
+                          ? 'Thu gọn tiêu đề'
+                          : 'Xem đầy đủ tiêu đề'
+                      }
+                    >
+                      <svg
+                        width='12'
+                        height='12'
+                        viewBox='0 0 12 12'
+                        fill='currentColor'
+                        className={`ai-ext-caret-icon ${
+                          isTitleExpanded
+                            ? 'ai-ext-caret-up'
+                            : 'ai-ext-caret-down'
+                        }`}
+                      >
+                        <path d='M6 8L2 4h8z' />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className='ai-ext-ticket-meta'>
+                <span className='ai-ext-status'>{ticketData.status}</span>
+                {ticketData.assignee && (
+                  <span className='ai-ext-assignee'>
+                    👤 {ticketData.assignee}
+                  </span>
                 )}
-                <button
-                  className='ai-ext-control-button ai-ext-clear-button'
-                  onClick={handleClearHistory}
-                  title='Xóa lịch sử chat'
-                >
-                  🗑️
-                </button>
-              </>
-            )}
-            {isLoadingHistory && (
-              <div
-                className='ai-ext-loading-indicator'
-                title='Đang tải lịch sử chat...'
-              >
-                ⏳
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div className='ai-ext-messages-container'>
-          {messages.length === 0 ? (
-            <div className='ai-ext-welcome-message'>
-              <p>👋 Xin chào! Tôi có thể giúp bạn phân tích ticket này.</p>
-              <p>Hãy hỏi tôi bất cứ điều gì về ticket!</p>
-
-              {/* Suggestion buttons */}
-              <div className='ai-ext-suggestion-buttons'>
-                <button
-                  className='ai-ext-suggestion-button'
-                  onClick={() => handleSuggestionClick('summary')}
-                  disabled={isTyping}
-                >
-                  📝 Tóm tắt nội dung
-                </button>
-                <button
-                  className='ai-ext-suggestion-button'
-                  onClick={() => handleSuggestionClick('explain')}
-                  disabled={isTyping}
-                >
-                  💡 Giải thích yêu cầu ticket
-                </button>
-                <button
-                  className='ai-ext-suggestion-button'
-                  onClick={() => handleSuggestionClick('translate')}
-                  disabled={isTyping}
-                >
-                  🌍 Dịch nội dung ticket
-                </button>
-                <button
-                  className='ai-ext-suggestion-button'
-                  onClick={() => handleSuggestionClick('create-ticket')}
-                  disabled={isTyping}
-                >
-                  📋 Tạo Backlog ticket
-                </button>
+                {ticketData.priority && (
+                  <span className='ai-ext-priority'>
+                    ⚡ {ticketData.priority}
+                  </span>
+                )}
               </div>
             </div>
-          ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`ai-ext-message ai-ext-message-${message.sender}`}
-              >
-                <div className='ai-ext-message-avatar'>
-                  {message.sender === 'user' ? (
-                    userInfo?.avatar && userInfo.avatar.trim() ? (
-                      <img
-                        src={userInfo.avatar}
-                        alt={userInfo.name || 'User'}
-                        title={userInfo.name || 'User'}
-                        className='ai-ext-avatar-image'
-                        onError={(e) => {
-                          console.error(
-                            'Failed to load user avatar:',
-                            userInfo.avatar
-                          );
-                          // Hide broken image and show fallback
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          const fallback = (e.target as HTMLImageElement)
-                            .nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                      />
-                    ) : null
-                  ) : (
+          )}
+
+          {/* Chat Section */}
+          <div className='ai-ext-chatbot-content'>
+            <div className='ai-ext-chat-header'>
+              <h4>💬 Chat với AI</h4>
+              <div className='ai-ext-chat-controls'>
+                {messages.length > 0 && (
+                  <>
+                    {!autoSaveEnabled && (
+                      <button
+                        className='ai-ext-control-button ai-ext-save-button'
+                        onClick={handleManualSave}
+                        title='Lưu chat history thủ công'
+                      >
+                        💾
+                      </button>
+                    )}
+                    <button
+                      className='ai-ext-control-button ai-ext-clear-button'
+                      onClick={handleClearHistory}
+                      title='Xóa lịch sử chat'
+                    >
+                      🗑️
+                    </button>
+                  </>
+                )}
+                {isLoadingHistory && (
+                  <div
+                    className='ai-ext-loading-indicator'
+                    title='Đang tải lịch sử chat...'
+                  >
+                    ⏳
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className='ai-ext-messages-container'>
+              {messages.length === 0 ? (
+                <div className='ai-ext-welcome-message'>
+                  <p>👋 Xin chào! Tôi có thể giúp bạn phân tích ticket này.</p>
+                  <p>Hãy hỏi tôi bất cứ điều gì về ticket!</p>
+
+                  {/* Suggestion buttons */}
+                  <div className='ai-ext-suggestion-buttons'>
+                    <button
+                      className='ai-ext-suggestion-button'
+                      onClick={() => handleSuggestionClick('summary')}
+                      disabled={isTyping}
+                    >
+                      📝 Tóm tắt nội dung
+                    </button>
+                    <button
+                      className='ai-ext-suggestion-button'
+                      onClick={() => handleSuggestionClick('explain')}
+                      disabled={isTyping}
+                    >
+                      💡 Giải thích yêu cầu ticket
+                    </button>
+                    <button
+                      className='ai-ext-suggestion-button'
+                      onClick={() => handleSuggestionClick('translate')}
+                      disabled={isTyping}
+                    >
+                      🌍 Dịch nội dung ticket
+                    </button>
+                    <button
+                      className='ai-ext-suggestion-button'
+                      onClick={() => handleSuggestionClick('create-ticket')}
+                      disabled={isTyping}
+                    >
+                      📋 Tạo Backlog ticket
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`ai-ext-message ai-ext-message-${message.sender}`}
+                  >
+                    <div className='ai-ext-message-avatar'>
+                      {message.sender === 'user' ? (
+                        userInfo?.avatar && userInfo.avatar.trim() ? (
+                          <img
+                            src={userInfo.avatar}
+                            alt={userInfo.name || 'User'}
+                            title={userInfo.name || 'User'}
+                            className='ai-ext-avatar-image'
+                            onError={(e) => {
+                              console.error(
+                                'Failed to load user avatar:',
+                                userInfo.avatar
+                              );
+                              // Hide broken image and show fallback
+                              (e.target as HTMLImageElement).style.display =
+                                'none';
+                              const fallback = (e.target as HTMLImageElement)
+                                .nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null
+                      ) : (
+                        <img
+                          src={aiIcon}
+                          alt='AI Assistant'
+                          title='AI Assistant'
+                          className='ai-ext-avatar-image ai-ext-ai-avatar'
+                        />
+                      )}
+                      {message.sender === 'user' && (
+                        <span
+                          className='ai-ext-avatar-fallback'
+                          style={{
+                            display:
+                              userInfo?.avatar && userInfo.avatar.trim()
+                                ? 'none'
+                                : 'flex',
+                          }}
+                        >
+                          👤
+                        </span>
+                      )}
+                    </div>
+                    <div className='ai-ext-message-content'>
+                      {message.sender === 'ai' ? (
+                        <div className='ai-ext-message-text'>
+                          <MarkdownRenderer content={message.content} />
+                        </div>
+                      ) : (
+                        <div
+                          className='ai-ext-message-text'
+                          dangerouslySetInnerHTML={{
+                            __html: formatMessageContent(message.content),
+                          }}
+                        />
+                      )}
+
+                      {/* Render attachments separately if present */}
+                      {message.attachments &&
+                        message.attachments.length > 0 && (
+                          <div>
+                            <div className='ai-ext-attachments-title'>
+                              Attached files:
+                            </div>
+                            <ul className='ai-ext-message-attachments'>
+                              {message.attachments.map((attachment) => (
+                                <li key={attachment.id}>
+                                  {attachment.name} (
+                                  {AttachmentUtils.formatFileSize(
+                                    attachment.size
+                                  )}
+                                  )
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                      <div
+                        className='ai-ext-message-time'
+                        title={formatFullTimestamp(
+                          safeTimestampToDate(message.timestamp)
+                        )}
+                      >
+                        {formatRelativeTime(
+                          safeTimestampToDate(message.timestamp)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className='ai-ext-message ai-ext-message-ai'>
+                  <div className='ai-ext-message-avatar'>
                     <img
                       src={aiIcon}
                       alt='AI Assistant'
                       title='AI Assistant'
                       className='ai-ext-avatar-image ai-ext-ai-avatar'
                     />
-                  )}
-                  {message.sender === 'user' && (
-                    <span
-                      className='ai-ext-avatar-fallback'
-                      style={{
-                        display:
-                          userInfo?.avatar && userInfo.avatar.trim()
-                            ? 'none'
-                            : 'flex',
-                      }}
-                    >
-                      👤
-                    </span>
-                  )}
-                </div>
-                <div className='ai-ext-message-content'>
-                  {message.sender === 'ai' ? (
-                    <div className='ai-ext-message-text'>
-                      <MarkdownRenderer content={message.content} />
+                  </div>
+                  <div className='ai-ext-message-content'>
+                    <div className='ai-ext-typing-indicator'>
+                      <span></span>
+                      <span></span>
+                      <span></span>
                     </div>
-                  ) : (
-                    <div
-                      className='ai-ext-message-text'
-                      dangerouslySetInnerHTML={{
-                        __html: formatMessageContent(message.content),
-                      }}
-                    />
-                  )}
-
-                  {/* Render attachments separately if present */}
-                  {message.attachments && message.attachments.length > 0 && (
-                    <div>
-                      <div className='ai-ext-attachments-title'>
-                        Attached files:
-                      </div>
-                      <ul className='ai-ext-message-attachments'>
-                        {message.attachments.map((attachment) => (
-                          <li key={attachment.id}>
-                            {attachment.name} (
-                            {AttachmentUtils.formatFileSize(attachment.size)})
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div
-                    className='ai-ext-message-time'
-                    title={formatFullTimestamp(
-                      safeTimestampToDate(message.timestamp)
-                    )}
-                  >
-                    {formatRelativeTime(safeTimestampToDate(message.timestamp))}
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              )}
 
-          {/* Typing indicator */}
-          {isTyping && (
-            <div className='ai-ext-message ai-ext-message-ai'>
-              <div className='ai-ext-message-avatar'>
-                <img
-                  src={aiIcon}
-                  alt='AI Assistant'
-                  title='AI Assistant'
-                  className='ai-ext-avatar-image ai-ext-ai-avatar'
-                />
-              </div>
-              <div className='ai-ext-message-content'>
-                <div className='ai-ext-typing-indicator'>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
+              <div ref={messagesEndRef} />
             </div>
-          )}
 
-          <div ref={messagesEndRef} />
-        </div>
+            {/* Input */}
+            <div className='ai-ext-chat-input-container'>
+              {/* Quick Actions, Model Selector and Attachment Button Row */}
+              <div className='ai-ext-input-header'>
+                {/* Quick Actions Dropdown */}
+                <select
+                  className='ai-ext-quick-actions'
+                  value={quickActionValue}
+                  onChange={(e) => handleQuickActionChange(e.target.value)}
+                  disabled={isTyping}
+                  title='Quick actions for common requests'
+                >
+                  <option value=''>⚡️ Quick Actions</option>
+                  <option value='summary'>📝 Tóm tắt nội dung</option>
+                  <option value='explain'>💡 Giải thích yêu cầu</option>
+                  <option value='translate'>🌍 Dịch nội dung</option>
+                  <option value='create-ticket'>📋 Tạo Backlog ticket</option>
+                </select>
 
-        {/* Input */}
-        <div className='ai-ext-chat-input-container'>
-          {/* Quick Actions, Model Selector and Attachment Button Row */}
-          <div className='ai-ext-input-header'>
-            {/* Quick Actions Dropdown */}
-            <select
-              className='ai-ext-quick-actions'
-              value={quickActionValue}
-              onChange={(e) => handleQuickActionChange(e.target.value)}
-              disabled={isTyping}
-              title='Quick actions for common requests'
-            >
-              <option value=''>⚡️ Quick Actions</option>
-              <option value='summary'>📝 Tóm tắt nội dung</option>
-              <option value='explain'>💡 Giải thích yêu cầu</option>
-              <option value='translate'>🌍 Dịch nội dung</option>
-              <option value='create-ticket'>📋 Tạo Backlog ticket</option>
-            </select>
-
-            {/* Model Selector */}
-            <select
-              className='ai-ext-model-selector'
-              value={currentModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-              disabled={isLoadingModels || isTyping}
-              title={`Current AI model: ${
-                availableModels.find((m) => m.id === currentModel)?.name ||
-                currentModel
-              }`}
-            >
-              {isLoadingModels ? (
-                <option value=''>Loading models...</option>
-              ) : selectedModels.length === 0 ? (
-                <option value={defaultModelId}>
-                  {availableModels.find((m) => m.id === defaultModelId)?.name ||
-                    defaultModelId}
-                </option>
-              ) : (
-                selectedModels.map((modelId) => {
-                  const model = availableModels.find((m) => m.id === modelId);
-                  return (
-                    <option key={modelId} value={modelId}>
-                      {model ? model.name : modelId}
+                {/* Model Selector */}
+                <select
+                  className='ai-ext-model-selector'
+                  value={currentModel}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  disabled={isLoadingModels || isTyping}
+                  title={`Current AI model: ${
+                    availableModels.find((m) => m.id === currentModel)?.name ||
+                    currentModel
+                  }`}
+                >
+                  {isLoadingModels ? (
+                    <option value=''>Loading models...</option>
+                  ) : selectedModels.length === 0 ? (
+                    <option value={defaultModelId}>
+                      {availableModels.find((m) => m.id === defaultModelId)
+                        ?.name || defaultModelId}
                     </option>
-                  );
-                })
-              )}
-            </select>
+                  ) : (
+                    selectedModels.map((modelId) => {
+                      const model = availableModels.find(
+                        (m) => m.id === modelId
+                      );
+                      return (
+                        <option key={modelId} value={modelId}>
+                          {model ? model.name : modelId}
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
 
-            {/* Attachment button with badge */}
-            <button
-              className='ai-ext-attachment-button'
-              onClick={handleAttachmentClick}
-              disabled={isTyping || isProcessingFile}
-              title={isProcessingFile ? 'Processing files...' : 'Attach files'}
-            >
-              {isProcessingFile ? '⏳' : '📎'}
-              {attachments.length > 0 && (
-                <span className='ai-ext-attachment-badge'>
-                  {attachments.length}
-                </span>
-              )}
-            </button>
-          </div>
+                {/* Attachment button with badge */}
+                <button
+                  className='ai-ext-attachment-button'
+                  onClick={handleAttachmentClick}
+                  disabled={isTyping || isProcessingFile}
+                  title={
+                    isProcessingFile ? 'Processing files...' : 'Attach files'
+                  }
+                >
+                  {isProcessingFile ? '⏳' : '📎'}
+                  {attachments.length > 0 && (
+                    <span className='ai-ext-attachment-badge'>
+                      {attachments.length}
+                    </span>
+                  )}
+                </button>
+              </div>
 
-          {/* File Attachments Area */}
-          {(attachments.length > 0 || attachmentError) && (
-            <div className='ai-ext-attachments-container'>
-              {attachmentError && (
-                <div className='ai-ext-attachment-error'>{attachmentError}</div>
-              )}
-              {attachments.length > 0 && (
-                <div className='ai-ext-attachments-list'>
-                  {attachments.map((attachment) => (
-                    <div key={attachment.id} className='ai-ext-attachment-item'>
-                      <span
-                        className='ai-ext-attachment-name'
-                        title={attachment.name}
-                      >
-                        {attachment.name}
-                      </span>
-                      <span className='ai-ext-attachment-size'>
-                        {AttachmentUtils.formatFileSize(attachment.size)}
-                      </span>
-                      <button
-                        className='ai-ext-attachment-remove'
-                        onClick={() => handleRemoveAttachment(attachment.id)}
-                        title='Remove file'
-                      >
-                        ×
-                      </button>
+              {/* File Attachments Area */}
+              {(attachments.length > 0 || attachmentError) && (
+                <div className='ai-ext-attachments-container'>
+                  {attachmentError && (
+                    <div className='ai-ext-attachment-error'>
+                      {attachmentError}
                     </div>
-                  ))}
+                  )}
+                  {attachments.length > 0 && (
+                    <div className='ai-ext-attachments-list'>
+                      {attachments.map((attachment) => (
+                        <div
+                          key={attachment.id}
+                          className='ai-ext-attachment-item'
+                        >
+                          <span
+                            className='ai-ext-attachment-name'
+                            title={attachment.name}
+                          >
+                            {attachment.name}
+                          </span>
+                          <span className='ai-ext-attachment-size'>
+                            {AttachmentUtils.formatFileSize(attachment.size)}
+                          </span>
+                          <button
+                            className='ai-ext-attachment-remove'
+                            onClick={() =>
+                              handleRemoveAttachment(attachment.id)
+                            }
+                            title='Remove file'
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {commentContext && (
+                <CommentContextPreview
+                  commentContext={commentContext}
+                  onRemove={handleRemoveCommentContext}
+                />
+              )}
+
+              <div className='ai-ext-chat-input-wrapper'>
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type='file'
+                  multiple
+                  accept='.txt,.md,.csv,.json,.xml,.js,.ts,.css,.html,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg'
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+                <textarea
+                  ref={textareaRef}
+                  className='ai-ext-chat-input'
+                  placeholder={getPlaceholderText()}
+                  value={currentMessage}
+                  onChange={(e) => {
+                    setCurrentMessage(e.target.value);
+                    autoResizeTextarea(e.target as HTMLTextAreaElement);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      // Helper function to insert new line manually
+                      const insertNewLine = () => {
+                        e.preventDefault();
+                        const textarea = e.target as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const newValue =
+                          currentMessage.substring(0, start) +
+                          '\n' +
+                          currentMessage.substring(end);
+                        setCurrentMessage(newValue);
+
+                        // Set cursor position after the new line
+                        setTimeout(() => {
+                          textarea.selectionStart = textarea.selectionEnd =
+                            start + 1;
+                          autoResizeTextarea(textarea);
+                        }, 0);
+                      };
+
+                      if (enterToSend) {
+                        // Enter to send mode: Enter sends, modifier keys for new line
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+                          // Insert new line with Ctrl/Cmd/Shift/Alt + Enter
+                          insertNewLine();
+                        } else {
+                          // Send message with plain Enter
+                          e.preventDefault();
+                          handleSendMessage(currentMessage);
+                        }
+                      } else {
+                        // Traditional mode: Enter for new line, Ctrl/Cmd+Enter to send
+                        if (e.ctrlKey || e.metaKey) {
+                          // Send message with Ctrl/Cmd+Enter
+                          e.preventDefault();
+                          handleSendMessage(currentMessage);
+                        } else if (e.shiftKey || e.altKey) {
+                          // Insert new line with Shift/Alt + Enter (manual handling for consistency)
+                          insertNewLine();
+                        }
+                        // Allow new line with plain Enter (default behavior)
+                      }
+                    }
+                  }}
+                  disabled={isTyping}
+                  rows={1}
+                  style={{
+                    resize: 'none',
+                    overflow: 'hidden',
+                  }}
+                />
+                <button
+                  className='ai-ext-send-button'
+                  onClick={() => handleSendMessage(currentMessage)}
+                  disabled={!currentMessage.trim() || isTyping}
+                  title={getSendButtonTitle()}
+                >
+                  {isTyping ? '⏳' : '↑'}
+                </button>
+              </div>
             </div>
-          )}
-
-          {commentContext && (
-            <CommentContextPreview
-              commentContext={commentContext}
-              onRemove={handleRemoveCommentContext}
-            />
-          )}
-
-          <div className='ai-ext-chat-input-wrapper'>
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type='file'
-              multiple
-              accept='.txt,.md,.csv,.json,.xml,.js,.ts,.css,.html,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg'
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
-            <textarea
-              ref={textareaRef}
-              className='ai-ext-chat-input'
-              placeholder={getPlaceholderText()}
-              value={currentMessage}
-              onChange={(e) => {
-                setCurrentMessage(e.target.value);
-                autoResizeTextarea(e.target as HTMLTextAreaElement);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  // Helper function to insert new line manually
-                  const insertNewLine = () => {
-                    e.preventDefault();
-                    const textarea = e.target as HTMLTextAreaElement;
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    const newValue =
-                      currentMessage.substring(0, start) +
-                      '\n' +
-                      currentMessage.substring(end);
-                    setCurrentMessage(newValue);
-
-                    // Set cursor position after the new line
-                    setTimeout(() => {
-                      textarea.selectionStart = textarea.selectionEnd =
-                        start + 1;
-                      autoResizeTextarea(textarea);
-                    }, 0);
-                  };
-
-                  if (enterToSend) {
-                    // Enter to send mode: Enter sends, modifier keys for new line
-                    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
-                      // Insert new line with Ctrl/Cmd/Shift/Alt + Enter
-                      insertNewLine();
-                    } else {
-                      // Send message with plain Enter
-                      e.preventDefault();
-                      handleSendMessage(currentMessage);
-                    }
-                  } else {
-                    // Traditional mode: Enter for new line, Ctrl/Cmd+Enter to send
-                    if (e.ctrlKey || e.metaKey) {
-                      // Send message with Ctrl/Cmd+Enter
-                      e.preventDefault();
-                      handleSendMessage(currentMessage);
-                    } else if (e.shiftKey || e.altKey) {
-                      // Insert new line with Shift/Alt + Enter (manual handling for consistency)
-                      insertNewLine();
-                    }
-                    // Allow new line with plain Enter (default behavior)
-                  }
-                }
-              }}
-              disabled={isTyping}
-              rows={1}
-              style={{
-                resize: 'none',
-                overflow: 'hidden',
-              }}
-            />
-            <button
-              className='ai-ext-send-button'
-              onClick={() => handleSendMessage(currentMessage)}
-              disabled={!currentMessage.trim() || isTyping}
-              title={getSendButtonTitle()}
-            >
-              {isTyping ? '⏳' : '↑'}
-            </button>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Translate Modal */}
       <TranslateModal

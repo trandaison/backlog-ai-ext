@@ -777,7 +777,7 @@ class BacklogAIInjector {
           break;
 
         case 'OPEN_OPTIONS_PAGE':
-          this.handleOpenOptionsPage();
+          this.handleOpenOptionsPage(event.data.hash);
           break;
 
         case 'REQUEST_TICKET_DATA':
@@ -815,6 +815,10 @@ class BacklogAIInjector {
 
         case 'GET_MODEL_SETTINGS':
           this.handleGetModelSettings(event.data.id);
+          break;
+
+        case 'GET_BACKLOG_SETTINGS':
+          this.handleGetBacklogSettings(event.data.id);
           break;
 
         case 'GET_FEATURE_FLAGS':
@@ -1271,6 +1275,7 @@ class BacklogAIInjector {
 
   private async handleGetModelSettings(messageId?: string): Promise<void> {
     try {
+      // Get both AI models and provider keys
       const response = await chrome.runtime.sendMessage({
         action: 'GET_SECTION',
         section: 'aiModels',
@@ -1282,11 +1287,7 @@ class BacklogAIInjector {
             type: 'MODEL_SETTINGS_RESPONSE',
             id: messageId,
             success: true,
-            data: {
-              selectedModels: response.data.selectedModels || [],
-              preferredModel:
-                response.data.preferredModel || 'gemini-2.5-flash',
-            },
+            data: response.data,
           },
           '*'
         );
@@ -1298,6 +1299,38 @@ class BacklogAIInjector {
       window.postMessage(
         {
           type: 'MODEL_SETTINGS_RESPONSE',
+          id: messageId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        '*'
+      );
+    }
+  }
+
+  private async handleGetBacklogSettings(messageId: string) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'GET_SECTION',
+        section: 'backlog',
+      });
+
+      window.postMessage(
+        {
+          type: 'BACKLOG_SETTINGS_RESPONSE',
+          id: messageId,
+          success: true,
+          data: {
+            backlog: response.success ? response.data : []
+          },
+        },
+        '*'
+      );
+    } catch (error) {
+      console.error('Error getting Backlog settings:', error);
+      window.postMessage(
+        {
+          type: 'BACKLOG_SETTINGS_RESPONSE',
           id: messageId,
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -1574,12 +1607,13 @@ class BacklogAIInjector {
     }
   }
 
-  private handleOpenOptionsPage(): void {
+  private handleOpenOptionsPage(hash?: string): void {
     try {
       // Send message to background script to open options page
       chrome.runtime
         .sendMessage({
           action: 'openOptionsPage',
+          hash: hash || '',
         })
         .catch((error) => {
           console.error(

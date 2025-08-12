@@ -164,7 +164,7 @@ class BackgroundService {
           break;
 
         case 'openOptionsPage':
-          this.handleOpenOptionsPage();
+          this.handleOpenOptionsPage(message.hash);
           sendResponse({ success: true });
           break;
 
@@ -1271,11 +1271,15 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
     }
   }
 
-  private handleOpenOptionsPage(): void {
+  private handleOpenOptionsPage(hash?: string): void {
     try {
-      // Open options page in a new tab
+      // Open options page in a new tab with hash if provided
+      const url = hash
+        ? chrome.runtime.getURL(`options.html#${hash}`)
+        : chrome.runtime.getURL('options.html');
+
       chrome.tabs.create({
-        url: chrome.runtime.getURL('options.html'),
+        url: url,
         active: true,
       });
     } catch (error) {
