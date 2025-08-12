@@ -9,7 +9,10 @@ export class EncryptionService {
   /**
    * Generate encryption key từ password/passphrase
    */
-  private static async deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  private static async deriveKey(
+    password: string,
+    salt: Uint8Array
+  ): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -24,12 +27,12 @@ export class EncryptionService {
         name: 'PBKDF2',
         salt: salt,
         iterations: 100000,
-        hash: 'SHA-256'
+        hash: 'SHA-256',
       },
       keyMaterial,
       {
         name: this.ALGORITHM,
-        length: this.KEY_LENGTH
+        length: this.KEY_LENGTH,
       },
       false,
       ['encrypt', 'decrypt']
@@ -37,17 +40,20 @@ export class EncryptionService {
   }
 
   /**
-   * Tạo master key từ extension ID (unique per installation)
+   * Tạo master key từ một constant key (consistent across installations)
+   * This allows import/export to work across different extension installations
    */
   private static async getMasterKey(): Promise<CryptoKey> {
-    const extensionId = chrome.runtime.id;
-    const salt = new TextEncoder().encode(extensionId + 'backlog-ai-salt');
+    // Use a consistent key that doesn't depend on extension ID
+    // This allows encrypted data to be portable across installations
+    const consistentKey = 'backlog-ai-extension-v1';
+    const salt = new TextEncoder().encode('backlog-ai-salt-v1');
 
     // Pad salt to 16 bytes
     const paddedSalt = new Uint8Array(16);
     paddedSalt.set(salt.slice(0, 16));
 
-    return this.deriveKey(extensionId + 'master-key', paddedSalt);
+    return this.deriveKey(consistentKey, paddedSalt);
   }
 
   /**
@@ -69,7 +75,7 @@ export class EncryptionService {
       const encrypted = await crypto.subtle.encrypt(
         {
           name: this.ALGORITHM,
-          iv: iv
+          iv: iv,
         },
         key,
         data
@@ -100,7 +106,9 @@ export class EncryptionService {
 
       // Decode from base64
       const combined = new Uint8Array(
-        atob(encryptedData).split('').map(char => char.charCodeAt(0))
+        atob(encryptedData)
+          .split('')
+          .map((char) => char.charCodeAt(0))
       );
 
       // Extract IV and encrypted data
@@ -111,7 +119,7 @@ export class EncryptionService {
       const decrypted = await crypto.subtle.decrypt(
         {
           name: this.ALGORITHM,
-          iv: iv
+          iv: iv,
         },
         key,
         encrypted
@@ -120,7 +128,7 @@ export class EncryptionService {
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error: any) {
-      console.error('Decryption error:', error);
+      console.error('Decryption error:', { error, encryptedData });
       throw new Error('Failed to decrypt API key: ' + error.message);
     }
   }
@@ -182,8 +190,12 @@ export class EncryptionService {
    * Sign export data to ensure authenticity and integrity
    * TEMPORARILY DISABLED - Return mock signature for now
    */
-  static async signExportData(data: any): Promise<{ signature: string; metadata: any }> {
-    console.log('🔐 signExportData: Temporarily disabled, returning mock signature');
+  static async signExportData(
+    data: any
+  ): Promise<{ signature: string; metadata: any }> {
+    console.log(
+      '🔐 signExportData: Temporarily disabled, returning mock signature'
+    );
 
     // Return mock signature for now
     return {
@@ -193,8 +205,8 @@ export class EncryptionService {
         signedAt: new Date().toISOString(),
         version: '1.0.0',
         unsigned: true,
-        note: 'Digital signature temporarily disabled'
-      }
+        note: 'Digital signature temporarily disabled',
+      },
     };
   }
 
@@ -202,8 +214,14 @@ export class EncryptionService {
    * Verify the signature of imported data
    * TEMPORARILY DISABLED - Always return false (unsigned)
    */
-  static async verifyImportData(data: any, signature: string, metadata: any): Promise<boolean> {
-    console.log('🔍 verifyImportData: Temporarily disabled, treating all files as unsigned');
+  static async verifyImportData(
+    data: any,
+    signature: string,
+    metadata: any
+  ): Promise<boolean> {
+    console.log(
+      '🔍 verifyImportData: Temporarily disabled, treating all files as unsigned'
+    );
 
     // Always treat as unsigned for now
     return false;
