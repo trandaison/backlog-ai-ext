@@ -1213,7 +1213,7 @@ const OptionsPage: React.FC = () => {
                 v
                 {typeof __APP_VERSION__ !== 'undefined'
                   ? __APP_VERSION__
-                  : '1.0.0'}
+                  : '0.0.0'}
               </span>
             </div>
             {typeof __COMMIT_ID__ !== 'undefined' &&

@@ -1,6 +1,6 @@
 {
   "name": "backlog-ai-ext",
-  "version": "1.0.0",
+  "version": "0.0.4",
   "main": "index.js",
   "scripts": {
     "build": "npm run clean && webpack --mode=production",

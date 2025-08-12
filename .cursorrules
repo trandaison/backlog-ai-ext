@@ -168,7 +168,7 @@ The `dev.sh` script provides a standardized development workflow and should be u
 ## Release Management:
 
 ### Versioning:
-- Use semantic versioning (MAJOR.MINOR.PATCH) starting from v1.0.0
+- Use semantic versioning (MAJOR.MINOR.PATCH) starting from v0.0.0
 - Follow semver principles:
   - PATCH: Bug fixes and minor improvements
   - MINOR: New features that are backward compatible

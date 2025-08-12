@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Backlog AI Assistant",
-  "version": "1.0.0",
+  "version": "0.0.4",
   "description": "AI-powered assistant for Backlog ticket analysis and chat",
   "permissions": [
     "activeTab",
