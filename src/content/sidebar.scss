@@ -795,6 +795,10 @@ body.ai-ext-sidebar-open {
     }
   }
 
+  .ai-ext-comment-context-badge {
+    margin-top: 12px;
+  }
+
   .ai-ext-message-time {
     font-size: 11px;
     opacity: 0.7;
@@ -841,6 +845,20 @@ body.ai-ext-sidebar-open {
     li {
       color: inherit;
     }
+  }
+
+  .ai-ext-comment-context-badge {
+    background: white;
+    color: #575757;
+  }
+
+  .ai-ext-comment-context-timestamp {
+    color: #878787;
+  }
+
+  .ai-ext-comment-context-content {
+    background: #eee;
+    white-space: pre-line;
   }
 }
 
@@ -1678,5 +1696,47 @@ body.ai-ext-sidebar-open {
     margin-top: 24px;
     padding-top: 16px;
     border-top: 1px solid #e5e7eb;
+  }
+}
+/* Comment Context Loading Styles */
+.ai-ext-comment-context-container {
+  margin-bottom: 8px;
+}
+
+.ai-ext-comment-context-loading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #6c757d;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.ai-ext-comment-context-cancel {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+
+  &:hover {
+    background-color: #e9ecef;
+    color: #495057;
   }
 }

@@ -20,6 +20,7 @@ import CommentContextPreview from './CommentContextPreview';
 import { ISSUE_URL_REGEX, SPACE_URL_REGEX } from '../configs/backlog';
 import IconBacklog from './icons/IconBacklog';
 import IconAI from './icons/IconAI';
+import { truncate } from '../shared/truncate';
 
 // AI Icon as data URL
 const aiIcon =
@@ -216,6 +217,9 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
           '📝 [ChatbotAsidePanel] Received comment context:',
           commentData
         );
+
+        // Set loading state immediately for better UX
+        setIsLoadingCommentContext(true);
 
         // Load comment context from API
         handleLoadCommentContext(commentData);
@@ -827,12 +831,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
         // Load new ticket data
         await loadTicketData();
-
-        // Show transition notification
-        setStorageWarning(
-          `Đã chuyển sang ticket ${changeData.newTicketId || 'mới'}`
-        );
-        setTimeout(() => setStorageWarning(null), 3000);
       } catch (error) {
         console.error(
           '❌ [ChatbotAsidePanel] Error during ticket transition:',
@@ -918,8 +916,14 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
       console.log('Command detected:', commandResult);
     }
 
-    // Capture current attachments
+    // Capture current attachments and comment context
     const currentAttachments = [...attachments];
+    const currentCommentContext = commentContext ? {
+      iconUrl: commentContext.selectedComment.createdUser.nulabAccount.iconUrl,
+      name: commentContext.selectedComment.createdUser.name,
+      created: commentContext.selectedComment.created,
+      content: truncate(commentContext.selectedComment.content),
+    } : undefined;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -928,6 +932,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
       timestamp: new Date(),
       attachments:
         currentAttachments.length > 0 ? currentAttachments : undefined, // Store attachments separately
+      commentContext: currentCommentContext, // Store comment context information
     };
 
     // Update messages with the new user message
@@ -939,6 +944,11 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     // Clear attachments after sending
     setAttachments([]);
     setAttachmentError(null);
+
+    // Clear comment context after sending message
+    if (commentContext) {
+      setCommentContext(null);
+    }
 
     // Reset textarea height after clearing message
     setTimeout(() => {
@@ -1203,8 +1213,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
   const handleLoadCommentContext = async (commentData: any) => {
     try {
-      setIsLoadingCommentContext(true);
-
       // Extract space info and issue key from current URL
       const url = window.location.href;
       const issueMatch = url.match(ISSUE_URL_REGEX);
@@ -1300,6 +1308,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
   const handleRemoveCommentContext = () => {
     setCommentContext(null);
+    setIsLoadingCommentContext(false);
   };
 
   return (
@@ -1789,6 +1798,27 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
                           </div>
                         )}
 
+                      {/* Render comment context if present */}
+                      {message.commentContext && (
+                        <div className='ai-ext-message-comment-context'>
+                          <CommentContextPreview
+                            commentContext={{
+                              selectedComment: {
+                                createdUser: {
+                                  nulabAccount: {
+                                    iconUrl: message.commentContext.iconUrl
+                                  },
+                                  name: message.commentContext.name
+                                },
+                                created: message.commentContext.created,
+                                content: message.commentContext.content
+                              }
+                            }}
+                            clearable={false}
+                          />
+                        </div>
+                      )}
+
                       <div
                         className='ai-ext-message-time'
                         title={formatFullTimestamp(
@@ -1937,11 +1967,26 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
                 </div>
               )}
 
-              {commentContext && (
-                <CommentContextPreview
-                  commentContext={commentContext}
-                  onRemove={handleRemoveCommentContext}
-                />
+              {(commentContext || isLoadingCommentContext) && (
+                <div className='ai-ext-comment-context-container'>
+                  {isLoadingCommentContext ? (
+                    <div className='ai-ext-comment-context-loading'>
+                      <span>⏳ Loading comment context...</span>
+                      <button
+                        className='ai-ext-comment-context-cancel'
+                        onClick={handleRemoveCommentContext}
+                        title='Cancel loading'
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <CommentContextPreview
+                      commentContext={commentContext}
+                      onRemove={handleRemoveCommentContext}
+                    />
+                  )}
+                </div>
               )}
 
               <div className='ai-ext-chat-input-wrapper'>

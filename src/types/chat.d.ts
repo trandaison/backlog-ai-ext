@@ -1,3 +1,6 @@
+import { FileAttachment } from './attachment.d';
+import { UserInfo } from './backlog';
+
 export type ChatMessage = {
   id: string;
   content: string;
@@ -7,6 +10,12 @@ export type ChatMessage = {
   tokenCount?: number; // Track token usage per message
   compressed?: boolean; // Flag if this message was summarized
   attachments?: FileAttachment[]; // Array of file attachments
+  commentContext?: {
+    iconUrl: string;
+    name: string;
+    created: string;
+    content: string; // Truncated to first 200 characters
+  };
 };
 
 export type ChatHistoryData = {

@@ -405,13 +405,19 @@ $z-index-chatbot: 999998;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 12px;
-  margin: 0 0 8px;
+  margin: 0;
   background: linear-gradient(315deg, #3b9d7c, hsl(160.18deg 43.08% 50.39%));
   color: white;
-}
 
-.ai-ext-comment-context-info {
-  width: calc(100% - 20px);
+  .ai-ext-comment-context-info {
+    width: 100%;
+  }
+
+  &.clearable {
+    .ai-ext-comment-context-info {
+      width: calc(100% - 20px);
+    }
+  }
 }
 
 .ai-ext-comment-context-timestamp {

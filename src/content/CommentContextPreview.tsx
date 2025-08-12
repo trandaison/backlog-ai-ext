@@ -1,6 +1,16 @@
-export default function CommentContextPreview({ commentContext, onRemove }: { commentContext: any, onRemove: () => void }) {
+interface CommentContextPreviewProps {
+  commentContext: any;
+  onRemove?: () => void;
+  clearable?: boolean;
+}
+
+export default function CommentContextPreview({
+  commentContext,
+  onRemove,
+  clearable = true,
+}: CommentContextPreviewProps) {
   return (
-    <div className='ai-ext-comment-context-badge'>
+    <div className={`ai-ext-comment-context-badge ${clearable ? 'clearable' : ''}`}>
       <div className='ai-ext-comment-context-info'>
         <span className='ai-ext-comment-context-user'>
           <img
@@ -26,13 +36,15 @@ export default function CommentContextPreview({ commentContext, onRemove }: { co
           {commentContext.selectedComment.content}
         </div>
       </div>
-      <button
-        className='ai-ext-comment-context-remove'
-        onClick={onRemove}
-        title='Remove comment context'
-      >
-        ×
-      </button>
+      {clearable && onRemove && (
+        <button
+          className='ai-ext-comment-context-remove'
+          onClick={onRemove}
+          title='Remove comment context'
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
