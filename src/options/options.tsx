@@ -392,12 +392,49 @@ const OptionsPage: React.FC = () => {
 
       // Import configurations if present
       if (importData.configs) {
-        await settingsClient.saveAllSettings(importData.configs);
+        // Validate that the configs structure matches expected format
+        const configs = importData.configs;
+
+        // Basic structure validation
+        if (typeof configs !== 'object' || !configs.general || !configs.features || !configs.aiModels || !configs.backlog) {
+          throw new Error('Invalid configuration structure in import file');
+        }
+
+        // Save the encrypted data as-is (no double encryption)
+        // The exported data already contains encrypted API keys, so we save them directly
+        // without re-encrypting to avoid double encryption
+        await settingsClient.saveAllSettings(configs);
+        console.log('✅ [Import] Configurations imported successfully');
       }
 
       // Import chat history if present
       if (importData.chatData) {
-        await chrome.storage.local.set(importData.chatData);
+        // Validate chat data structure
+        if (typeof importData.chatData !== 'object') {
+          throw new Error('Invalid chat data structure in import file');
+        }
+
+        // Filter out any invalid chat data entries
+        const validChatData: { [key: string]: any } = {};
+        for (const [key, value] of Object.entries(importData.chatData)) {
+          // Only import chat history entries and valid metadata
+          if (key.startsWith('chat-history-') || ['clientId', 'ga4_api_secret', 'ga4_measurement_id'].includes(key)) {
+            validChatData[key] = value;
+          }
+        }
+
+        if (Object.keys(validChatData).length > 0) {
+          await chrome.storage.local.set(validChatData);
+          console.log('✅ [Import] Chat history imported successfully', Object.keys(validChatData));
+        }
+      }
+
+      // Verify import by trying to read back the settings
+      try {
+        const verifySettings = await settingsClient.getAllSettings();
+        console.log('✅ [Import] Settings verification successful', verifySettings);
+      } catch (verifyError) {
+        console.warn('⚠️ [Import] Settings verification failed:', verifyError);
       }
 
       alert(
