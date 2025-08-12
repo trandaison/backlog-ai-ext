@@ -3,15 +3,21 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Release type'
-        required: true
+      bump_type:
+        description: 'Bump type (leave empty if using specific_version)'
+        required: false
         default: 'patch'
         type: choice
         options:
+          - ''
           - patch
           - minor
           - major
+
+      specific_version:
+        description: 'or Specific version (e.g., 1.0.0)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -27,6 +33,9 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -46,7 +55,14 @@ jobs:
         run: npm run lint
 
       - name: Bump version and generate changelog (without commit)
-        run: npm run release:prepare -- --${{ inputs.release_type }}
+        run: |
+          if [ -n "${{ inputs.specific_version }}" ]; then
+            npm run release:prepare -- -r ${{ inputs.specific_version }}
+          elif [ -n "${{ inputs.bump_type }}" ]; then
+            npm run release:prepare -- --${{ inputs.bump_type }}
+          else
+            echo "No bump type or version specified" && exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

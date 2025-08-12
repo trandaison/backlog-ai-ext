@@ -11,7 +11,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-blue?logo=react&logoColor=white)](https://reactjs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/trandaison/backlog-ai-ext/releases)
+[![Version](https://img.shields.io/badge/Version-0.0.4-brightgreen)](https://github.com/trandaison/backlog-ai-ext/releases)
 
 **Transform your Backlog workflow with AI-powered ticket analysis, smart suggestions, and intelligent chat assistance.**
 
