@@ -7,6 +7,7 @@ import {
 } from '../shared/ticketURLMonitor';
 import { availableModels } from '../configs';
 import { ISSUE_URL_REGEX } from '../configs/backlog';
+import { createLoadingContent } from '../shared/loadingSpinner';
 
 // Class quản lý comment enhancer
 class CommentEnhancer {
@@ -392,21 +393,7 @@ class BacklogAIInjector {
             justify-content: center;
             z-index: 1000;
           ">
-            <div style="text-align: center;">
-              <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="30px" height="30px" viewBox="0 0 30 30" class="lds-ring">
-                    <circle cx="15" cy="15" fill="none" r="13" stroke="#b7b7b7" stroke-width="2" stroke-linecap="round" transform="rotate(216.567 15 15)">
-                        <animateTransform attributeName="transform" type="rotate" calcMode="linear" values="0 15 15;320 15 15;720 15 15" keyTimes="0;0.5;1" dur="1s" begin="0s" repeatCount="indefinite"/>
-                        <animate attributeName="stroke-dasharray" calcMode="linear" values="0 80; 70 80; 00 80" keyTimes="0;0.5;1" dur="1" begin="0s" repeatCount="indefinite"/>
-                    </circle>
-                </svg>
-                <p style="
-                  margin: 16px 0;
-                  font0-size: 12px;
-                  color: #666;
-                ">Đang tải thông tin ticket...</p>
-              </div>
-            </div>
+            ${createLoadingContent('Đang tải thông tin ticket...')}
           </div>
         `;
 
@@ -482,6 +469,20 @@ class BacklogAIInjector {
     this.chatbotAsideContainer = document.createElement('aside');
     this.chatbotAsideContainer.id = 'ai-ext-chatbot-aside';
     this.chatbotAsideContainer.className = 'ai-ext-root';
+
+    // Thêm loading content ngay khi tạo container để tránh empty state
+    this.chatbotAsideContainer.innerHTML = `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 400px;
+        padding: 20px;
+      ">
+        ${createLoadingContent('Đang khởi tạo AI Chatbot...')}
+      </div>
+    `;
 
     // Tạo toggle button để mở/đóng chatbot panel
     this.chatbotToggleButton = document.createElement('button');
@@ -937,7 +938,10 @@ class BacklogAIInjector {
       console.log('📨 [Content] Background response:', response);
 
       // Track chat event in GA4 if successful
-      if (response.success && fullContextData.userInfo?.nulabAccount?.uniqueId) {
+      if (
+        response.success &&
+        fullContextData.userInfo?.nulabAccount?.uniqueId
+      ) {
         this.trackChatEvent(fullContextData.userInfo.nulabAccount.uniqueId);
       }
 
@@ -1681,12 +1685,14 @@ class BacklogAIInjector {
   private async handleBroadcastWidthChange(width: number): Promise<void> {
     try {
       // Broadcast width change to other tabs via background script
-      chrome.runtime.sendMessage({
-        action: 'sidebarWidthChanged',
-        width: width,
-      }).catch(() => {
-        // Ignore errors if background script is not available
-      });
+      chrome.runtime
+        .sendMessage({
+          action: 'sidebarWidthChanged',
+          width: width,
+        })
+        .catch(() => {
+          // Ignore errors if background script is not available
+        });
     } catch (error) {
       console.error('❌ [Content] Error broadcasting width change:', error);
     }
@@ -1721,16 +1727,21 @@ class BacklogAIInjector {
   private async trackChatEvent(uniqueId: string): Promise<void> {
     try {
       // Send tracking request to background script
-      chrome.runtime.sendMessage({
-        action: 'trackChatEvent',
-        data: { uniqueId }
-      }).catch(() => {
-        // Silent failure if background script is not available
-      });
+      chrome.runtime
+        .sendMessage({
+          action: 'trackChatEvent',
+          data: { uniqueId },
+        })
+        .catch(() => {
+          // Silent failure if background script is not available
+        });
 
       console.log('✅ [Content] Chat event tracking requested');
     } catch (error) {
-      console.warn('⚠️ [Content] Failed to request chat event tracking:', error);
+      console.warn(
+        '⚠️ [Content] Failed to request chat event tracking:',
+        error
+      );
       // Silent failure - don't break the main functionality
     }
   }
