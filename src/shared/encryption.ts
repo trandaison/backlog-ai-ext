@@ -119,9 +119,9 @@ export class EncryptionService {
 
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Decryption error:', error);
-      throw new Error('Failed to decrypt API key');
+      throw new Error('Failed to decrypt API key: ' + error.message);
     }
   }
 

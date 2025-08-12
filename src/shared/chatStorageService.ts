@@ -2,6 +2,7 @@ import { safeTimestampToDate } from './timeUtils';
 import { FileAttachment } from '../types/attachment.d';
 import { TicketData, UserInfo } from '../types/backlog';
 import { ChatHistoryData, ChatMessage, SaveResult, StorageMetadata } from '../types/chat';
+import ContextOptimizer from './contextOptimizer';
 
 export class ChatStorageService {
   private static readonly STORAGE_KEY_PREFIX = 'chat-history-';
@@ -657,7 +658,7 @@ export class ChatStorageService {
 
       // Auto-optimize if enabled and message count exceeds limit
       if (options?.autoOptimize && (options.maxMessages || 20) < updatedMessages.length) {
-        const ContextOptimizer = (await import('./contextOptimizer')).default;
+        // Use static import instead of dynamic import
         const optimized = ContextOptimizer.optimizeContext(updatedHistory, {
           maxMessages: options.maxMessages || 15,
           maxTokens: 6000
