@@ -706,76 +706,26 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     }
   };
 
-  const handleTicketSummary = async () => {
-    if (!ticketData) {
-      setSummaryError('Không thể tìm thấy thông tin ticket');
-      return;
+  const handleSuggestionClick = (
+    type: 'summary' | 'explain' | 'translate' | 'create-ticket'
+  ) => {
+    if (type === 'translate') {
+      // Open translate modal instead of sending message directly
+      setIsTranslateModalOpen(true);
+    } else if (type === 'create-ticket') {
+      // Open create ticket modal
+      setIsCreateTicketModalOpen(true);
+    } else {
+      // Messages for each suggestion type - these will appear as user messages in chat
+      const suggestionMessages = {
+        summary: 'Tóm tắt nội dung',
+        explain: 'Giải thích yêu cầu ticket',
+        translate: 'Dịch nội dung ticket', // This won't be used since translate opens modal
+      };
+
+      // Send the suggestion as a message with 'suggestion' type
+      handleSendMessage(suggestionMessages[type], 'user');
     }
-
-    try {
-      setIsLoadingSummary(true);
-      setSummaryError('');
-      setSummaryContent('');
-
-      // Request summary via postMessage to content script
-      const response = await new Promise<any>((resolve, reject) => {
-        const messageId = Date.now() + Math.random();
-
-        const responseHandler = (event: MessageEvent) => {
-          if (event.source !== window) return;
-
-          if (
-            event.data.type === 'SUMMARY_RESPONSE' &&
-            event.data.id === messageId
-          ) {
-            window.removeEventListener('message', responseHandler);
-
-            if (event.data.success) {
-              resolve({ summary: event.data.data, success: true });
-            } else {
-              reject(new Error(event.data.error));
-            }
-          }
-        };
-
-        window.addEventListener('message', responseHandler);
-
-        window.postMessage(
-          {
-            type: 'REQUEST_SUMMARY',
-            id: messageId,
-            ticketId: ticketData.id,
-            ticketData: ticketData,
-          },
-          '*'
-        );
-
-        // Timeout
-        setTimeout(() => {
-          window.removeEventListener('message', responseHandler);
-          reject(new Error('Timeout waiting for summary response'));
-        }, 30000);
-      });
-
-      setSummaryContent(response.summary || response.response);
-    } catch (error) {
-      console.error('Error getting ticket summary:', error);
-      setSummaryError(String(error));
-    } finally {
-      setIsLoadingSummary(false);
-    }
-  };
-
-  const handleSuggestionClick = (type: 'summary' | 'explain' | 'translate') => {
-    // Messages for each suggestion type - these will appear as user messages in chat
-    const suggestionMessages = {
-      summary: 'Tóm tắt nội dung',
-      explain: 'Giải thích yêu cầu ticket',
-      translate: 'Dịch nội dung ticket',
-    };
-
-    // Send the suggestion as a message with 'suggestion' type
-    handleSendMessage(suggestionMessages[type], 'user');
   };
 
   const handleQuickActionChange = (value: string) => {
@@ -949,11 +899,6 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
     } finally {
       setIsTyping(false);
     }
-  };
-
-  const clearSummary = () => {
-    setSummaryContent('');
-    setSummaryError('');
   };
 
   // Manual save function
@@ -1398,6 +1343,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
                   disabled={isTyping}
                 >
                   🌍 Dịch nội dung ticket
+                </button>
+                <button
+                  className='ai-ext-suggestion-button'
+                  onClick={() => handleSuggestionClick('create-ticket')}
+                  disabled={isTyping}
+                >
+                  📋 Tạo Backlog ticket
                 </button>
               </div>
             </div>
