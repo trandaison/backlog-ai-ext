@@ -936,6 +936,11 @@ class BacklogAIInjector {
 
       console.log('📨 [Content] Background response:', response);
 
+      // Track chat event in GA4 if successful
+      if (response.success && fullContextData.userInfo?.nulabAccount?.uniqueId) {
+        this.trackChatEvent(fullContextData.userInfo.nulabAccount.uniqueId);
+      }
+
       window.postMessage(
         {
           type: 'CHAT_RESPONSE',
@@ -1710,6 +1715,23 @@ class BacklogAIInjector {
         },
         '*'
       );
+    }
+  }
+
+  private async trackChatEvent(uniqueId: string): Promise<void> {
+    try {
+      // Send tracking request to background script
+      chrome.runtime.sendMessage({
+        action: 'trackChatEvent',
+        data: { uniqueId }
+      }).catch(() => {
+        // Silent failure if background script is not available
+      });
+
+      console.log('✅ [Content] Chat event tracking requested');
+    } catch (error) {
+      console.warn('⚠️ [Content] Failed to request chat event tracking:', error);
+      // Silent failure - don't break the main functionality
     }
   }
 }

@@ -14,6 +14,9 @@ import { ChatHistoryData } from '../types/chat';
 import { BacklogApiService } from '../services/backlogApi';
 import { TicketCreationService } from '../services/ticketCreation';
 import { ISSUE_URL_REGEX } from '../configs/backlog';
+import { GAService } from '../services/GAService';
+import { GA4_CONFIG } from '../configs/analytics';
+import { initializeGA4Config } from '../configs/ga4';
 
 class BackgroundService {
   private openaiService: OpenAIService;
@@ -33,6 +36,9 @@ class BackgroundService {
       // Initialize settings service (which will trigger migration if needed)
       const settings = await this.settingsService.getAllSettings();
       console.log('✅ Settings service initialized', settings);
+
+      // Initialize GA4 configuration
+      await initializeGA4Config();
 
       // Setup message listeners after migration is complete
       this.setupMessageListeners();
@@ -162,6 +168,11 @@ class BackgroundService {
           sendResponse({ success: true });
           break;
 
+        case 'trackChatEvent':
+          await this.handleTrackChatEvent(message.data);
+          sendResponse({ success: true });
+          break;
+
         case 'fetchBacklogProjects':
           await this.handleFetchBacklogProjects(message.data, sendResponse);
           break;
@@ -214,16 +225,7 @@ class BackgroundService {
         commentContext,
         currentUrl,
       } = data;
-
-      console.log(
-        '🔍 [Background] handleUserMessage attachments:',
-        attachments?.length || 0,
-        attachments
-      );
-      console.log(
-        '🔍 [Background] handleUserMessage commentContext:',
-        !!commentContext
-      );
+      console.log('🔎 ~ BackgroundService ~ handleUserMessage ~ data:', data);
 
       // Get current AI service, but override preferredModel with currentModel if provided
       const settings = await this.getSettings();
@@ -1575,10 +1577,10 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
       }
 
       // Build AI prompt for ticket creation
-      const prompt = this.buildCreateTicketPrompt(ticketData, language, currentUrl);
-      console.log(
-        '🔎 ~ BackgroundService ~ handleCreateTicketCommand ~ prompt:',
-        prompt
+      const prompt = this.buildCreateTicketPrompt(
+        ticketData,
+        language,
+        currentUrl
       );
 
       // Get AI-generated ticket data
@@ -1678,7 +1680,7 @@ Bạn đang tương tác với một team member. Hãy cung cấp:
   private buildCreateTicketPrompt(
     ticketData: any,
     targetLanguage: string,
-    sourceTicketUrl = '#',
+    sourceTicketUrl = '#'
   ): string {
     const languageMap: Record<string, string> = {
       vi: 'tiếng Việt',
@@ -1723,6 +1725,17 @@ Source ticket: ${sourceTicketUrl}`;
 }
 
 Chỉ trả về JSON, không thêm text khác.`;
+  }
+
+  private async handleTrackChatEvent(data: { uniqueId: string }): Promise<void> {
+    try {
+      await GAService.collect({
+        uniqueId: data.uniqueId,
+        event: GA4_CONFIG.EVENTS.EXTENSION_CHAT,
+      });
+    } catch (error) {
+      // Silent failure - don't break the main functionality
+    }
   }
 }
 

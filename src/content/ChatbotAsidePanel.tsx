@@ -339,7 +339,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'SAVED_WIDTH_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'SAVED_WIDTH_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
             resolve(event.data);
           }
@@ -347,10 +350,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'GET_SAVED_WIDTH',
-          id: messageId
-        }, '*');
+        window.postMessage(
+          {
+            type: 'GET_SAVED_WIDTH',
+            id: messageId,
+          },
+          '*'
+        );
 
         // Timeout after 5 seconds
         setTimeout(() => {
@@ -406,7 +412,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'MODEL_SETTINGS_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'MODEL_SETTINGS_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
@@ -419,10 +428,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'GET_MODEL_SETTINGS',
-          id: messageId
-        }, '*');
+        window.postMessage(
+          {
+            type: 'GET_MODEL_SETTINGS',
+            id: messageId,
+          },
+          '*'
+        );
 
         // Timeout after 10 seconds
         setTimeout(() => {
@@ -430,8 +442,7 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
           reject(new Error('Timeout waiting for model settings response'));
         }, 10000);
       });
-        console.log('🔎 ~ loadModelSettings ~ response:', response);
-
+      console.log('🔎 ~ loadModelSettings ~ response:', response);
 
       if (response.success) {
         // Set selected models (filter to only include available models)
@@ -479,7 +490,10 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
         const responseHandler = (event: MessageEvent) => {
           if (event.source !== window) return;
 
-          if (event.data.type === 'FEATURE_FLAGS_RESPONSE' && event.data.id === messageId) {
+          if (
+            event.data.type === 'FEATURE_FLAGS_RESPONSE' &&
+            event.data.id === messageId
+          ) {
             window.removeEventListener('message', responseHandler);
 
             if (event.data.success) {
@@ -492,10 +506,13 @@ const ChatbotAsidePanel: React.FC<ChatbotAsidePanelProps> = ({
 
         window.addEventListener('message', responseHandler);
 
-        window.postMessage({
-          type: 'GET_FEATURE_FLAGS',
-          id: messageId
-        }, '*');
+        window.postMessage(
+          {
+            type: 'GET_FEATURE_FLAGS',
+            id: messageId,
+          },
+          '*'
+        );
 
         // Timeout after 10 seconds
         setTimeout(() => {

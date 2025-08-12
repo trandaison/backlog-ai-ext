@@ -8,6 +8,11 @@ const { execSync } = require('child_process');
 // Get version from manifest.json
 const manifest = require('./manifest.json');
 
+// Debug: Log environment variables
+console.log('🔍 GA4 Environment Variables:');
+console.log('GA4_MEASUREMENT_ID:', process.env.GA4_MEASUREMENT_ID);
+console.log('GA4_API_SECRET:', process.env.GA4_API_SECRET ? '***SET***' : 'NOT_SET');
+
 // Get commit ID (short form)
 let commitId;
 try {
@@ -83,6 +88,8 @@ module.exports = {
     new webpack.DefinePlugin({
       __APP_VERSION__: JSON.stringify(manifest.version),
       __COMMIT_ID__: JSON.stringify(commitId),
+      __GA4_MEASUREMENT_ID__: JSON.stringify(process.env.GA4_MEASUREMENT_ID || ''),
+      __GA4_API_SECRET__: JSON.stringify(process.env.GA4_API_SECRET || ''),
     }),
     new MiniCssExtractPlugin({
       filename: '[name].css'

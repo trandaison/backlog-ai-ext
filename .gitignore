@@ -45,6 +45,9 @@ coverage/
 .env.test.local
 .env.production.local
 
+# GA4 configuration (sensitive)
+src/configs/ga4-secrets.json
+
 # Optional npm cache directory
 .npm
 

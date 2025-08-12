@@ -63,6 +63,8 @@ module.exports = {
     new webpack.DefinePlugin({
       __APP_VERSION__: JSON.stringify(manifest.version),
       __COMMIT_ID__: JSON.stringify(commitId),
+      __GA4_MEASUREMENT_ID__: JSON.stringify(process.env.GA4_MEASUREMENT_ID || ''),
+      __GA4_API_SECRET__: JSON.stringify(process.env.GA4_API_SECRET || ''),
     }),
     new MiniCssExtractPlugin({
       filename: '[name].css'

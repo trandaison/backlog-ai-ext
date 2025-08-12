@@ -11,7 +11,8 @@
   "host_permissions": [
     "*://*.backlog.com/*",
     "*://*.backlog.jp/*",
-    "*://*.backlogtool.com/*"
+    "*://*.backlogtool.com/*",
+    "https://www.google-analytics.com/*"
   ],
   "content_scripts": [
     {
