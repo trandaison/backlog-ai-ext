@@ -4,6 +4,7 @@ const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const { execSync } = require('child_process');
+const ManifestGeneratorPlugin = require('./webpack-plugins/manifest-generator');
 
 // Get version from manifest.json
 const manifest = require('./manifest.json');
@@ -79,6 +80,11 @@ module.exports = {
     new MiniCssExtractPlugin({
       filename: '[name].css',
     }),
+    new ManifestGeneratorPlugin({
+      templatePath: 'manifest.template.json',
+      outputPath: 'manifest.json',
+      iconSuffix: ''
+    }),
     new CopyPlugin({
       patterns: [
         {
@@ -89,10 +95,6 @@ module.exports = {
           from: 'src/assets/icons',
           to: 'icons',
           noErrorOnMissing: true,
-        },
-        {
-          from: 'manifest.json',
-          to: 'manifest.json',
         },
       ],
     }),
