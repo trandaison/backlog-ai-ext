@@ -51,10 +51,12 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-      - name: Run type checking
+      # Step 1: Lint → Type checking first
+      - name: 🔍 Run type checking and linting
         run: npm run lint
 
-      - name: Bump version and generate changelog (without commit)
+      # Step 2: Bump version → Update package.json and generate changelog
+      - name: 📝 Bump version and generate changelog
         run: |
           if [ -n "${{ inputs.specific_version }}" ]; then
             npm run release:prepare -- -r ${{ inputs.specific_version }}
@@ -66,14 +68,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get new version
+      - name: 🏷️ Get new version
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
+          echo "New version: v$VERSION"
 
-      - name: Update manifest.json version
+      - name: 📄 Update manifest.json version
         run: |
           VERSION=${{ steps.version.outputs.version_number }}
           echo "Updating manifest.json version to $VERSION"
@@ -85,69 +88,104 @@ jobs:
             console.log('Updated manifest.json version to', manifest.version);
           "
 
-      - name: Update README.md version badge
+      - name: 📋 Update README.md version badge
         run: |
           VERSION=${{ steps.version.outputs.version_number }}
           echo "Updating README.md version badge to $VERSION"
           sed -i.bak "s/Version-[^-]*-brightgreen/Version-$VERSION-brightgreen/g" README.md
           echo "Updated README.md version badge"
 
-      - name: Commit version updates and create tag
+      # Step 3: Commit changes → Save version updates (but no tag yet)
+      - name: 💾 Commit version updates (without tag)
         run: |
           VERSION=${{ steps.version.outputs.version_number }}
           git add package.json CHANGELOG.md manifest.json README.md
           git commit -m "chore(release): v$VERSION"
-          git tag "v$VERSION"
-          echo "Created commit and tag for version v$VERSION"
+          echo "✅ Created commit for version v$VERSION (no tag yet)"
 
-      - name: Push changes and tags
-        run: git push origin HEAD --follow-tags
-
-      - name: Build extension for production
-        run: npm run build
-
-      - name: Create build directory
-        run: mkdir -p build
-
-      - name: Create extension zip
+      # Step 4: Build → Create production build
+      - name: 🏗️ Build extension for production
         run: |
+          echo "Building extension for production..."
+          npm run build
+          echo "✅ Build completed successfully"
+
+      # Step 5: Zip file → Package the extension
+      - name: 📦 Create extension package
+        run: |
+          echo "Creating build directory and packaging extension..."
+          mkdir -p build
           cd dist
           zip -r ../build/backlog-ai-ext_${{ steps.version.outputs.version }}.zip .
           cd ..
+          echo "✅ Extension packaged successfully"
 
-      - name: Verify zip file
+      # Step 6: Verify zip file → Ensure the package is valid
+      - name: ✅ Verify extension package
         run: |
-          echo "Created zip file:"
+          echo "Verifying extension package..."
+          echo "📁 Created zip file:"
           ls -la build/
-          echo "Zip contents:"
+          echo "📋 Package contents:"
           unzip -l build/backlog-ai-ext_${{ steps.version.outputs.version }}.zip
 
-      - name: Extract changelog for release
+          # Basic validation
+          if [ ! -f "build/backlog-ai-ext_${{ steps.version.outputs.version }}.zip" ]; then
+            echo "❌ Package file not found!"
+            exit 1
+          fi
+
+          # Check if zip is not empty
+          if [ $(unzip -l build/backlog-ai-ext_${{ steps.version.outputs.version }}.zip | wc -l) -lt 5 ]; then
+            echo "❌ Package appears to be empty or invalid!"
+            exit 1
+          fi
+
+          echo "✅ Package verification completed successfully"
+
+      # Step 7: Create tag → Only after everything succeeds
+      - name: 🏷️ Create release tag
+        run: |
+          VERSION=${{ steps.version.outputs.version_number }}
+          git tag "v$VERSION"
+          echo "✅ Created local tag v$VERSION"
+
+      # Step 8: Push code → Push changes and tags
+      - name: 🚀 Push changes and tags
+        run: |
+          echo "Pushing changes and tags to repository..."
+          git push origin HEAD --follow-tags
+          echo "✅ Successfully pushed all changes and tags"
+
+      # Step 9: Release → Create GitHub release with artifacts
+      - name: 📋 Extract changelog for release
         id: changelog
         run: |
           VERSION=${{ steps.version.outputs.version_number }}
           echo "Extracting changelog for version $VERSION"
 
           # Get changelog content between the current version and the next version header
-          awk "/^## \\[$VERSION\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md > release_notes.txt
+          # Handle both v1.0.0 and 1.0.0 formats
+          awk "/^## v?$VERSION\$/{flag=1; next} /^## v?[0-9]+\.[0-9]+\.[0-9]+/{if(flag) exit} flag" CHANGELOG.md > release_notes.txt
 
           # If no specific version section found, get content from top until first version
           if [ ! -s release_notes.txt ]; then
-            awk '/^## \[/{if(!found){found=1; next} else exit} found' CHANGELOG.md > release_notes.txt
+            echo "No specific version section found, extracting from top"
+            awk '/^## v?[0-9]+\.[0-9]+\.[0-9]+/{if(!found){found=1; next} else exit} found' CHANGELOG.md > release_notes.txt
           fi
 
-          echo "Release notes content:"
+          echo "📋 Release notes content:"
           cat release_notes.txt
 
-      - name: Create GitHub Release Draft
+      - name: 🎉 Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
           body_path: release_notes.txt
           files: |
             build/backlog-ai-ext_${{ steps.version.outputs.version }}.zip
-          draft: true
+          draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
